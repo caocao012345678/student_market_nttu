@@ -34,9 +34,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   final List<String> _bannerImages = [
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner1.jpg?alt=media',
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner2.jpg?alt=media',
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner3.jpg?alt=media',
+    'assets/images/banner/banner1.jpg',
+    'assets/images/banner/banner2.jpg',
+    'assets/images/banner/banner3.jpg',
   ];
 
   @override
@@ -98,9 +98,9 @@ class _HomeContentState extends State<HomeContent> {
   int _currentBannerIndex = 0;
   
   final List<String> _bannerImages = [
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner1.jpg?alt=media',
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner2.jpg?alt=media',
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner3.jpg?alt=media',
+    'assets/images/banner/banner1.jpg',
+    'assets/images/banner/banner2.jpg',
+    'assets/images/banner/banner3.jpg',
   ];
 
   @override
@@ -219,8 +219,6 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-
-
   Widget _buildRecommendedProducts() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -259,7 +257,7 @@ class _HomeContentState extends State<HomeContent> {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 250,
+              height: 300,
               child: FutureBuilder<List<Product>>(
                 future: Provider.of<ProductService>(context, listen: false).getRecommendedProducts(),
                 builder: (context, snapshot) {
@@ -278,7 +276,7 @@ class _HomeContentState extends State<HomeContent> {
                     itemCount: products.length,
                     itemBuilder: (context, index) {
                       return Container(
-                        width: 160,
+                        width: 180,
                         margin: const EdgeInsets.only(right: 12),
                         child: ProductCardStandard(
                           product: products[index],
@@ -336,28 +334,45 @@ class _HomeContentState extends State<HomeContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Shop nổi bật',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Shop nổi bật',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    // Navigate to see all featured shops
+                  },
+                  child: Text(
+                    'Xem tất cả',
+                    style: TextStyle(
+                      color: Colors.blue[900],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 120,
+              height: 140,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: featuredShops.length,
                 itemBuilder: (context, index) {
                   final shop = featuredShops[index];
                   return Container(
-                    width: 100,
+                    width: 110,
                     margin: const EdgeInsets.only(right: 12),
                     child: Column(
                       children: [
                         CircleAvatar(
-                          radius: 32,
+                          radius: 36,
                           backgroundImage: CachedNetworkImageProvider(
                             shop['avatar'],
                           ),
@@ -386,6 +401,13 @@ class _HomeContentState extends State<HomeContent> {
                               ),
                             ),
                           ],
+                        ),
+                        Text(
+                          '${shop['productCount']} sản phẩm',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ],
                     ),
@@ -430,76 +452,97 @@ class _HomeContentState extends State<HomeContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Vinh danh người tặng đồ',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Vinh danh người tặng đồ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    // Navigate to see all donors
+                  },
+                  child: Text(
+                    'Xem tất cả',
+                    style: TextStyle(
+                      color: Colors.blue[900],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: topDonors.asMap().entries.map((entry) {
-                final index = entry.key;
-                final donor = entry.value;
-                
-                // Different styles for top 3 donors
-                final List<Color> medalColors = [
-                  Colors.amber[700]!, // Gold
-                  Colors.grey[400]!, // Silver
-                  Colors.brown[300]!, // Bronze
-                ];
-                
-                final List<String> medals = ['🥇', '🥈', '🥉'];
-                
-                return Column(
-                  children: [
-                    Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 35,
-                          backgroundImage: CachedNetworkImageProvider(donor['avatar']),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: medalColors[index],
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: Text(
-                              medals[index],
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+            SizedBox(
+              height: 120,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: topDonors.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final donor = entry.value;
+                  
+                  // Different styles for top 3 donors
+                  final List<Color> medalColors = [
+                    Colors.amber[700]!, // Gold
+                    Colors.grey[400]!, // Silver
+                    Colors.brown[300]!, // Bronze
+                  ];
+                  
+                  final List<String> medals = ['🥇', '🥈', '🥉'];
+                  
+                  return Column(
+                    children: [
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 35,
+                            backgroundImage: CachedNetworkImageProvider(donor['avatar']),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: medalColors[index],
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: Text(
+                                medals[index],
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        donor['name'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      donor['name'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                    Text(
-                      '${donor['donationCount']} lượt tặng',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
+                      Text(
+                        '${donor['donationCount']} lượt tặng',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              }).toList(),
+                    ],
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ),
@@ -578,7 +621,7 @@ class _HomeContentState extends State<HomeContent> {
                   padding: const EdgeInsets.all(8),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.65,
+                    childAspectRatio: 0.58,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),

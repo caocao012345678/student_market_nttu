@@ -20,6 +20,8 @@ class Product {
   final Map<String, String> specifications;
   final int viewCount;
   final int favoriteCount;
+  final double rating;
+  final int reviewCount;
 
   Product({
     required this.id,
@@ -41,6 +43,8 @@ class Product {
     this.specifications = const {},
     this.viewCount = 0,
     this.favoriteCount = 0,
+    this.rating = 0.0,
+    this.reviewCount = 0,
   });
 
   factory Product.fromMap(Map<String, dynamic> map, String id) {
@@ -64,6 +68,8 @@ class Product {
       specifications: Map<String, String>.from(map['specifications'] ?? {}),
       viewCount: map['viewCount'] ?? 0,
       favoriteCount: map['favoriteCount'] ?? 0,
+      rating: (map['rating'] ?? 0.0).toDouble(),
+      reviewCount: map['reviewCount'] ?? 0,
     );
   }
 
@@ -87,6 +93,8 @@ class Product {
       'specifications': specifications,
       'viewCount': viewCount,
       'favoriteCount': favoriteCount,
+      'rating': rating,
+      'reviewCount': reviewCount,
     };
   }
 
@@ -110,6 +118,8 @@ class Product {
     Map<String, String>? specifications,
     int? viewCount,
     int? favoriteCount,
+    double? rating,
+    int? reviewCount,
   }) {
     return Product(
       id: id ?? this.id,
@@ -131,6 +141,8 @@ class Product {
       specifications: specifications ?? this.specifications,
       viewCount: viewCount ?? this.viewCount,
       favoriteCount: favoriteCount ?? this.favoriteCount,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
     );
   }
 } 

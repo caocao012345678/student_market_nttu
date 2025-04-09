@@ -30,30 +30,79 @@ class AuthService extends ChangeNotifier {
   User? get currentUser => _auth.currentUser;
 
   // Sign up with email and password
-  Future<UserCredential> signUp(String email, String password) async {
+  Future<void> signUp(String email, String password, String username) async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      // Create user with email and password
+      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Create user document in Firestore
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
-        'email': email,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      if (userCredential.user != null) {
+        // Create initial user document in Firestore
+        await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+          'email': email,
+          'displayName': username,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastActive': FieldValue.serverTimestamp(),
+          'photoURL': '',
+          'phoneNumber': '',
+          'address': '',
+          'preferences': {},
+          'settings': {},
+          'favoriteProducts': [],
+          'followers': [],
+          'following': [],
+          'isShipper': false,
+          'isVerified': false,
+          'productCount': 0,
+          'rating': 0.0,
+          'nttPoint': 0,
+          'nttCredit': 100,
+          'isStudent': false,
+          'studentId': null,
+          'department': null,
+        });
 
-      _user = userCredential.user;
+        // Send email verification
+        await userCredential.user!.sendEmailVerification();
+      }
+
       _isLoading = false;
       notifyListeners();
-      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      throw _handleFirebaseAuthException(e);
     } catch (e) {
       _isLoading = false;
       notifyListeners();
-      throw e;
+      rethrow;
+    }
+  }
+
+  // Xử lý FirebaseAuthException
+  String _handleFirebaseAuthException(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'email-already-in-use':
+        return 'Email này đã được sử dụng';
+      case 'invalid-email':
+        return 'Email không hợp lệ';
+      case 'operation-not-allowed':
+        return 'Tài khoản email/mật khẩu chưa được kích hoạt';
+      case 'weak-password':
+        return 'Mật khẩu quá yếu';
+      case 'user-disabled':
+        return 'Tài khoản đã bị vô hiệu hóa';
+      case 'user-not-found':
+        return 'Không tìm thấy tài khoản với email này';
+      case 'wrong-password':
+        return 'Mật khẩu không chính xác';
+      default:
+        return e.message ?? 'Đã xảy ra lỗi không xác định';
     }
   }
 

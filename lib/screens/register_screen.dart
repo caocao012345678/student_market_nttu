@@ -33,15 +33,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       try {
-        final userCredential = await Provider.of<AuthService>(context, listen: false).signUp(
+        await Provider.of<AuthService>(context, listen: false).signUp(
           _emailController.text.trim(),
           _passwordController.text.trim(),
+          _usernameController.text.trim(),
         );
-
-        // Update the user's display name in Firestore
-        await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).update({
-          'username': _usernameController.text.trim(),
-        });
 
         if (!mounted) return;
 

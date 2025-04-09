@@ -474,7 +474,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 230,
+              height: 250,
               child: FutureBuilder<List<Product>>(
                 future: Provider.of<ProductService>(context, listen: false).getRecommendedProducts(),
                 builder: (context, snapshot) {
@@ -594,7 +594,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         padding: const EdgeInsets.all(8),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.65,
+          childAspectRatio: 0.58,
           crossAxisSpacing: 8,
           mainAxisSpacing: 8,
         ),

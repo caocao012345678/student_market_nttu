@@ -17,9 +17,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _displayNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _studentIdController = TextEditingController();
+  final _departmentController = TextEditingController();
   
   dynamic _selectedImage;
   bool _imageChanged = false;
+  bool _isStudent = false;
 
   @override
   void initState() {
@@ -31,6 +34,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _displayNameController.text = user.displayName;
       _phoneController.text = user.phoneNumber;
       _addressController.text = user.address;
+      _isStudent = user.isStudent;
+      _studentIdController.text = user.studentId ?? '';
+      _departmentController.text = user.department ?? '';
     }
   }
 
@@ -39,6 +45,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _displayNameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _studentIdController.dispose();
+    _departmentController.dispose();
     super.dispose();
   }
 
@@ -69,6 +77,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         displayName: _displayNameController.text,
         phoneNumber: _phoneController.text,
         address: _addressController.text,
+        isStudent: _isStudent,
+        studentId: _isStudent ? _studentIdController.text : null,
+        department: _isStudent ? _departmentController.text : null,
       );
 
       // Update profile photo if changed
@@ -187,6 +198,83 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 maxLines: 2,
               ),
+              const SizedBox(height: 16),
+              
+              // Student information section
+              SwitchListTile(
+                title: const Text('Tôi là sinh viên'),
+                subtitle: const Text('Kích hoạt để nhập thông tin sinh viên'),
+                value: _isStudent,
+                onChanged: (value) {
+                  setState(() {
+                    _isStudent = value;
+                  });
+                },
+              ),
+              
+              if (_isStudent) ...[
+                const SizedBox(height: 16),
+                
+                // Student ID field
+                TextFormField(
+                  controller: _studentIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Mã số sinh viên',
+                    prefixIcon: Icon(Icons.school),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (_isStudent && (value == null || value.isEmpty)) {
+                      return 'Vui lòng nhập mã số sinh viên';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                
+                // Department field
+                TextFormField(
+                  controller: _departmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Khoa/Ngành học',
+                    prefixIcon: Icon(Icons.business),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (_isStudent && (value == null || value.isEmpty)) {
+                      return 'Vui lòng nhập khoa/ngành học';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+              
+              const SizedBox(height: 24),
+              
+              // Point and credit information
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Thông tin điểm',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('NTT Point:', '${user.nttPoint} điểm'),
+                      const SizedBox(height: 4),
+                      _buildInfoRow('Điểm uy tín:', '${user.nttCredit} (${user.getCreditRating()})'),
+                    ],
+                  ),
+                ),
+              ),
+              
               const SizedBox(height: 24),
               
               // Save button
@@ -212,6 +300,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(value),
+      ],
     );
   }
 

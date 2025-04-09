@@ -37,6 +37,8 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
   void initState() {
     super.initState();
     _checkIfFavorite();
+    // Register Vietnamese locale for timeago
+    timeago.setLocaleMessages('vi', timeago.ViMessages());
   }
 
   Future<void> _checkIfFavorite() async {
@@ -89,7 +91,26 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
   String _getTimeAgo() {
     if (widget.product.createdAt == null) return '';
     
-    return timeago.format(widget.product.createdAt!, locale: 'vi');
+    // Calculate time difference
+    final now = DateTime.now();
+    final difference = now.difference(widget.product.createdAt!);
+    
+    // Custom Vietnamese time text
+    if (difference.inSeconds < 60) {
+      return 'Vừa xong';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} phút trước';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} giờ trước';
+    } else if (difference.inDays < 30) {
+      return '${difference.inDays} ngày trước';
+    } else if (difference.inDays < 365) {
+      final months = (difference.inDays / 30).floor();
+      return '$months tháng trước';
+    } else {
+      final years = (difference.inDays / 365).floor();
+      return '$years năm trước';
+    }
   }
   
   Widget _buildFavoriteButton() {
@@ -267,8 +288,8 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
     }
     
     return Positioned(
-      top: 0,
-      right: widget.showFavoriteButton ? 40 : 8,
+      bottom: 0,
+      right: 0,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -280,6 +301,7 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
           style: const TextStyle(
             color: Colors.white,
             fontSize: 10,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -430,7 +452,36 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                       ),
                       const SizedBox(height: 4),
                       _buildPriceSection(),
-                      const Spacer(),
+                      const SizedBox(height: 6),
+                      // Rating display
+                      if (widget.product.reviewCount > 0)
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star,
+                              size: 14,
+                              color: Colors.amber,
+                            ),
+                            SizedBox(width: 2),
+                            Text(
+                              widget.product.rating.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              "(${widget.product.reviewCount})",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (widget.product.reviewCount > 0)
+                        const SizedBox(height: 6),
                       Row(
                         children: [
                           const Icon(
@@ -578,6 +629,35 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                   const SizedBox(height: 4),
                   _buildPriceSection(),
                   const SizedBox(height: 6),
+                  // Rating display
+                  if (widget.product.reviewCount > 0)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.star,
+                          size: 14,
+                          color: Colors.amber,
+                        ),
+                        SizedBox(width: 2),
+                        Text(
+                          widget.product.rating.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          "(${widget.product.reviewCount})",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (widget.product.reviewCount > 0)
+                    const SizedBox(height: 6),
                   // Show the category and location in a more compact way
                   if (!widget.isCompact) 
                     Row(

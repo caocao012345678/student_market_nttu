@@ -158,7 +158,63 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
+          // Student information display
+          if (userModel?.isStudent == true) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: Chip(
+                label: const Text('Sinh viên NTTU'),
+                backgroundColor: Colors.blue.shade100,
+                labelStyle: TextStyle(color: Colors.blue.shade800),
+                avatar: const Icon(Icons.school, size: 16, color: Colors.blue),
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (userModel?.studentId?.isNotEmpty == true)
+              Center(
+                child: Text(
+                  'MSSV: ${userModel!.studentId}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+            if (userModel?.department?.isNotEmpty == true)
+              Center(
+                child: Text(
+                  'Khoa: ${userModel!.department}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+          ],
           const SizedBox(height: 20),
+          // Credit and points information
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildStatCard(
+                  context, 
+                  'NTT Point', 
+                  '${userModel?.nttPoint ?? 0}',
+                  Icons.monetization_on,
+                  Colors.amber
+                ),
+                _buildStatCard(
+                  context, 
+                  'NTT Credit', 
+                  '${userModel?.nttCredit ?? 0}',
+                  Icons.credit_score,
+                  Colors.green
+                ),
+              ],
+            ),
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.shopping_bag),
@@ -276,6 +332,38 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 40, color: color),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        if (title == 'NTT Credit')
+          Consumer<UserService>(
+            builder: (context, userService, child) {
+              final user = userService.currentUser;
+              return Text(
+                user?.getCreditRating() ?? '',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic
+                ),
+              );
+            }
+          ),
+      ],
     );
   }
 } 

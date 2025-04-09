@@ -383,7 +383,7 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: const EdgeInsets.all(12),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 0.65,
+              childAspectRatio: 0.58,
               crossAxisSpacing: 8,
               mainAxisSpacing: 12,
             ),
@@ -546,7 +546,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4,
-                    childAspectRatio: 0.8,
+                    childAspectRatio: 0.75,
                   ),
                   itemCount: _categories.length > 8 ? 8 : _categories.length, // Limit to 8 categories
                   itemBuilder: (context, index) {
@@ -615,7 +615,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 230,
+                  height: 290,
                   child: FutureBuilder<List<Product>>(
                     future: Provider.of<ProductService>(context, listen: false)
                         .getRecommendedProducts(limit: 5),
@@ -639,7 +639,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         itemCount: products.length,
                         itemBuilder: (context, index) {
                           return Container(
-                            width: 160,
+                            width: 180,
                             margin: const EdgeInsets.only(right: 8),
                             child: ProductCardStandard(
                               product: products[index],
