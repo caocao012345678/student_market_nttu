@@ -14,13 +14,41 @@ class ShipperService extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      await _firestore.collection('shippers').doc(shipper.id).set(shipper.toMap());
+      print('ShipperService: Bắt đầu đăng ký shipper với id=${shipper.id}');
+      
+      // Kiểm tra xem shipper đã đăng ký chưa
+      final existingShipper = await _firestore
+          .collection('shippers')
+          .doc(shipper.id)
+          .get();
+          
+      if (existingShipper.exists) {
+        print('ShipperService: Shipper đã tồn tại');
+        // Nếu đã tồn tại, chỉ cập nhật thông tin
+        await _firestore.collection('shippers').doc(shipper.id).update({
+          'name': shipper.name,
+          'phone': shipper.phone,
+          'identityCard': shipper.identityCard,
+          'vehicleType': shipper.vehicleType,
+          'vehiclePlate': shipper.vehiclePlate,
+          'deliveryAreas': shipper.deliveryAreas,
+          'status': shipper.status, // Giữ nguyên trạng thái nếu chỉ đang cập nhật thông tin
+        });
+        print('ShipperService: Đã cập nhật thông tin shipper');
+      } else {
+        // Nếu chưa tồn tại, tạo mới
+        print('ShipperService: Tạo mới thông tin shipper');
+        await _firestore.collection('shippers').doc(shipper.id).set(shipper.toMap());
+        print('ShipperService: Đã tạo mới shipper thành công');
+      }
 
       _isLoading = false;
       notifyListeners();
+      print('ShipperService: Hoàn tất quá trình đăng ký');
     } catch (e) {
       _isLoading = false;
       notifyListeners();
+      print('ShipperService ERROR: $e');
       throw e;
     }
   }

@@ -10,44 +10,16 @@ import 'package:student_market_nttu/screens/edit_profile_screen.dart';
 import 'package:student_market_nttu/screens/favorite_products_screen.dart';
 import 'package:student_market_nttu/screens/order_history_screen.dart';
 import 'package:student_market_nttu/screens/user_profile_page.dart';
+import 'package:student_market_nttu/screens/register_shipper_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   void _showShipperRegistrationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Đăng ký làm Shipper'),
-        content: const Text(
-          'Bằng cách đăng ký, bạn có thể nhận các đơn hàng và giao cho người mua. '
-          'Chúng tôi sẽ xem xét đơn đăng ký của bạn và thông báo sau.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                final userService = Provider.of<UserService>(context, listen: false);
-                await userService.requestShipperRole();
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã gửi yêu cầu thành công')),
-                );
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Lỗi: ${e.toString()}')),
-                );
-              }
-            },
-            child: const Text('Đăng ký'),
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const RegisterShipperScreen(),
       ),
     );
   }

@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product.dart';
 import '../services/user_service.dart';
-import '../widgets/product_card.dart';
+import '../services/favorites_service.dart';
+import '../widgets/product_card_standard.dart';
 
 class FavoriteProductsScreen extends StatelessWidget {
   const FavoriteProductsScreen({Key? key}) : super(key: key);
@@ -12,6 +13,7 @@ class FavoriteProductsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final userService = Provider.of<UserService>(context);
     final user = userService.currentUser;
+    final favoritesService = Provider.of<FavoritesService>(context);
 
     if (user == null) {
       return const Scaffold(
@@ -25,24 +27,24 @@ class FavoriteProductsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Sản phẩm yêu thích'),
       ),
-      body: FutureBuilder<List<Product>>(
-        future: _getFavoriteProducts(user.favoriteProducts),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: FutureBuilder<List<String>>(
+        future: favoritesService.getUserFavorites(),
+        builder: (context, favoriteIdsSnapshot) {
+          if (favoriteIdsSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(),
             );
           }
 
-          if (snapshot.hasError) {
+          if (favoriteIdsSnapshot.hasError) {
             return Center(
-              child: Text('Lỗi: ${snapshot.error}'),
+              child: Text('Lỗi: ${favoriteIdsSnapshot.error}'),
             );
           }
 
-          final products = snapshot.data ?? [];
+          final favoriteIds = favoriteIdsSnapshot.data ?? [];
 
-          if (products.isEmpty) {
+          if (favoriteIds.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -72,26 +74,79 @@ class FavoriteProductsScreen extends StatelessWidget {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(8.0),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return Dismissible(
-                key: Key(products[index].id),
-                direction: DismissDirection.endToStart,
-                background: Container(
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20.0),
-                  color: Colors.red,
-                  child: const Icon(
-                    Icons.delete,
-                    color: Colors.white,
+          return FutureBuilder<List<Product>>(
+            future: _getFavoriteProducts(favoriteIds),
+            builder: (context, productsSnapshot) {
+              if (productsSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+
+              if (productsSnapshot.hasError) {
+                return Center(
+                  child: Text('Lỗi: ${productsSnapshot.error}'),
+                );
+              }
+
+              final products = productsSnapshot.data ?? [];
+
+              if (products.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.favorite_border,
+                        size: 80,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Không tìm thấy sản phẩm yêu thích nào',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                onDismissed: (direction) {
-                  _removeFromFavorites(context, products[index].id);
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(8.0),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  return Dismissible(
+                    key: Key(products[index].id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20.0),
+                      color: Colors.red,
+                      child: const Icon(
+                        Icons.delete,
+                        color: Colors.white,
+                      ),
+                    ),
+                    onDismissed: (direction) {
+                      _removeFromFavorites(context, products[index].id);
+                    },
+                    child: ProductCardStandard(
+                      product: products[index],
+                      onFavoriteToggle: () {
+                        // Refresh the screen when a favorite is toggled
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const FavoriteProductsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  );
                 },
-                child: ProductCard(product: products[index]),
               );
             },
           );
@@ -126,8 +181,8 @@ class FavoriteProductsScreen extends StatelessWidget {
 
   void _removeFromFavorites(BuildContext context, String productId) {
     try {
-      final userService = Provider.of<UserService>(context, listen: false);
-      userService.toggleFavoriteProduct(productId);
+      final favoritesService = Provider.of<FavoritesService>(context, listen: false);
+      favoritesService.removeFromFavorites(productId);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đã xóa khỏi danh sách yêu thích'),

@@ -168,7 +168,121 @@ class ProductService extends ChangeNotifier {
     }
   }
 
-  // Search products
+  // Advanced search products with multiple filters
+  Stream<List<Product>> searchProductsAdvanced({
+    String? query,
+    String? category,
+    double? minPrice,
+    double? maxPrice,
+    String? condition,
+    String? sortBy,
+  }) {
+    Query productsQuery = _firestore.collection('products').where('isSold', isEqualTo: false);
+    
+    // Apply category filter
+    if (category != null && category != 'Tất cả') {
+      productsQuery = productsQuery.where('category', isEqualTo: category);
+    }
+    
+    // Apply condition filter
+    if (condition != null) {
+      productsQuery = productsQuery.where('condition', isEqualTo: condition);
+    }
+    
+    // Apply sorting
+    if (sortBy != null) {
+      switch (sortBy) {
+        case 'Mới nhất':
+          productsQuery = productsQuery.orderBy('createdAt', descending: true);
+          break;
+        case 'Giá thấp đến cao':
+          productsQuery = productsQuery.orderBy('price', descending: false);
+          break;
+        case 'Giá cao đến thấp':
+          productsQuery = productsQuery.orderBy('price', descending: true);
+          break;
+        case 'Bán chạy':
+          productsQuery = productsQuery.orderBy('viewCount', descending: true);
+          break;
+        case 'Đánh giá cao':
+          productsQuery = productsQuery.orderBy('favoriteCount', descending: true);
+          break;
+        default:
+          productsQuery = productsQuery.orderBy('createdAt', descending: true);
+      }
+    } else {
+      productsQuery = productsQuery.orderBy('createdAt', descending: true);
+    }
+    
+    return productsQuery.snapshots().map((snapshot) {
+      List<Product> products = snapshot.docs
+          .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+      
+      // Apply price filter (client-side filtering since Firestore doesn't support range queries on multiple fields)
+      if (minPrice != null || maxPrice != null) {
+        products = products.where((product) {
+          if (minPrice != null && product.price < minPrice) {
+            return false;
+          }
+          if (maxPrice != null && product.price > maxPrice) {
+            return false;
+          }
+          return true;
+        }).toList();
+      }
+      
+      // Apply text search (client-side filtering for more complex search)
+      if (query != null && query.isNotEmpty) {
+        final lowercaseQuery = query.toLowerCase();
+        products = products.where((product) {
+          final titleMatch = product.title.toLowerCase().contains(lowercaseQuery);
+          final descriptionMatch = product.description.toLowerCase().contains(lowercaseQuery);
+          final tagMatch = product.tags.any((tag) => tag.toLowerCase().contains(lowercaseQuery));
+          final categoryMatch = product.category.toLowerCase().contains(lowercaseQuery);
+          
+          return titleMatch || descriptionMatch || tagMatch || categoryMatch;
+        }).toList();
+      }
+      
+      return products;
+    });
+  }
+
+  // Get used items 
+  Stream<List<Product>> getUsedItems() {
+    return _firestore
+        .collection('products')
+        .where('category', isEqualTo: 'Đồ đã qua sử dụng')
+        .where('isSold', isEqualTo: false)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList());
+  }
+
+  // Get recommended products for user
+  Future<List<Product>> getRecommendedProducts({int limit = 10}) async {
+    try {
+      // This is a simple recommendation based on most viewed products
+      // In a real-world scenario, this would incorporate user preferences and behavior
+      final snapshot = await _firestore
+          .collection('products')
+          .where('isSold', isEqualTo: false)
+          .orderBy('viewCount', descending: true)
+          .limit(limit)
+          .get();
+          
+      return snapshot.docs
+          .map((doc) => Product.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting recommended products: $e');
+      return [];
+    }
+  }
+  
+  // Search products (basic)
   Stream<List<Product>> searchProducts(String query) {
     return _firestore
         .collection('products')
@@ -183,6 +297,10 @@ class ProductService extends ChangeNotifier {
 
   // Get products by category
   Stream<List<Product>> getProductsByCategory(String category) {
+    if (category == 'Tất cả') {
+      return getAllProducts();
+    }
+    
     return _firestore
         .collection('products')
         .where('category', isEqualTo: category)
