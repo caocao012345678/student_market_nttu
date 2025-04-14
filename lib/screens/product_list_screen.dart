@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:student_market_nttu/services/product_service.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
+import 'package:student_market_nttu/screens/cart_screen.dart';
+import 'package:student_market_nttu/widgets/cart_badge.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -326,36 +328,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              'Lọc sản phẩm',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      'Tất cả',
-                      ..._categories.map((cat) => cat['name']).toList(),
-                    ].map<DropdownMenuItem<String>>((dynamic value) {
-                      return DropdownMenuItem<String>(
-                        value: value.toString(),
-                        child: Text(
-                          value.toString(),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedCategory = value!;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _sortBy,
@@ -429,80 +411,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   style: const TextStyle(color: Colors.grey),
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecommendations() {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Gợi ý cho bạn',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // Navigate to all recommendations
-                  },
-                  child: const Text(
-                    'Xem tất cả',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 250,
-              child: FutureBuilder<List<Product>>(
-                future: Provider.of<ProductService>(context, listen: false).getRecommendedProducts(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('Không có gợi ý'));
-                  }
-                  
-                  final products = snapshot.data!;
-                  
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return SizedBox(
-                        width: 160,
-                        child: ProductCardStandard(
-                          product: products[index],
-                          isCompact: true,
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
             ),
           ],
         ),
@@ -630,7 +538,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // Navigate to search
               Navigator.push(
                 context, 
                 MaterialPageRoute(
@@ -639,12 +546,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            onPressed: () {
-              // Navigate to cart
-            },
-          ),
+          const CartBadge(),
         ],
       ),
       body: RefreshIndicator(
@@ -655,33 +557,64 @@ class _ProductListScreenState extends State<ProductListScreen> {
             _isSearching = false;
           });
         },
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              
-              if (_isSearching) ...[
-                _buildSectionHeader('Kết quả tìm kiếm'),
-                _buildProductsView(isSearchResults: true),
-              ] else ...[
-                _buildBannerSlider(),
-                const SizedBox(height: 8),
-                _buildCategories(),
-                const SizedBox(height: 8),
-                _buildFilters(),
-                const SizedBox(height: 8),
-                _buildRecommendations(),
-                const SizedBox(height: 8),
-                _buildSectionHeader('Sản phẩm $_selectedCategory'),
-                _buildProductsView(),
-              ],
-              
-              const SizedBox(height: 16),
-            ],
-          ),
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Danh mục
+                  _buildCategories(),
+                  const SizedBox(height: 8),
+                  
+                  // Lọc giá
+                  _buildFilters(),
+                  const SizedBox(height: 8),
+                  
+                  // Tất cả sản phẩm
+                  _buildSectionHeader('Tất cả sản phẩm'),
+                  _buildProductsView(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRecommendedProducts() {
+    return FutureBuilder<List<Product>>(
+      future: Provider.of<ProductService>(context, listen: false).getRecommendedProducts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('Không có sản phẩm đề xuất'));
+        }
+        
+        final products = snapshot.data!;
+        
+        return SizedBox(
+          height: 250,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              return SizedBox(
+                width: 160,
+                child: ProductCardStandard(
+                  product: products[index],
+                  isCompact: true,
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 } 

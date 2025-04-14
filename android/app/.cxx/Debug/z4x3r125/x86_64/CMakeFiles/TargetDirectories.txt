@@ -1,0 +1,2 @@
+C:/Users/defaultuser0.LAPTOP-POTNR7PE/student_market_nttu/android/app/.cxx/Debug/z4x3r125/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/defaultuser0.LAPTOP-POTNR7PE/student_market_nttu/android/app/.cxx/Debug/z4x3r125/x86_64/CMakeFiles/rebuild_cache.dir

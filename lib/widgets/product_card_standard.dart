@@ -8,6 +8,8 @@ import '../models/product.dart';
 import '../screens/product_detail_screen.dart';
 import '../screens/user_profile_page.dart';
 import '../services/favorites_service.dart';
+import '../services/auth_service.dart';
+import '../services/cart_service.dart';
 
 class ProductCardStandard extends StatefulWidget {
   final Product product;
@@ -85,6 +87,39 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Có lỗi xảy ra: $e')),
       );
+    }
+  }
+
+  Future<void> _addToCart() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final cartService = Provider.of<CartService>(context, listen: false);
+    
+    if (authService.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng')),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _isLoading = true);
+      
+      await cartService.addToCart(widget.product, authService.currentUser!.uid);
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã thêm ${widget.product.title} vào giỏ hàng')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -379,6 +414,49 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
     );
   }
 
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        // Nút Thêm vào giỏ hàng
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _addToCart,
+            icon: const Icon(Icons.shopping_cart, size: 12),
+            label: const Text('Giỏ', style: TextStyle(fontSize: 9)),
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 24),
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              side: BorderSide(color: Theme.of(context).colorScheme.primary),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        
+        // Nút Mua ngay
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailScreen(product: widget.product),
+                ),
+              );
+            },
+            icon: const Icon(Icons.shopping_bag, size: 12),
+            label: const Text('Mua', style: TextStyle(fontSize: 9)),
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 24),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildListViewLayout() {
     return SizedBox(
       height: 140,
@@ -402,7 +480,7 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
             children: [
               // Image section
               SizedBox(
-                width: 120,
+                width: 110,
                 height: 140,
                 child: Stack(
                   children: [
@@ -437,92 +515,55 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
               // Info section
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(8.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        widget.product.title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      _buildPriceSection(),
-                      const SizedBox(height: 6),
-                      // Rating display
-                      if (widget.product.reviewCount > 0)
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.star,
-                              size: 14,
-                              color: Colors.amber,
-                            ),
-                            SizedBox(width: 2),
-                            Text(
-                              widget.product.rating.toStringAsFixed(1),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              "(${widget.product.reviewCount})",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (widget.product.reviewCount > 0)
-                        const SizedBox(height: 6),
-                      Row(
+                      // Thông tin sản phẩm
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 12,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              widget.product.location.isNotEmpty
-                                  ? widget.product.location
-                                  : 'NTTU',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      if (widget.product.category.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            widget.product.category,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.blue[800],
+                          Text(
+                            widget.product.title,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
+                          const SizedBox(height: 2),
+                          _buildPriceSection(),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 10,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 2),
+                              Expanded(
+                                child: Text(
+                                  widget.product.location.isNotEmpty
+                                      ? widget.product.location
+                                      : 'NTTU',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      
+                      // Thêm nút hành động
+                      _buildActionButtons(),
                     ],
                   ),
                 ),
@@ -530,10 +571,10 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
               // Favorite button
               if (widget.showFavoriteButton)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8, right: 8),
+                  padding: const EdgeInsets.only(top: 4, right: 4),
                   child: SizedBox(
-                    width: 36,
-                    height: 36,
+                    width: 32,
+                    height: 32,
                     child: _buildFavoriteButton(),
                   ),
                 ),
@@ -565,7 +606,7 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
           children: [
             // Image with badges section
             AspectRatio(
-              aspectRatio: widget.isCompact ? 1 : 1.2,
+              aspectRatio: widget.isCompact ? 1 : 1.3,
               child: Stack(
                 children: [
                   Positioned.fill(
@@ -612,100 +653,47 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
               ),
             ),
             // Product info section
-            Padding(
-              padding: const EdgeInsets.all(10.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.product.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.product.title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  _buildPriceSection(),
-                  const SizedBox(height: 6),
-                  // Rating display
-                  if (widget.product.reviewCount > 0)
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.star,
-                          size: 14,
-                          color: Colors.amber,
-                        ),
-                        SizedBox(width: 2),
-                        Text(
-                          widget.product.rating.toStringAsFixed(1),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          "(${widget.product.reviewCount})",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  if (widget.product.reviewCount > 0)
-                    const SizedBox(height: 6),
-                  // Show the category and location in a more compact way
-                  if (!widget.isCompact) 
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          size: 12,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            widget.product.location.isNotEmpty
-                                ? widget.product.location
-                                : 'NTTU',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (widget.product.category.isNotEmpty)
-                          Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              widget.product.category,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.blue[800],
+                    const SizedBox(height: 2),
+                    _buildPriceSection(),
+                    const SizedBox(height: 2),
+                    
+                    // Đơn giản hóa phần hiển thị thông tin khác
+                    if (!widget.isCompact)
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Seller info nếu còn đủ không gian
+                            if (!widget.isCompact && widget.product.sellerName.isNotEmpty)
+                              Expanded(
+                                child: _buildSellerInfo(),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                    ),
-                  if (!widget.isCompact)
-                    const SizedBox(height: 6),
-                  // Seller info
-                  _buildSellerInfo(),
-                ],
+                            
+                            // Luôn hiển thị các nút
+                            _buildActionButtons(),
+                          ],
+                        ),
+                      ),
+                    // Với chế độ thu gọn, chỉ hiển thị nút
+                    if (widget.isCompact)
+                      _buildActionButtons(),
+                  ],
+                ),
               ),
             ),
           ],

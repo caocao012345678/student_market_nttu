@@ -470,4 +470,152 @@ class UserService extends ChangeNotifier {
       throw e;
     }
   }
+
+  // Lấy danh sách người dùng có rating cao nhất
+  Future<List<Map<String, dynamic>>> getTopRatedUsers({int limit = 4}) async {
+    try {
+      // Không còn lọc theo productCount > 0, chỉ lấy theo rating
+      final snapshot = await _firestore
+          .collection('users')
+          .orderBy('rating', descending: true) // Sắp xếp theo rating cao nhất
+          .limit(limit)
+          .get();
+      
+      final List<Map<String, dynamic>> result = [];
+      for (var doc in snapshot.docs) {
+        final userData = doc.data();
+        final id = doc.id;
+        final user = UserModel.fromMap(userData, id);
+        // Đảm bảo dữ liệu hợp lệ về hiển thị
+        result.add({
+          'id': user.id,
+          'name': user.displayName.isNotEmpty ? user.displayName : 'Người dùng',
+          'avatar': user.photoURL.isNotEmpty ? user.photoURL : 'https://via.placeholder.com/80',
+          'rating': user.rating > 0 ? user.rating : 4.5, // Nếu rating = 0, hiển thị 4.5
+          'productCount': user.productCount > 0 ? user.productCount : 1, // Tối thiểu là 1
+        });
+      }
+      
+      // Nếu không có dữ liệu từ Firestore, lấy người dùng bất kỳ
+      if (result.isEmpty) {
+        final usersSnapshot = await _firestore
+            .collection('users')
+            .limit(limit)
+            .get();
+        
+        for (var doc in usersSnapshot.docs) {
+          final userData = doc.data();
+          final id = doc.id;
+          final user = UserModel.fromMap(userData, id);
+          result.add({
+            'id': user.id,
+            'name': user.displayName.isNotEmpty ? user.displayName : 'Người dùng',
+            'avatar': user.photoURL.isNotEmpty ? user.photoURL : 'https://via.placeholder.com/80',
+            'rating': 4.5, // Rating mặc định
+            'productCount': 1, // Số sản phẩm mặc định
+          });
+        }
+      }
+      
+      return result;
+    } catch (e) {
+      print('Lỗi khi lấy người dùng có rating cao: $e');
+      // Vẫn trả về danh sách rỗng
+      return [];
+    }
+  }
+
+  // Lấy danh sách người dùng có NTTCredit tăng nhiều nhất trong tuần
+  Future<List<Map<String, dynamic>>> getTopCreditGainersThisWeek({int limit = 3}) async {
+    try {
+      // Lấy timestamp của 7 ngày trước
+      final oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
+      final timestamp = Timestamp.fromDate(oneWeekAgo);
+      
+      // Lấy lịch sử thay đổi điểm uy tín trong tuần qua
+      final creditHistorySnapshot = await _firestore
+          .collection('creditHistory')
+          .where('createdAt', isGreaterThan: timestamp)
+          .where('points', isGreaterThan: 0) // Chỉ lấy những ghi nhận tăng điểm
+          .get();
+      
+      // Tính tổng điểm của mỗi người dùng
+      final Map<String, int> userPoints = {};
+      final Map<String, String> userNames = {};
+      final Map<String, String> userAvatars = {};
+      
+      for (var doc in creditHistorySnapshot.docs) {
+        final data = doc.data();
+        final userId = data['userId'] as String;
+        final points = data['points'] as int;
+        
+        if (!userPoints.containsKey(userId)) {
+          userPoints[userId] = 0;
+          
+          // Lấy thông tin tên và avatar
+          final userDoc = await _firestore.collection('users').doc(userId).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data()!;
+            userNames[userId] = userData['displayName'] ?? '';
+            userAvatars[userId] = userData['photoURL'] ?? '';
+          }
+        }
+        
+        userPoints[userId] = (userPoints[userId] ?? 0) + points;
+      }
+      
+      // Chuyển thành danh sách để sắp xếp
+      final List<Map<String, dynamic>> sortedUsers = userPoints.entries.map((entry) {
+        return {
+          'id': entry.key,
+          'name': userNames[entry.key] ?? '',
+          'avatar': userAvatars[entry.key] ?? '',
+          'creditGain': entry.value,
+        };
+      }).toList();
+      
+      // Sắp xếp theo điểm tăng nhiều nhất
+      sortedUsers.sort((a, b) => b['creditGain'].compareTo(a['creditGain']));
+      
+      // Nếu không có dữ liệu từ lịch sử, lấy người dùng có điểm tín dụng cao nhất
+      if (sortedUsers.isEmpty) {
+        final usersSnapshot = await _firestore
+            .collection('users')
+            .orderBy('nttCredit', descending: true)
+            .limit(limit)
+            .get();
+            
+        for (var doc in usersSnapshot.docs) {
+          final userData = doc.data();
+          final user = UserModel.fromMap(userData, doc.id);
+          // Hiển thị NTTCredit hiện tại thay vì creditGain
+          sortedUsers.add({
+            'id': user.id,
+            'name': user.displayName.isNotEmpty ? user.displayName : 'Người dùng',
+            'avatar': user.photoURL.isNotEmpty ? user.photoURL : 'https://via.placeholder.com/80',
+            'creditGain': user.nttCredit > 100 ? user.nttCredit - 100 : 5, // Trừ giá trị mặc định (100)
+          });
+        }
+      }
+      
+      // Đảm bảo không hiển thị dữ liệu trống
+      for (var i = 0; i < sortedUsers.length; i++) {
+        if (sortedUsers[i]['name'] == '') {
+          sortedUsers[i]['name'] = 'Người dùng ${i + 1}';
+        }
+        if (sortedUsers[i]['avatar'] == '') {
+          sortedUsers[i]['avatar'] = 'https://via.placeholder.com/80';
+        }
+        if (sortedUsers[i]['creditGain'] == 0) {
+          sortedUsers[i]['creditGain'] = 5; // Giá trị tối thiểu
+        }
+      }
+      
+      // Trả về danh sách đã giới hạn số lượng
+      return sortedUsers.length <= limit ? sortedUsers : sortedUsers.sublist(0, limit);
+    } catch (e) {
+      print('Lỗi khi lấy người dùng tăng điểm NTTCredit: $e');
+      return [];
+    }
+  }
 } 

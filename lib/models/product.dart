@@ -1,5 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum ProductStatus {
+  available,
+  sold,
+  deleted,
+  hidden,
+  reserved
+}
+
 class Product {
   final String id;
   final String title;
@@ -22,6 +30,7 @@ class Product {
   final int favoriteCount;
   final double rating;
   final int reviewCount;
+  final ProductStatus status;
 
   Product({
     required this.id,
@@ -45,9 +54,22 @@ class Product {
     this.favoriteCount = 0,
     this.rating = 0.0,
     this.reviewCount = 0,
+    this.status = ProductStatus.available,
   });
 
   factory Product.fromMap(Map<String, dynamic> map, String id) {
+    // Xác định trạng thái của sản phẩm
+    ProductStatus productStatus = ProductStatus.available;
+    if (map['isSold'] == true) {
+      productStatus = ProductStatus.sold;
+    } else if (map['status'] != null) {
+      String statusString = map['status'];
+      if (statusString == 'sold') productStatus = ProductStatus.sold;
+      else if (statusString == 'deleted') productStatus = ProductStatus.deleted;
+      else if (statusString == 'hidden') productStatus = ProductStatus.hidden;
+      else if (statusString == 'reserved') productStatus = ProductStatus.reserved;
+    }
+
     return Product(
       id: id,
       title: map['title'] ?? '',
@@ -70,10 +92,17 @@ class Product {
       favoriteCount: map['favoriteCount'] ?? 0,
       rating: (map['rating'] ?? 0.0).toDouble(),
       reviewCount: map['reviewCount'] ?? 0,
+      status: productStatus,
     );
   }
 
   Map<String, dynamic> toMap() {
+    String statusString = 'available';
+    if (status == ProductStatus.sold) statusString = 'sold';
+    else if (status == ProductStatus.deleted) statusString = 'deleted';
+    else if (status == ProductStatus.hidden) statusString = 'hidden';
+    else if (status == ProductStatus.reserved) statusString = 'reserved';
+
     return {
       'title': title,
       'description': description,
@@ -95,6 +124,7 @@ class Product {
       'favoriteCount': favoriteCount,
       'rating': rating,
       'reviewCount': reviewCount,
+      'status': statusString,
     };
   }
 
@@ -120,6 +150,7 @@ class Product {
     int? favoriteCount,
     double? rating,
     int? reviewCount,
+    ProductStatus? status,
   }) {
     return Product(
       id: id ?? this.id,
@@ -143,6 +174,7 @@ class Product {
       favoriteCount: favoriteCount ?? this.favoriteCount,
       rating: rating ?? this.rating,
       reviewCount: reviewCount ?? this.reviewCount,
+      status: status ?? this.status,
     );
   }
 } 

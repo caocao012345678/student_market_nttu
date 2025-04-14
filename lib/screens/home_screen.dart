@@ -12,6 +12,9 @@ import 'package:student_market_nttu/models/product.dart';
 import 'package:student_market_nttu/widgets/product_card_standard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
+import 'package:student_market_nttu/services/user_service.dart';
+import 'package:student_market_nttu/screens/cart_screen.dart';
+import 'package:student_market_nttu/widgets/cart_badge.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -129,12 +132,7 @@ class _HomeContentState extends State<HomeContent> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            onPressed: () {
-              // Navigate to cart
-            },
-          ),
+          const CartBadge(),
         ],
       ),
       body: RefreshIndicator(
@@ -295,34 +293,6 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildFeaturedShops() {
-    // This would be replaced with actual data from a service
-    final List<Map<String, dynamic>> featuredShops = [
-      {
-        'name': 'Shop NTTU Books',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop1.jpg?alt=media',
-        'rating': 4.8,
-        'productCount': 56,
-      },
-      {
-        'name': 'Điện tử sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop2.jpg?alt=media',
-        'rating': 4.5,
-        'productCount': 42,
-      },
-      {
-        'name': 'Second Hand NTTU',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop3.jpg?alt=media',
-        'rating': 4.6,
-        'productCount': 78,
-      },
-      {
-        'name': 'Thời trang sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop4.jpg?alt=media',
-        'rating': 4.7,
-        'productCount': 63,
-      },
-    ];
-
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       shape: RoundedRectangleBorder(
@@ -361,56 +331,74 @@ class _HomeContentState extends State<HomeContent> {
             const SizedBox(height: 16),
             SizedBox(
               height: 140,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: featuredShops.length,
-                itemBuilder: (context, index) {
-                  final shop = featuredShops[index];
-                  return Container(
-                    width: 110,
-                    margin: const EdgeInsets.only(right: 12),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundImage: CachedNetworkImageProvider(
-                            shop['avatar'],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          shop['name'],
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 12,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: Provider.of<UserService>(context, listen: false).getTopRatedUsers(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('Không có shop nổi bật'));
+                  }
+                  
+                  final shops = snapshot.data!;
+                  
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: shops.length,
+                    itemBuilder: (context, index) {
+                      final shop = shops[index];
+                      return Container(
+                        width: 110,
+                        margin: const EdgeInsets.only(right: 12),
+                        child: Column(
                           children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 14),
-                            const SizedBox(width: 2),
+                            CircleAvatar(
+                              radius: 36,
+                              backgroundImage: CachedNetworkImageProvider(
+                                shop['avatar'] != '' 
+                                    ? shop['avatar'] 
+                                    : 'https://via.placeholder.com/80',
+                              ),
+                              backgroundColor: Colors.grey[200],
+                            ),
+                            const SizedBox(height: 8),
                             Text(
-                              '${shop['rating']}',
+                              shop['name'] != '' ? shop['name'] : 'Người dùng',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.star, color: Colors.amber, size: 14),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${shop['rating']}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '${shop['productCount']} sản phẩm',
                               style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[700],
+                                fontSize: 10,
+                                color: Colors.grey[600],
                               ),
                             ),
                           ],
                         ),
-                        Text(
-                          '${shop['productCount']} sản phẩm',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               ),
@@ -422,25 +410,6 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildDonorRecognition() {
-    // This would be replaced with actual data from a service
-    final List<Map<String, dynamic>> topDonors = [
-      {
-        'name': 'Nguyễn Văn A',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor1.jpg?alt=media',
-        'donationCount': 15,
-      },
-      {
-        'name': 'Trần Thị B',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor2.jpg?alt=media',
-        'donationCount': 12,
-      },
-      {
-        'name': 'Lê Văn C',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor3.jpg?alt=media',
-        'donationCount': 10,
-      },
-    ];
-
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       shape: RoundedRectangleBorder(
@@ -479,69 +448,90 @@ class _HomeContentState extends State<HomeContent> {
             const SizedBox(height: 16),
             SizedBox(
               height: 120,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: topDonors.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final donor = entry.value;
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: Provider.of<UserService>(context, listen: false).getTopCreditGainersThisWeek(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
                   
-                  // Different styles for top 3 donors
-                  final List<Color> medalColors = [
-                    Colors.amber[700]!, // Gold
-                    Colors.grey[400]!, // Silver
-                    Colors.brown[300]!, // Bronze
-                  ];
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('Không có dữ liệu'));
+                  }
                   
-                  final List<String> medals = ['🥇', '🥈', '🥉'];
+                  final donors = snapshot.data!;
                   
-                  return Column(
-                    children: [
-                      Stack(
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: donors.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final donor = entry.value;
+                      
+                      // Different styles for top 3 donors
+                      final List<Color> medalColors = [
+                        Colors.amber[700]!, // Gold
+                        Colors.grey[400]!, // Silver
+                        Colors.brown[300]!, // Bronze
+                      ];
+                      
+                      final List<String> medals = ['🥇', '🥈', '🥉'];
+                      
+                      return Column(
                         children: [
-                          CircleAvatar(
-                            radius: 35,
-                            backgroundImage: CachedNetworkImageProvider(donor['avatar']),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: medalColors[index],
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
+                          Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 35,
+                                backgroundImage: CachedNetworkImageProvider(
+                                  donor['avatar'] != '' 
+                                      ? donor['avatar'] 
+                                      : 'https://via.placeholder.com/80',
+                                ),
+                                backgroundColor: Colors.grey[200],
                               ),
-                              child: Text(
-                                medals[index],
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: medalColors[index],
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: Text(
+                                    medals[index],
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            donor['name'] != '' ? donor['name'] : 'Người dùng',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            '+${donor['creditGain']} điểm uy tín',
+                            style: TextStyle(
+                              color: Colors.green[700],
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        donor['name'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        '${donor['donationCount']} lượt tặng',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   );
-                }).toList(),
+                },
               ),
             ),
           ],

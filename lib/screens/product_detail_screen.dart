@@ -8,9 +8,12 @@ import '../models/review.dart';
 import '../services/auth_service.dart';
 import '../services/review_service.dart';
 import '../services/order_service.dart';
+import '../services/cart_service.dart';
 import '../models/purchase_order.dart';
 import '../screens/user_profile_page.dart';
 import '../screens/product_list_screen.dart';
+import '../screens/cart_screen.dart';
+import '../widgets/cart_badge.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -70,6 +73,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       _isFavorite = !_isFavorite;
       // TODO: Implement saving favorite state to database
     });
+  }
+
+  Future<void> _addToCart(BuildContext context) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final cartService = Provider.of<CartService>(context, listen: false);
+    
+    if (authService.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng')),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _isLoading = true);
+      
+      await cartService.addToCart(widget.product, authService.currentUser!.uid);
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã thêm ${widget.product.title} vào giỏ hàng'),
+          action: SnackBarAction(
+            label: 'XEM GIỎ HÀNG',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CartScreen()),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _shareProduct() async {
@@ -974,6 +1021,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             icon: const Icon(Icons.share),
             onPressed: _shareProduct,
           ),
+          const CartBadge(),
         ],
       ),
       body: NestedScrollView(
@@ -1027,14 +1075,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   label: const Text('Nhắn tin'),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _addToCart(context),
+                  icon: const Icon(Icons.shopping_cart_outlined),
+                  label: const Text('Thêm vào giỏ'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => _showPurchaseDialog(context),
-                  icon: const Icon(Icons.shopping_cart),
+                  icon: const Icon(Icons.payment),
                   label: const Text('Mua ngay'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
                   ),
                 ),
