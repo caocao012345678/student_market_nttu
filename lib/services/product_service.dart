@@ -310,4 +310,24 @@ class ProductService extends ChangeNotifier {
         .map((snapshot) =>
             snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList());
   }
+
+  Stream<List<Product>> getRelatedProducts({
+    required String category,
+    required String excludeProductId,
+    int limit = 10,
+  }) {
+    return _firestore
+        .collection('products')
+        .where('category', isEqualTo: category)
+        .where('isSold', isEqualTo: false)
+        .where(FieldPath.documentId, isNotEqualTo: excludeProductId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => Product.fromMap(doc.data(), doc.id))
+          .toList();
+    });
+  }
 } 
