@@ -24,6 +24,12 @@ class UserModel {
   final bool isStudent;       // Xác định có phải là sinh viên không
   final String? studentId;    // Mã số sinh viên (nếu có)
   final String? department;   // Khoa/Ngành học (nếu có)
+  final int? studentYear;     // Năm học (1, 2, 3, 4, ...)
+  final String? major;        // Ngành học
+  final String? specialization; // Chuyên ngành
+  final List<String> interests; // Sở thích cá nhân
+  final List<String> preferredCategories; // Các danh mục sản phẩm quan tâm
+  final bool completedSurvey; // Đã hoàn thành khảo sát hay chưa
 
   UserModel({
     required this.id,
@@ -49,6 +55,12 @@ class UserModel {
     this.isStudent = false,
     this.studentId,
     this.department,
+    this.studentYear,
+    this.major,
+    this.specialization,
+    this.interests = const [],
+    this.preferredCategories = const [],
+    this.completedSurvey = false,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
@@ -76,6 +88,12 @@ class UserModel {
       isStudent: map['isStudent'] ?? false,
       studentId: map['studentId'],
       department: map['department'],
+      studentYear: map['studentYear'],
+      major: map['major'],
+      specialization: map['specialization'],
+      interests: List<String>.from(map['interests'] ?? []),
+      preferredCategories: List<String>.from(map['preferredCategories'] ?? []),
+      completedSurvey: map['completedSurvey'] ?? false,
     );
   }
 
@@ -103,6 +121,12 @@ class UserModel {
       'isStudent': isStudent,
       'studentId': studentId,
       'department': department,
+      'studentYear': studentYear,
+      'major': major,
+      'specialization': specialization,
+      'interests': interests,
+      'preferredCategories': preferredCategories,
+      'completedSurvey': completedSurvey,
     };
   }
 
@@ -130,6 +154,12 @@ class UserModel {
     bool? isStudent,
     String? studentId,
     String? department,
+    int? studentYear,
+    String? major,
+    String? specialization,
+    List<String>? interests,
+    List<String>? preferredCategories,
+    bool? completedSurvey,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -155,6 +185,12 @@ class UserModel {
       isStudent: isStudent ?? this.isStudent,
       studentId: studentId ?? this.studentId,
       department: department ?? this.department,
+      studentYear: studentYear ?? this.studentYear,
+      major: major ?? this.major,
+      specialization: specialization ?? this.specialization,
+      interests: interests ?? this.interests,
+      preferredCategories: preferredCategories ?? this.preferredCategories,
+      completedSurvey: completedSurvey ?? this.completedSurvey,
     );
   }
 

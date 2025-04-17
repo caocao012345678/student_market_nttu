@@ -12,9 +12,8 @@ import 'package:student_market_nttu/models/product.dart';
 import 'package:student_market_nttu/widgets/product_card_standard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
-import 'package:student_market_nttu/services/user_service.dart';
-import 'package:student_market_nttu/screens/cart_screen.dart';
-import 'package:student_market_nttu/widgets/cart_badge.dart';
+
+import '../services/user_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -132,7 +131,12 @@ class _HomeContentState extends State<HomeContent> {
               );
             },
           ),
-          const CartBadge(),
+          IconButton(
+            icon: const Icon(Icons.shopping_cart_outlined),
+            onPressed: () {
+              // Navigate to cart
+            },
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -293,6 +297,34 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildFeaturedShops() {
+    // This would be replaced with actual data from a service
+    final List<Map<String, dynamic>> featuredShops = [
+      {
+        'name': 'Shop NTTU Books',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop1.jpg?alt=media',
+        'rating': 4.8,
+        'productCount': 56,
+      },
+      {
+        'name': 'Điện tử sinh viên',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop2.jpg?alt=media',
+        'rating': 4.5,
+        'productCount': 42,
+      },
+      {
+        'name': 'Second Hand NTTU',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop3.jpg?alt=media',
+        'rating': 4.6,
+        'productCount': 78,
+      },
+      {
+        'name': 'Thời trang sinh viên',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop4.jpg?alt=media',
+        'rating': 4.7,
+        'productCount': 63,
+      },
+    ];
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       shape: RoundedRectangleBorder(
@@ -331,74 +363,56 @@ class _HomeContentState extends State<HomeContent> {
             const SizedBox(height: 16),
             SizedBox(
               height: 140,
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: Provider.of<UserService>(context, listen: false).getTopRatedUsers(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('Không có shop nổi bật'));
-                  }
-                  
-                  final shops = snapshot.data!;
-                  
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: shops.length,
-                    itemBuilder: (context, index) {
-                      final shop = shops[index];
-                      return Container(
-                        width: 110,
-                        margin: const EdgeInsets.only(right: 12),
-                        child: Column(
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: featuredShops.length,
+                itemBuilder: (context, index) {
+                  final shop = featuredShops[index];
+                  return Container(
+                    width: 110,
+                    margin: const EdgeInsets.only(right: 12),
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 36,
+                          backgroundImage: CachedNetworkImageProvider(
+                            shop['avatar'],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          shop['name'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundImage: CachedNetworkImageProvider(
-                                shop['avatar'] != '' 
-                                    ? shop['avatar'] 
-                                    : 'https://via.placeholder.com/80',
-                              ),
-                              backgroundColor: Colors.grey[200],
-                            ),
-                            const SizedBox(height: 8),
+                            const Icon(Icons.star, color: Colors.amber, size: 14),
+                            const SizedBox(width: 2),
                             Text(
-                              shop['name'] != '' ? shop['name'] : 'Người dùng',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 12,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.star, color: Colors.amber, size: 14),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${shop['rating']}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              '${shop['productCount']} sản phẩm',
+                              '${shop['rating']}',
                               style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[600],
+                                fontSize: 11,
+                                color: Colors.grey[700],
                               ),
                             ),
                           ],
                         ),
-                      );
-                    },
+                        Text(
+                          '${shop['productCount']} sản phẩm',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -410,6 +424,25 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildDonorRecognition() {
+    // This would be replaced with actual data from a service
+    final List<Map<String, dynamic>> topDonors = [
+      {
+        'name': 'Nguyễn Văn A',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor1.jpg?alt=media',
+        'donationCount': 15,
+      },
+      {
+        'name': 'Trần Thị B',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor2.jpg?alt=media',
+        'donationCount': 12,
+      },
+      {
+        'name': 'Lê Văn C',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor3.jpg?alt=media',
+        'donationCount': 10,
+      },
+    ];
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       shape: RoundedRectangleBorder(
@@ -454,28 +487,28 @@ class _HomeContentState extends State<HomeContent> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
+
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Center(child: Text('Không có dữ liệu'));
                   }
-                  
+
                   final donors = snapshot.data!;
-                  
+
                   return Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: donors.asMap().entries.map((entry) {
                       final index = entry.key;
                       final donor = entry.value;
-                      
+
                       // Different styles for top 3 donors
                       final List<Color> medalColors = [
                         Colors.amber[700]!, // Gold
                         Colors.grey[400]!, // Silver
                         Colors.brown[300]!, // Bronze
                       ];
-                      
+
                       final List<String> medals = ['🥇', '🥈', '🥉'];
-                      
+
                       return Column(
                         children: [
                           Stack(
@@ -483,8 +516,8 @@ class _HomeContentState extends State<HomeContent> {
                               CircleAvatar(
                                 radius: 35,
                                 backgroundImage: CachedNetworkImageProvider(
-                                  donor['avatar'] != '' 
-                                      ? donor['avatar'] 
+                                  donor['avatar'] != ''
+                                      ? donor['avatar']
                                       : 'https://via.placeholder.com/80',
                                 ),
                                 backgroundColor: Colors.grey[200],

@@ -65,6 +65,12 @@ class AuthService extends ChangeNotifier {
           'isStudent': false,
           'studentId': null,
           'department': null,
+          'studentYear': null,
+          'major': null,
+          'specialization': null,
+          'interests': [],
+          'preferredCategories': [],
+          'completedSurvey': false,
         });
 
         // Send email verification

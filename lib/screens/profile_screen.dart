@@ -11,6 +11,7 @@ import 'package:student_market_nttu/screens/favorite_products_screen.dart';
 import 'package:student_market_nttu/screens/order_history_screen.dart';
 import 'package:student_market_nttu/screens/user_profile_page.dart';
 import 'package:student_market_nttu/screens/register_shipper_screen.dart';
+import 'package:student_market_nttu/screens/user_survey_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -279,6 +280,25 @@ class ProfileScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const OrderHistoryScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.interests),
+            title: const Text('Khảo sát sở thích'),
+            subtitle: Text(
+              userModel?.completedSurvey == true 
+                  ? 'Đã hoàn thành' 
+                  : 'Chưa hoàn thành'
+            ),
+            trailing: userModel?.completedSurvey == true
+                ? const Icon(Icons.check_circle, color: Colors.green)
+                : const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => UserSurveyScreen(fromProfile: true),
                 ),
               );
             },
