@@ -51,3 +51,5 @@ app.*.map.json
 /lib/firebase_options.dart
 /web/js/firebase_init.js
 .github
+.env
+web/js/env_config.js

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:student_market_nttu/screens/splash_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
@@ -15,11 +16,26 @@ import 'package:student_market_nttu/services/user_service.dart';
 import 'package:student_market_nttu/services/favorites_service.dart';
 import 'package:student_market_nttu/services/chat_service.dart';
 import 'package:student_market_nttu/services/cart_service.dart';
+import 'package:student_market_nttu/services/gemini_service.dart';
+import 'package:student_market_nttu/services/rag_service.dart';
+import 'package:student_market_nttu/services/app_layout_service.dart';
+import 'package:student_market_nttu/services/db_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Nạp biến môi trường từ .env
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Không thể tải tệp .env: $e");
+    // Đặt giá trị mặc định
+    dotenv.env['GEMINI_API_KEY'] = const String.fromEnvironment('GEMINI_API_KEY', 
+        defaultValue: 'AIzaSyCGPdS0XY68bFH7ADXcpKd83aEyuWX8hWA');
+  }
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -30,18 +46,40 @@ void main() async {
     initializeFirebaseWeb(options);
   }
   
-  runApp(const MyApp());
+  // Khởi tạo các services chính
+  final geminiService = GeminiService();
+  final appLayoutService = AppLayoutService();
+  final dbService = DbService();
+  
+  // Đảm bảo rằng các services được khởi tạo trước khi chạy ứng dụng
+  runApp(MyApp(
+    geminiService: geminiService,
+    appLayoutService: appLayoutService,
+    dbService: dbService,
+  ));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final GeminiService geminiService;
+  final AppLayoutService appLayoutService;
+  final DbService dbService;
+  
+  const MyApp({
+    Key? key,
+    required this.geminiService,
+    required this.appLayoutService,
+    required this.dbService,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
-        ChangeNotifierProvider(create: (_) => ThemeService()),
+        ChangeNotifierProvider<ThemeService>(
+          create: (_) => ThemeService(),
+        ),
         ChangeNotifierProvider(create: (_) => ProductService()),
         ChangeNotifierProvider(create: (_) => ReviewService()),
         ChangeNotifierProvider(create: (_) => OrderService()),
@@ -50,6 +88,16 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FavoritesService()),
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => CartService()),
+        // Đưa các services đã tạo làm provider
+        ChangeNotifierProvider<GeminiService>.value(value: geminiService),
+        // Cung cấp DbService
+        Provider<DbService>.value(value: dbService),
+        // Sử dụng cùng instance geminiService cho RAGService
+        ChangeNotifierProvider<RAGService>(
+          create: (_) => RAGService(geminiService),
+        ),
+        // Thêm AppLayoutService
+        ChangeNotifierProvider<AppLayoutService>.value(value: appLayoutService),
       ],
       child: Consumer<ThemeService>(
         builder: (context, themeService, child) {
