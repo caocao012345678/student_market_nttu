@@ -39,7 +39,7 @@ class ProductService extends ChangeNotifier {
     try {
       final doc = await _firestore.collection('products').doc(productId).get();
       if (!doc.exists) throw Exception('Product not found');
-      return Product.fromMap(doc.data()!, doc.id);
+      return Product.fromMap(doc.data()! as Map<String, dynamic>, doc.id);
     } catch (e) {
       throw e;
     }
@@ -53,7 +53,7 @@ class ProductService extends ChangeNotifier {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList());
+            snapshot.docs.map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList());
   }
 
   // Get all products
@@ -64,7 +64,7 @@ class ProductService extends ChangeNotifier {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList());
+            snapshot.docs.map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList());
   }
 
   // Update product status
@@ -258,7 +258,7 @@ class ProductService extends ChangeNotifier {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList());
+            snapshot.docs.map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList());
   }
 
   // Get recommended products for user
@@ -274,7 +274,7 @@ class ProductService extends ChangeNotifier {
           .get();
           
       return snapshot.docs
-          .map((doc) => Product.fromMap(doc.data(), doc.id))
+          .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     } catch (e) {
       print('Error getting recommended products: $e');
@@ -292,23 +292,62 @@ class ProductService extends ChangeNotifier {
         .endAt([query + '\uf8ff'])
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList());
+            snapshot.docs.map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList());
   }
 
   // Get products by category
-  Stream<List<Product>> getProductsByCategory(String category) {
-    if (category == 'Tất cả') {
-      return getAllProducts();
+  Stream<List<Product>> getProductsByCategory(String categoryId, {String? sortBy}) {
+    Query query;
+    bool needsClientSideSorting = false;
+    bool priceAscending = false;
+    
+    if (categoryId == 'all') {
+      query = _firestore
+        .collection('products')
+        .where('isSold', isEqualTo: false);
+    } else {
+      query = _firestore
+        .collection('products')
+        .where('category', isEqualTo: categoryId)
+        .where('isSold', isEqualTo: false);
     }
     
-    return _firestore
-        .collection('products')
-        .where('category', isEqualTo: category)
-        .where('isSold', isEqualTo: false)
-        .orderBy('createdAt', descending: true)
+    // Check if sorting by price (will be done client-side)
+    if (sortBy == 'price_asc' || sortBy == 'price_desc') {
+      needsClientSideSorting = true;
+      priceAscending = sortBy == 'price_asc';
+      // Default ordering for fetching data
+      query = query.orderBy('createdAt', descending: true);
+    } else {
+      // Apply server-side sorting for non-price fields
+      switch (sortBy) {
+        case 'newest':
+          query = query.orderBy('createdAt', descending: true);
+          break;
+        case 'oldest':
+          query = query.orderBy('createdAt', descending: false);
+          break;
+        default:
+          query = query.orderBy('createdAt', descending: true);
+      }
+    }
+    
+    return query
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList());
+        .map((snapshot) {
+          List<Product> products = snapshot.docs
+              .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+              .toList();
+          
+          // Apply client-side sorting for price if needed
+          if (needsClientSideSorting) {
+            products.sort((a, b) => priceAscending 
+                ? a.price.compareTo(b.price) 
+                : b.price.compareTo(a.price));
+          }
+          
+          return products;
+        });
   }
 
   Stream<List<Product>> getRelatedProducts({
@@ -320,14 +359,17 @@ class ProductService extends ChangeNotifier {
         .collection('products')
         .where('category', isEqualTo: category)
         .where('isSold', isEqualTo: false)
-        .where(FieldPath.documentId, isNotEqualTo: excludeProductId)
         .orderBy('createdAt', descending: true)
-        .limit(limit)
+        .limit(limit + 1) // Fetch one extra to account for filtering
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => Product.fromMap(doc.data(), doc.id))
+      List<Product> products = snapshot.docs
+          .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .where((product) => product.id != excludeProductId) // Filter out the current product
+          .take(limit) // Take only the number we need
           .toList();
+      
+      return products;
     });
   }
 } 

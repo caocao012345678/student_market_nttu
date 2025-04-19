@@ -8,103 +8,97 @@ class AIHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(
-        title: const Text('AI Hub'),
-        backgroundColor: Colors.blue[900],
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Trung tâm AI',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+    return SafeArea(
+      child: Scaffold(
+        drawer: const AppDrawer(),
+        appBar: AppBar(
+          title: const Text('AI Hub'),
+          backgroundColor: Colors.blue[900],
+          foregroundColor: Colors.white,
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Trung tâm AI',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Khám phá các tính năng AI trong ứng dụng Student Market NTTU. Sử dụng trợ lý ảo để trò chuyện hoặc xem thông tin về các mô hình AI được sử dụng.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
+              const SizedBox(height: 8),
+              const Text(
+                'Khám phá các tính năng AI trong ứng dụng Student Market NTTU. Sử dụng trợ lý ảo để trò chuyện hoặc xem thông tin về các mô hình AI được sử dụng.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            
-            // Cards Grid
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  // Chatbot Card
-                  _buildFeatureCard(
-                    context,
-                    title: 'Trợ lý ảo',
-                    description: 'Trò chuyện với trợ lý ảo thông minh.',
-                    icon: Icons.chat_bubble_outline,
-                    color: Colors.blue[800],
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ChatbotScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  
-                  // Models Info Card
-                  _buildFeatureCard(
-                    context,
-                    title: 'Mô hình AI',
-                    description: 'Xem thông tin về các mô hình AI được sử dụng.',
-                    icon: Icons.model_training,
-                    color: Colors.indigo[800],
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const GeminiModelsInfoScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  
-                  // Research Card
-                  _buildFeatureCard(
-                    context,
-                    title: 'Tài liệu nghiên cứu',
-                    description: 'Tìm hiểu thêm về công nghệ AI.',
-                    icon: Icons.science_outlined,
-                    color: Colors.purple[800],
-                    onTap: () {
-                      _showComingSoonDialog(context);
-                    },
-                  ),
-                  
-                  // Settings Card
-                  _buildFeatureCard(
-                    context,
-                    title: 'Cài đặt AI',
-                    description: 'Tùy chỉnh cài đặt AI trong ứng dụng.',
-                    icon: Icons.settings_outlined,
-                    color: Colors.green[800],
-                    onTap: () {
-                      _showComingSoonDialog(context);
-                    },
-                  ),
-                ],
+              const SizedBox(height: 32),
+              Flexible(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  shrinkWrap: true,
+                  children: [
+                    _buildFeatureCard(
+                      context,
+                      title: 'Trợ lý ảo',
+                      description: 'Trò chuyện với trợ lý ảo thông minh.',
+                      icon: Icons.chat_bubble_outline,
+                      color: Colors.blue[800],
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ChatbotScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildFeatureCard(
+                      context,
+                      title: 'Mô hình AI',
+                      description: 'Xem thông tin về các mô hình AI được sử dụng.',
+                      icon: Icons.model_training,
+                      color: Colors.indigo[800],
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const GeminiModelsInfoScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildFeatureCard(
+                      context,
+                      title: 'Tài liệu nghiên cứu',
+                      description: 'Tìm hiểu thêm về công nghệ AI.',
+                      icon: Icons.science_outlined,
+                      color: Colors.purple[800],
+                      onTap: () {
+                        _showComingSoonDialog(context);
+                      },
+                    ),
+                    _buildFeatureCard(
+                      context,
+                      title: 'Cài đặt AI',
+                      description: 'Tùy chỉnh cài đặt AI trong ứng dụng.',
+                      icon: Icons.settings_outlined,
+                      color: Colors.green[800],
+                      onTap: () {
+                        _showComingSoonDialog(context);
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -151,15 +145,21 @@ class AIHubScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 8),
-              Text(
-                description,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
+              Flexible(
+                child: Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),

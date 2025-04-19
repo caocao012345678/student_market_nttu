@@ -205,16 +205,10 @@ class _HomeContentState extends State<HomeContent> {
               },
               itemCount: _bannerImages.length,
               itemBuilder: (context, index) {
-                return CachedNetworkImage(
-                  imageUrl: _bannerImages[index],
+                return Image.asset(
+                  _bannerImages[index],
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
+                  errorBuilder: (context, error, stackTrace) => Container(
                     color: Colors.grey[200],
                     child: const Icon(Icons.error),
                   ),

@@ -6,11 +6,303 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class AppLayoutService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
-  // Danh sách các màn hình chính trong ứng dụng
-  final List<Map<String, dynamic>> _appScreens = [];
-  
-  // Danh sách các chức năng trong ứng dụng
-  final List<Map<String, dynamic>> _appFeatures = [];
+  // Danh sách màn hình trong ứng dụng
+  final List<Map<String, dynamic>> _appScreens = [
+    {
+      'id': 'home',
+      'name': 'Màn hình chính',
+      'description': 'Hiển thị sản phẩm nổi bật, danh mục và các tính năng chính',
+      'route': '/home',
+      'component_path': 'lib/screens/home_screen.dart',
+    },
+    {
+      'id': 'search',
+      'name': 'Tìm kiếm',
+      'description': 'Cho phép tìm kiếm sản phẩm theo từ khóa, danh mục và bộ lọc',
+      'route': '/search',
+      'component_path': 'lib/screens/search_screen.dart',
+    },
+    {
+      'id': 'product_detail',
+      'name': 'Chi tiết sản phẩm',
+      'description': 'Hiển thị thông tin chi tiết về một sản phẩm cụ thể',
+      'route': '/product/:id',
+      'component_path': 'lib/screens/product_detail_screen.dart',
+    },
+    {
+      'id': 'cart',
+      'name': 'Giỏ hàng',
+      'description': 'Quản lý sản phẩm trong giỏ hàng và tiến hành thanh toán',
+      'route': '/cart',
+      'component_path': 'lib/screens/cart_screen.dart',
+    },
+    {
+      'id': 'chat',
+      'name': 'Trò chuyện',
+      'description': 'Cho phép nhắn tin với người bán hoặc người mua',
+      'route': '/chat',
+      'component_path': 'lib/screens/chat_list_screen.dart',
+    },
+    {
+      'id': 'chat_detail',
+      'name': 'Chi tiết trò chuyện',
+      'description': 'Màn hình nhắn tin với một người dùng cụ thể',
+      'route': '/chat/:id',
+      'component_path': 'lib/screens/chat_screen.dart',
+    },
+    {
+      'id': 'profile',
+      'name': 'Hồ sơ cá nhân',
+      'description': 'Xem và chỉnh sửa thông tin cá nhân, quản lý sản phẩm và đơn hàng',
+      'route': '/profile',
+      'component_path': 'lib/screens/profile_screen.dart',
+    },
+    {
+      'id': 'add_product',
+      'name': 'Thêm sản phẩm',
+      'description': 'Đăng bán sản phẩm mới',
+      'route': '/add-product',
+      'component_path': 'lib/screens/add_product_screen.dart',
+    },
+    {
+      'id': 'my_products',
+      'name': 'Sản phẩm của tôi',
+      'description': 'Quản lý các sản phẩm đã đăng bán',
+      'route': '/my-products',
+      'component_path': 'lib/screens/my_products_screen.dart',
+    },
+    {
+      'id': 'favorites',
+      'name': 'Sản phẩm yêu thích',
+      'description': 'Xem các sản phẩm đã đánh dấu yêu thích',
+      'route': '/favorites',
+      'component_path': 'lib/screens/favorite_products_screen.dart',
+    },
+    {
+      'id': 'orders',
+      'name': 'Lịch sử đơn hàng',
+      'description': 'Xem lịch sử các đơn hàng đã mua và bán',
+      'route': '/orders',
+      'component_path': 'lib/screens/order_history_screen.dart',
+    },
+    {
+      'id': 'settings',
+      'name': 'Cài đặt',
+      'description': 'Thay đổi cài đặt ứng dụng, ngôn ngữ và chế độ màu',
+      'route': '/settings',
+      'component_path': 'lib/screens/settings_screen.dart',
+    },
+    {
+      'id': 'chatbot',
+      'name': 'Trợ lý ảo',
+      'description': 'Tương tác với trợ lý ảo để được hỗ trợ',
+      'route': '/chatbot',
+      'component_path': 'lib/screens/chatbot_screen.dart',
+    },
+  ];
+
+  // Danh sách chi tiết về các tính năng
+  final List<Map<String, dynamic>> _appFeatures = [
+    {
+      'id': 'product_search',
+      'name': 'Tìm kiếm sản phẩm',
+      'description': 'Cho phép tìm kiếm sản phẩm theo từ khóa, danh mục và bộ lọc',
+      'location': 'Nút kính lúp ở góc phải trên cùng của màn hình chính hoặc tab Tìm kiếm',
+      'usage': 'Nhấn vào nút, nhập từ khóa và nhấn Enter để tìm kiếm',
+      'screen_id': 'search',
+      'user_tasks': ['Tìm sản phẩm cụ thể', 'Lọc sản phẩm theo giá', 'Tìm theo danh mục', 'Tìm kiếm sản phẩm', 'Tra cứu sản phẩm', 'Tìm đồ', 'Tìm đồ cũ'],
+    },
+    {
+      'id': 'add_to_cart',
+      'name': 'Thêm vào giỏ hàng',
+      'description': 'Thêm sản phẩm vào giỏ hàng để mua sau',
+      'location': 'Nút "Thêm vào giỏ hàng" trên màn hình chi tiết sản phẩm',
+      'usage': 'Xem chi tiết sản phẩm, chọn số lượng và nhấn "Thêm vào giỏ hàng"',
+      'screen_id': 'product_detail',
+      'user_tasks': ['Mua sản phẩm', 'Tích lũy giỏ hàng', 'Thêm đồ vào giỏ', 'Thêm vào giỏ', 'Mua hàng'],
+    },
+    {
+      'id': 'chat_with_seller',
+      'name': 'Trò chuyện với người bán',
+      'description': 'Liên hệ trực tiếp với người bán để trao đổi về sản phẩm',
+      'location': 'Nút "Chat với người bán" trên màn hình chi tiết sản phẩm',
+      'usage': 'Xem chi tiết sản phẩm, nhấn "Chat với người bán", nhập tin nhắn và gửi',
+      'screen_id': 'product_detail',
+      'user_tasks': ['Hỏi thông tin sản phẩm', 'Thương lượng giá', 'Kiểm tra tình trạng', 'Chat với người bán', 'Liên hệ người bán', 'Nhắn tin người bán'],
+    },
+    {
+      'id': 'add_product',
+      'name': 'Đăng bán sản phẩm',
+      'description': 'Đăng thông tin sản phẩm để bán trên sàn',
+      'location': 'Nút "+" ở góc dưới phải hoặc từ trang hồ sơ "Sản phẩm của tôi"',
+      'usage': 'Nhấn nút +, điền thông tin sản phẩm, thêm hình ảnh và nhấn "Đăng bán"',
+      'screen_id': 'add_product',
+      'user_tasks': ['Đăng sản phẩm mới', 'Đăng lại sản phẩm', 'Bán đồ', 'Đăng bán', 'Bán sản phẩm', 'Làm sao để đăng bán', 'Cách đăng sản phẩm', 'Đăng bán sản phẩm', 'Bán hàng', 'Tôi muốn bán đồ'],
+    },
+    {
+      'id': 'manage_products',
+      'name': 'Quản lý sản phẩm đã đăng',
+      'description': 'Xem, chỉnh sửa, hoặc xóa các sản phẩm đã đăng bán',
+      'location': 'Mục "Sản phẩm của tôi" trong trang hồ sơ',
+      'usage': 'Vào trang hồ sơ, chọn "Sản phẩm của tôi", sau đó có thể chỉnh sửa hoặc xóa sản phẩm',
+      'screen_id': 'my_products',
+      'user_tasks': ['Quản lý sản phẩm', 'Sửa thông tin sản phẩm', 'Xóa sản phẩm', 'Kiểm tra sản phẩm đã đăng', 'Xem sản phẩm của tôi', 'Làm sao để quản lý sản phẩm', 'Xem đồ đang bán'],
+    },
+    {
+      'id': 'favorite_product',
+      'name': 'Yêu thích sản phẩm',
+      'description': 'Lưu sản phẩm vào danh sách yêu thích để xem sau',
+      'location': 'Biểu tượng trái tim trên thẻ sản phẩm hoặc trang chi tiết',
+      'usage': 'Nhấn vào biểu tượng trái tim để thêm/xóa khỏi yêu thích',
+      'screen_id': 'product_detail',
+      'user_tasks': ['Lưu sản phẩm để xem sau', 'Theo dõi giá', 'Thêm vào yêu thích', 'Đánh dấu sản phẩm', 'Lưu đồ yêu thích'],
+    },
+    {
+      'id': 'checkout',
+      'name': 'Thanh toán',
+      'description': 'Hoàn tất quá trình mua hàng và thanh toán',
+      'location': 'Nút "Thanh toán" ở phía dưới màn hình giỏ hàng',
+      'usage': 'Kiểm tra giỏ hàng, nhấn "Thanh toán", chọn phương thức thanh toán và xác nhận',
+      'screen_id': 'cart',
+      'user_tasks': ['Hoàn tất mua hàng', 'Chọn địa chỉ giao hàng', 'Chọn phương thức thanh toán', 'Thanh toán đơn hàng', 'Mua hàng', 'Trả tiền', 'Cách thanh toán'],
+    },
+    {
+      'id': 'view_orders',
+      'name': 'Xem đơn hàng',
+      'description': 'Xem lịch sử đơn hàng đã mua và đã bán',
+      'location': 'Tab "Đơn hàng" trong trang hồ sơ',
+      'usage': 'Vào trang hồ sơ, chọn "Đơn hàng" để xem danh sách',
+      'screen_id': 'orders',
+      'user_tasks': ['Kiểm tra tình trạng đơn hàng', 'Xem lịch sử mua hàng', 'Lịch sử đơn hàng', 'Đơn hàng của tôi', 'Xem các đơn đã đặt', 'Xem đơn hàng đã bán'],
+    },
+    {
+      'id': 'edit_profile',
+      'name': 'Chỉnh sửa hồ sơ',
+      'description': 'Cập nhật thông tin cá nhân và hồ sơ người dùng',
+      'location': 'Nút "Chỉnh sửa" trong trang hồ sơ',
+      'usage': 'Vào trang hồ sơ, nhấn "Chỉnh sửa", thay đổi thông tin và lưu',
+      'screen_id': 'profile',
+      'user_tasks': ['Cập nhật thông tin cá nhân', 'Thay đổi ảnh đại diện', 'Sửa tên người dùng', 'Cập nhật số điện thoại', 'Sửa địa chỉ', 'Sửa hồ sơ'],
+    },
+    {
+      'id': 'activate_darkmode',
+      'name': 'Chế độ tối',
+      'description': 'Chuyển đổi giao diện ứng dụng giữa chế độ sáng và tối',
+      'location': 'Công tắc trong trang cài đặt',
+      'usage': 'Vào trang cài đặt, bật/tắt công tắc "Chế độ tối"',
+      'screen_id': 'settings',
+      'user_tasks': ['Thay đổi giao diện', 'Giảm ánh sáng màn hình', 'Bật chế độ tối', 'Chuyển sang màu tối', 'Đổi giao diện'],
+    },
+    {
+      'id': 'rate_product',
+      'name': 'Đánh giá sản phẩm',
+      'description': 'Viết đánh giá và cho điểm sản phẩm đã mua',
+      'location': 'Nút "Đánh giá" trong lịch sử đơn hàng hoặc trang chi tiết sản phẩm',
+      'usage': 'Vào đơn hàng đã hoàn thành, chọn "Đánh giá", cho điểm và viết nhận xét',
+      'screen_id': 'product_detail',
+      'user_tasks': ['Cho điểm sản phẩm', 'Viết nhận xét', 'Chia sẻ hình ảnh thực tế', 'Đánh giá người bán', 'Review sản phẩm', 'Viết review'],
+    },
+  ];
+
+  // Thông tin về việc điều hướng giữa các màn hình
+  final List<Map<String, dynamic>> navigationPaths = [
+    {
+      'from_screen_id': 'home',
+      'to_screen_id': 'search',
+      'method': 'Nhấn vào biểu tượng kính lúp ở thanh tìm kiếm phía trên',
+      'ui_elements': ['search_bar', 'search_icon'],
+    },
+    {
+      'from_screen_id': 'home',
+      'to_screen_id': 'cart',
+      'method': 'Nhấn vào biểu tượng giỏ hàng ở góc phải trên cùng hoặc tab Giỏ hàng',
+      'ui_elements': ['cart_icon', 'bottom_nav_cart'],
+    },
+    {
+      'from_screen_id': 'home',
+      'to_screen_id': 'profile',
+      'method': 'Nhấn vào tab Tài khoản ở thanh điều hướng dưới cùng',
+      'ui_elements': ['bottom_nav_profile'],
+    },
+    {
+      'from_screen_id': 'home',
+      'to_screen_id': 'product_detail',
+      'method': 'Nhấn vào bất kỳ sản phẩm nào trên màn hình chính',
+      'ui_elements': ['product_card'],
+    },
+    {
+      'from_screen_id': 'home',
+      'to_screen_id': 'chat',
+      'method': 'Nhấn vào tab Chat ở thanh điều hướng dưới cùng',
+      'ui_elements': ['bottom_nav_chat'],
+    },
+    {
+      'from_screen_id': 'home',
+      'to_screen_id': 'chatbot',
+      'method': 'Nhấn vào biểu tượng trợ lý ảo ở góc dưới phải',
+      'ui_elements': ['chatbot_fab'],
+    },
+    {
+      'from_screen_id': 'profile',
+      'to_screen_id': 'my_products',
+      'method': 'Nhấn vào mục "Sản phẩm của tôi" trong trang hồ sơ',
+      'ui_elements': ['my_products_tile'],
+    },
+    {
+      'from_screen_id': 'profile',
+      'to_screen_id': 'orders',
+      'method': 'Nhấn vào mục "Đơn hàng" trong trang hồ sơ',
+      'ui_elements': ['orders_tile'],
+    },
+    {
+      'from_screen_id': 'product_detail',
+      'to_screen_id': 'cart',
+      'method': 'Nhấn vào nút "Thêm vào giỏ hàng" và sau đó vào biểu tượng giỏ hàng',
+      'ui_elements': ['add_to_cart_button', 'cart_icon'],
+    },
+    {
+      'from_screen_id': 'cart',
+      'to_screen_id': 'checkout',
+      'method': 'Nhấn vào nút "Thanh toán" ở dưới cùng của màn hình giỏ hàng',
+      'ui_elements': ['checkout_button'],
+    },
+  ];
+
+  // Thông tin về các UI component chính
+  final List<Map<String, dynamic>> uiComponents = [
+    {
+      'id': 'bottom_navigation',
+      'name': 'Thanh điều hướng dưới cùng',
+      'type': 'BottomNavigationBar',
+      'description': 'Thanh điều hướng chính giữa các màn hình',
+      'locations': ['Phần dưới cùng của ứng dụng'],
+      'child_elements': ['home_tab', 'search_tab', 'cart_tab', 'chat_tab', 'profile_tab'],
+    },
+    {
+      'id': 'app_drawer',
+      'name': 'Menu trượt',
+      'type': 'Drawer',
+      'description': 'Menu trượt từ trái sang phải chứa các tùy chọn',
+      'locations': ['Có thể truy cập từ biểu tượng menu ở góc trái trên cùng'],
+      'child_elements': ['home_item', 'categories_item', 'settings_item', 'help_item'],
+    },
+    {
+      'id': 'product_card',
+      'name': 'Thẻ sản phẩm',
+      'type': 'Card',
+      'description': 'Hiển thị thông tin tóm tắt về sản phẩm',
+      'locations': ['Màn hình chính', 'Kết quả tìm kiếm', 'Danh mục sản phẩm'],
+      'child_elements': ['product_image', 'product_name', 'product_price', 'favorite_button'],
+    },
+    {
+      'id': 'search_bar',
+      'name': 'Thanh tìm kiếm',
+      'type': 'TextField',
+      'description': 'Cho phép nhập từ khóa để tìm kiếm',
+      'locations': ['Phía trên màn hình chính', 'Đầu trang tìm kiếm'],
+      'child_elements': ['search_input', 'search_icon', 'filter_button'],
+    },
+  ];
   
   // Trạng thái
   bool _isLoading = false;
@@ -61,193 +353,8 @@ class AppLayoutService extends ChangeNotifier {
   
   /// Tạo dữ liệu mặc định về bố cục ứng dụng
   Future<void> _initializeDefaultAppData() async {
-    // Danh sách màn hình chính
-    _appScreens.clear();
-    _appScreens.addAll([
-      {
-        'id': 'home_screen',
-        'name': 'Trang chủ',
-        'route': '/',
-        'description': 'Màn hình chính hiển thị danh sách sản phẩm nổi bật, danh mục và các đề xuất.',
-        'features': ['product_list', 'categories', 'search_bar', 'promotion_banner'],
-        'navigation': 'bottom_nav_bar'
-      },
-      {
-        'id': 'product_screen',
-        'name': 'Chi tiết sản phẩm',
-        'route': '/product/:id',
-        'description': 'Hiển thị thông tin chi tiết về sản phẩm, gồm hình ảnh, mô tả, giá cả, đánh giá và các sản phẩm liên quan.',
-        'features': ['product_details', 'reviews', 'add_to_cart', 'contact_seller'],
-        'navigation': 'back_button'
-      },
-      {
-        'id': 'category_screen',
-        'name': 'Danh mục',
-        'route': '/category/:id',
-        'description': 'Hiển thị danh sách sản phẩm trong một danh mục cụ thể, có thể lọc và sắp xếp.',
-        'features': ['filter', 'sort', 'product_grid', 'search_in_category'],
-        'navigation': 'bottom_nav_bar'
-      },
-      {
-        'id': 'cart_screen',
-        'name': 'Giỏ hàng',
-        'route': '/cart',
-        'description': 'Hiển thị sản phẩm đã thêm vào giỏ hàng, cho phép cập nhật số lượng và thanh toán.',
-        'features': ['cart_items', 'update_quantity', 'checkout', 'remove_item'],
-        'navigation': 'bottom_nav_bar'
-      },
-      {
-        'id': 'profile_screen',
-        'name': 'Trang cá nhân',
-        'route': '/profile',
-        'description': 'Hiển thị thông tin cá nhân, lịch sử mua hàng, sản phẩm đã đăng và các cài đặt.',
-        'features': ['user_info', 'order_history', 'posted_products', 'settings'],
-        'navigation': 'bottom_nav_bar'
-      },
-      {
-        'id': 'chat_screen',
-        'name': 'Tin nhắn',
-        'route': '/chat',
-        'description': 'Danh sách các cuộc trò chuyện với người bán/người mua.',
-        'features': ['chat_list', 'message_notification'],
-        'navigation': 'bottom_nav_bar'
-      },
-      {
-        'id': 'chatbot_screen',
-        'name': 'Trợ lý ảo',
-        'route': '/chatbot',
-        'description': 'Trợ lý ảo sử dụng Gemini API để hỗ trợ người dùng tìm kiếm và sử dụng ứng dụng.',
-        'features': ['ai_assistant', 'product_recommendations', 'app_usage_guide'],
-        'navigation': 'bottom_nav_bar'
-      },
-      {
-        'id': 'order_screen',
-        'name': 'Đơn hàng',
-        'route': '/order/:id',
-        'description': 'Hiển thị chi tiết đơn hàng, trạng thái và thông tin vận chuyển.',
-        'features': ['order_details', 'shipping_info', 'cancel_order', 'track_order'],
-        'navigation': 'back_button'
-      },
-      {
-        'id': 'search_results_screen',
-        'name': 'Kết quả tìm kiếm',
-        'route': '/search',
-        'description': 'Hiển thị kết quả tìm kiếm sản phẩm với các bộ lọc.',
-        'features': ['search_results', 'filter_options', 'sort_options'],
-        'navigation': 'back_button'
-      },
-      {
-        'id': 'notifications_screen',
-        'name': 'Thông báo',
-        'route': '/notifications',
-        'description': 'Hiển thị danh sách thông báo về đơn hàng, khuyến mãi và cập nhật từ người bán.',
-        'features': ['notification_list', 'mark_as_read', 'delete_notification'],
-        'navigation': 'back_button'
-      }
-    ]);
-    
-    // Danh sách các chức năng chính
-    _appFeatures.clear();
-    _appFeatures.addAll([
-      {
-        'id': 'product_list',
-        'name': 'Danh sách sản phẩm',
-        'description': 'Hiển thị danh sách sản phẩm dưới dạng lưới hoặc danh sách.',
-        'location': 'home_screen, category_screen, search_results_screen',
-        'usage': 'Xem các sản phẩm, nhấn vào để xem chi tiết.'
-      },
-      {
-        'id': 'search_bar',
-        'name': 'Thanh tìm kiếm',
-        'description': 'Cho phép tìm kiếm sản phẩm theo tên, mô tả hoặc danh mục.',
-        'location': 'home_screen, appbar',
-        'usage': 'Nhập từ khóa và nhấn biểu tượng tìm kiếm.'
-      },
-      {
-        'id': 'categories',
-        'name': 'Danh mục sản phẩm',
-        'description': 'Hiển thị các danh mục sản phẩm để dễ dàng lọc.',
-        'location': 'home_screen, drawer_menu',
-        'usage': 'Nhấn vào danh mục để xem sản phẩm trong danh mục đó.'
-      },
-      {
-        'id': 'cart_items',
-        'name': 'Giỏ hàng',
-        'description': 'Hiển thị sản phẩm đã thêm vào giỏ hàng.',
-        'location': 'cart_screen',
-        'usage': 'Cập nhật số lượng, xóa sản phẩm hoặc tiến hành thanh toán.'
-      },
-      {
-        'id': 'checkout',
-        'name': 'Thanh toán',
-        'description': 'Quy trình thanh toán đơn hàng, bao gồm địa chỉ, phương thức thanh toán và xác nhận.',
-        'location': 'cart_screen, checkout_screen',
-        'usage': 'Nhập thông tin thanh toán và xác nhận để hoàn tất đơn hàng.'
-      },
-      {
-        'id': 'user_info',
-        'name': 'Thông tin người dùng',
-        'description': 'Hiển thị và cho phép cập nhật thông tin cá nhân.',
-        'location': 'profile_screen',
-        'usage': 'Xem và chỉnh sửa thông tin cá nhân như tên, địa chỉ, ảnh đại diện.'
-      },
-      {
-        'id': 'order_history',
-        'name': 'Lịch sử đơn hàng',
-        'description': 'Danh sách các đơn hàng đã đặt và trạng thái.',
-        'location': 'profile_screen, order_history_screen',
-        'usage': 'Xem chi tiết đơn hàng và theo dõi trạng thái.'
-      },
-      {
-        'id': 'posted_products',
-        'name': 'Sản phẩm đã đăng',
-        'description': 'Danh sách sản phẩm người dùng đã đăng bán.',
-        'location': 'profile_screen, my_products_screen',
-        'usage': 'Quản lý sản phẩm đã đăng, chỉnh sửa hoặc xóa.'
-      },
-      {
-        'id': 'chat_list',
-        'name': 'Danh sách tin nhắn',
-        'description': 'Hiển thị các cuộc trò chuyện với người bán/người mua.',
-        'location': 'chat_screen',
-        'usage': 'Nhấn vào cuộc trò chuyện để xem và gửi tin nhắn.'
-      },
-      {
-        'id': 'ai_assistant',
-        'name': 'Trợ lý ảo',
-        'description': 'Trợ lý ảo sử dụng Gemini API để trả lời câu hỏi và hỗ trợ người dùng.',
-        'location': 'chatbot_screen',
-        'usage': 'Nhập câu hỏi và nhận câu trả lời từ trợ lý ảo.'
-      },
-      {
-        'id': 'product_recommendations',
-        'name': 'Gợi ý sản phẩm',
-        'description': 'Đề xuất sản phẩm dựa trên lịch sử duyệt, mua hàng và sở thích.',
-        'location': 'home_screen, product_screen, chatbot_screen',
-        'usage': 'Xem sản phẩm được đề xuất và nhấn để xem chi tiết.'
-      },
-      {
-        'id': 'filter_options',
-        'name': 'Bộ lọc tìm kiếm',
-        'description': 'Cho phép lọc sản phẩm theo giá, đánh giá, tình trạng, v.v.',
-        'location': 'category_screen, search_results_screen',
-        'usage': 'Nhấn vào biểu tượng lọc, chọn các tiêu chí và áp dụng.'
-      },
-      {
-        'id': 'sort_options',
-        'name': 'Sắp xếp kết quả',
-        'description': 'Sắp xếp sản phẩm theo giá, mức độ phổ biến, đánh giá, v.v.',
-        'location': 'category_screen, search_results_screen',
-        'usage': 'Chọn tùy chọn sắp xếp từ menu thả xuống.'
-      },
-      {
-        'id': 'notification_list',
-        'name': 'Danh sách thông báo',
-        'description': 'Hiển thị các thông báo về đơn hàng, khuyến mãi và cập nhật.',
-        'location': 'notifications_screen',
-        'usage': 'Xem thông báo và nhấn để xem chi tiết.'
-      }
-    ]);
+    // Không cần clear và addAll khi chúng là giá trị mặc định
+    // và đã được khởi tạo khi class được tạo
     
     // Lưu dữ liệu vào Firestore
     await _saveAppDataToFirestore();
@@ -386,5 +493,110 @@ class AppLayoutService extends ChangeNotifier {
     }
     
     return overview;
+  }
+
+  // Tìm đường dẫn đến một tính năng từ bất kỳ màn hình nào
+  List<Map<String, dynamic>> findPathsToFeature(String featureId) {
+    final feature = _appFeatures.firstWhere(
+      (feature) => feature['id'] == featureId,
+      orElse: () => {'id': '', 'screen_id': ''},
+    );
+    
+    if (feature['id'].isEmpty || feature['screen_id'] == null) {
+      return [];
+    }
+    
+    final targetScreenId = feature['screen_id'];
+    List<Map<String, dynamic>> paths = [];
+    
+    // Duyệt qua tất cả các màn hình để tìm đường đi đến màn hình chứa tính năng
+    for (var screen in _appScreens) {
+      if (screen['id'] == targetScreenId) continue; // Bỏ qua nếu đã ở màn hình đích
+      
+      // Tìm đường đi trực tiếp từ màn hình hiện tại đến màn hình đích
+      final directPath = navigationPaths.firstWhere(
+        (path) => path['from_screen_id'] == screen['id'] && path['to_screen_id'] == targetScreenId,
+        orElse: () => {},
+      );
+      
+      if (directPath.isNotEmpty) {
+        paths.add({
+          'from': screen['name'],
+          'to': feature['name'],
+          'steps': [
+            '1. ${directPath['method']}',
+            '2. ${feature['usage']}'
+          ],
+          'screens_involved': [screen['id'], targetScreenId],
+        });
+      }
+    }
+    
+    return paths;
+  }
+
+  // Phương thức giúp trích xuất các thành phần UI cần thiết cho một tác vụ
+  Map<String, dynamic> getUIComponentsForTask(String taskDescription) {
+    // Phân tích mô tả tác vụ để tìm ra các từ khóa liên quan
+    final keywords = taskDescription.toLowerCase().split(' ');
+    
+    // Danh sách các tính năng có thể liên quan
+    List<Map<String, dynamic>> relevantFeatures = [];
+    
+    // Tìm các tính năng phù hợp nhất với mô tả
+    for (var feature in _appFeatures) {
+      int matchScore = 0;
+      
+      // Tính điểm dựa trên sự xuất hiện của từ khóa
+      for (var keyword in keywords) {
+        if (feature['name'].toString().toLowerCase().contains(keyword)) matchScore += 3;
+        if (feature['description'].toString().toLowerCase().contains(keyword)) matchScore += 2;
+        
+        // Kiểm tra trong user_tasks nếu có
+        if (feature['user_tasks'] != null) {
+          for (var task in feature['user_tasks']) {
+            if (task.toString().toLowerCase().contains(keyword)) matchScore += 4;
+          }
+        }
+      }
+      
+      if (matchScore > 0) {
+        relevantFeatures.add({
+          ...feature,
+          'match_score': matchScore,
+        });
+      }
+    }
+    
+    // Sắp xếp theo điểm phù hợp
+    relevantFeatures.sort((a, b) => (b['match_score'] as int).compareTo(a['match_score'] as int));
+    
+    // Lấy tính năng phù hợp nhất
+    if (relevantFeatures.isEmpty) {
+      return {
+        'found': false,
+        'message': 'Không tìm thấy tính năng phù hợp với mô tả tác vụ.'
+      };
+    }
+    
+    final bestFeature = relevantFeatures.first;
+    final screenId = bestFeature['screen_id'] ?? '';
+    
+    // Tìm màn hình và đường dẫn
+    final screen = _appScreens.firstWhere(
+      (s) => s['id'] == screenId,
+      orElse: () => {'name': 'Không xác định'},
+    );
+    
+    // Tìm đường dẫn đến tính năng
+    final paths = findPathsToFeature(bestFeature['id']);
+    
+    return {
+      'found': true,
+      'feature': bestFeature,
+      'screen': screen,
+      'navigation_paths': paths,
+      'usage_guide': generateUsageGuideForFeature(bestFeature['id']),
+    };
   }
 } 

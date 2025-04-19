@@ -13,6 +13,9 @@ import 'dart:js_util' if (dart.library.io) 'package:flutter/material.dart' as js
 class GeminiService extends ChangeNotifier {
   GenerativeModel? _model;
   ChatSession? _chatSession;
+  
+  // Danh sách lịch sử chat dạng Content
+  List<Content> _history = [];
 
   // Lịch sử chat - không còn private để RAGService có thể truy cập
   List<Map<String, dynamic>> chatHistory = [];
@@ -22,6 +25,9 @@ class GeminiService extends ChangeNotifier {
 
   String _errorMessage = '';
   String get errorMessage => _errorMessage;
+
+  // Tham chiếu đến phương thức sendMessageWithContext
+  late Future<String> Function(String context, String message) sendContextMessage;
 
   // Thêm phương thức để set isLoading
   void setLoading(bool value) {
@@ -49,6 +55,28 @@ class GeminiService extends ChangeNotifier {
   GeminiService() {
     _initializeGemini();
     _loadChatHistory();
+    // Gán tham chiếu đến phương thức
+    sendContextMessage = sendMessageWithContext;
+  }
+  
+  /// Khởi tạo model Gemini
+  Future<void> initialize() async {
+    await _initializeGemini();
+  }
+  
+  /// Kiểm tra xem model đã được khởi tạo chưa
+  void _checkInitialized() {
+    if (_model == null) {
+      throw Exception('Gemini model chưa được khởi tạo. Hãy gọi initialize() trước.');
+    }
+  }
+  
+  /// Giới hạn độ dài của lịch sử để tránh quá tải
+  void _trimHistory() {
+    // Giữ tối đa 10 tin nhắn gần nhất (5 cặp hỏi-đáp)
+    if (_history.length > 10) {
+      _history = _history.sublist(_history.length - 10);
+    }
   }
 
   // Phương thức lấy API key
@@ -74,6 +102,9 @@ class GeminiService extends ChangeNotifier {
 
       // Khởi tạo phiên chat
       _chatSession = _model?.startChat();
+      
+      // Khởi tạo lịch sử trống
+      _history = [];
       
       // Gửi tin nhắn system prompt đầu tiên
       if (_chatSession != null) {
@@ -291,8 +322,8 @@ class GeminiService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Thêm phương thức để gửi tin nhắn với ngữ cảnh (dành cho RAG)
-  Future<String> sendMessageWithContext(String context, String userQuery) async {
+  // Phương thức để gửi tin nhắn với ngữ cảnh RAG
+  Future<String> sendMessageWithRAGContext(String context, String userQuery) async {
     // Tạo prompt với ngữ cảnh và câu hỏi
     final prompt = """
 Dựa trên thông tin sau đây:
@@ -335,6 +366,110 @@ Trả lời một cách ngắn gọn, chính xác và hữu ích. Chỉ sử d�
       notifyListeners();
       
       return 'Lỗi khi xử lý dữ liệu: $e';
+    }
+  }
+
+  /// Gửi tin nhắn với context dưới dạng văn bản tự do
+  Future<String> sendMessageWithContext(String context, String message) async {
+    _checkInitialized();
+    
+    try {
+      final systemContext = 'Hãy sử dụng thông tin sau đây để trả lời câu hỏi:\n\n$context';
+      debugPrint('Sending message with context to Gemini');
+      
+      // Tạo phiên chat mới nếu chưa có
+      if (_chatSession == null) {
+        _chatSession = _model?.startChat();
+      }
+      
+      if (_model == null) {
+        throw Exception('Model không được khởi tạo');
+      }
+      
+      // Tạo nội dung
+      final List<Content> contentList = [Content.text(systemContext), Content.text(message)];
+      
+      final response = await _model!.generateContent(contentList);
+      final responseText = response.text ?? '';
+      
+      // Thêm vào lịch sử
+      _history.add(Content.text(message));
+      _history.add(Content.text(responseText));
+      
+      // Đảm bảo lịch sử không quá dài
+      _trimHistory();
+      
+      return responseText;
+    } catch (e) {
+      debugPrint('Gemini error: $e');
+      return 'Xin lỗi, tôi không thể trả lời câu hỏi này vào lúc này. Lỗi: $e';
+    }
+  }
+  
+  /// Gửi tin nhắn với system prompt để kiểm soát phản hồi
+  Future<String> sendPromptedMessage(String systemPrompt, String message, {bool addToHistory = true}) async {
+    _checkInitialized();
+    
+    try {
+      debugPrint('Sending prompted message to Gemini');
+      
+      if (_model == null) {
+        throw Exception('Model không được khởi tạo');
+      }
+      
+      // Tạo đối tượng Content cho system prompt và tin nhắn
+      final List<Content> contentList = [Content.text(systemPrompt), Content.text(message)];
+      
+      // Gửi tin nhắn
+      final response = await _model!.generateContent(contentList);
+      final responseText = response.text ?? '';
+      
+      // Thêm vào lịch sử nếu được chỉ định
+      if (addToHistory) {
+        _history.add(Content.text(message));
+        _history.add(Content.text(responseText));
+        
+        // Đảm bảo lịch sử không quá dài
+        _trimHistory();
+      }
+      
+      return responseText;
+    } catch (e) {
+      debugPrint('Gemini error: $e');
+      return 'Xin lỗi, tôi không thể trả lời câu hỏi này vào lúc này. Lỗi: $e';
+    }
+  }
+  
+  /// Gửi tin nhắn với cả context và system prompt
+  Future<String> sendContextAndPrompt(String context, String systemPrompt, String message) async {
+    _checkInitialized();
+    
+    try {
+      final fullPrompt = '$systemPrompt\n\nDữ liệu tham khảo:\n$context';
+      debugPrint('Sending message with context and system prompt to Gemini');
+      
+      if (_model == null) {
+        throw Exception('Model không được khởi tạo');
+      }
+      
+      // Tạo nội dung
+      final List<Content> contentList = [Content.text(fullPrompt), Content.text(message)];
+      
+      // Gửi tin nhắn
+      final response = await _model!.generateContent(contentList);
+      final responseText = response.text ?? '';
+      
+      // Thêm vào lịch sử
+      _history.add(Content.text(message));
+      _history.add(Content.text(responseText));
+      
+      // Đảm bảo lịch sử không quá dài
+      _trimHistory();
+      
+      return responseText;
+    } catch (e) {
+      debugPrint('Gemini error: $e');
+      return 'Xin lỗi, tôi không thể trả lời câu hỏi này vào lúc này. Lỗi: $e';
     }
   }
 } 

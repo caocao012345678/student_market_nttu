@@ -26,7 +26,8 @@ class AppDrawer extends StatelessWidget {
     final isDarkMode = themeService.isDarkMode;
 
     return Drawer(
-      child: Column(
+      child: ListView(
+        padding: EdgeInsets.zero,
         children: [
           // User Header
           UserAccountsDrawerHeader(
