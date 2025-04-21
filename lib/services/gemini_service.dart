@@ -83,20 +83,25 @@ class GeminiService extends ChangeNotifier {
   String? getApiKey() {
     return dotenv.env['GEMINI_API_KEY'];
   }
+  String? getModel() {
+    return dotenv.env['GEMINI_MODEL'];
+  }
 
   Future<void> _initializeGemini() async {
     try {
       // Lấy API key từ .env
       String? apiKey = getApiKey();
+      String? model = getModel();
       
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception('API key không hợp lệ. Vui lòng cấu hình API key');
       }
+      if (model == null || model.isEmpty) {
+        throw Exception('Model không hợp lệ. Vui lòng cấu hình model');
+      }
       
-      // Khởi tạo model với Gemini 1.5 Flash (Model phiên bản mới nhất chính thức)
       _model = GenerativeModel(
-        // Sử dụng model chính thức - model gemini-2.0-flash-thinking-experimental-01-21 không tồn tại
-        model: 'gemini-1.5-flash', // 'gemini-1.5-pro' là lựa chọn thay thế nếu cần nhiều tính năng hơn
+        model: model,
         apiKey: apiKey,
       );
 
