@@ -12,8 +12,11 @@ import 'package:student_market_nttu/models/product.dart';
 import 'package:student_market_nttu/widgets/product_card_standard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
+import 'package:student_market_nttu/screens/cart_screen.dart';
+import 'package:student_market_nttu/widgets/cart_badge.dart';
 
 import '../services/user_service.dart';
+import '../services/cart_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -106,6 +109,26 @@ class _HomeContentState extends State<HomeContent> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Khởi tạo giỏ hàng khi màn hình được mở
+    _initCartIfNeeded();
+  }
+  
+  // Phương thức khởi tạo giỏ hàng
+  void _initCartIfNeeded() {
+    Future.microtask(() {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final cartService = Provider.of<CartService>(context, listen: false);
+      
+      // Nếu người dùng đã đăng nhập, tải giỏ hàng
+      if (authService.currentUser != null) {
+        cartService.fetchCartItems(authService.currentUser!.uid);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _bannerController.dispose();
     super.dispose();
@@ -131,12 +154,7 @@ class _HomeContentState extends State<HomeContent> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            onPressed: () {
-              // Navigate to cart
-            },
-          ),
+          const CartBadge(),
         ],
       ),
       body: RefreshIndicator(
@@ -246,6 +264,12 @@ class _HomeContentState extends State<HomeContent> {
                 TextButton(
                   onPressed: () {
                     // Navigate to see all
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) => const ProductListScreen(),
+                      ),
+                    );
                   },
                   child: Text(
                     'Xem tất cả',
@@ -259,9 +283,9 @@ class _HomeContentState extends State<HomeContent> {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 300,
+              height: 350,
               child: FutureBuilder<List<Product>>(
-                future: Provider.of<ProductService>(context, listen: false).getRecommendedProducts(),
+                future: _getPersonalizedRecommendations(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -282,7 +306,7 @@ class _HomeContentState extends State<HomeContent> {
                         margin: const EdgeInsets.only(right: 12),
                         child: ProductCardStandard(
                           product: products[index],
-                          isCompact: true,
+                          isCompact: false,
                         ),
                       );
                     },
@@ -294,6 +318,23 @@ class _HomeContentState extends State<HomeContent> {
         ),
       ),
     );
+  }
+
+  // Phương thức lấy sản phẩm đề xuất cá nhân hóa cho người dùng
+  Future<List<Product>> _getPersonalizedRecommendations() async {
+    final productService = Provider.of<ProductService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    // Nếu người dùng đã đăng nhập, lấy đề xuất dựa trên hành vi của họ
+    if (authService.currentUser != null) {
+      return productService.getRecommendedProductsForUser(
+        authService.currentUser!.uid,
+        limit: 10,
+      );
+    } else {
+      // Nếu chưa đăng nhập, lấy đề xuất chung
+      return productService.getRecommendedProducts(limit: 10);
+    }
   }
 
   Widget _buildFeaturedShops() {
@@ -653,6 +694,7 @@ class _HomeContentState extends State<HomeContent> {
                     return ProductCardStandard(
                       product: products[index],
                       showFavoriteButton: true,
+                      isCompact: false,
                     );
                   },
                 );
