@@ -17,7 +17,6 @@ import '../widgets/cart_badge.dart';
 import '../widgets/related_products_section.dart';
 import '../services/user_service.dart';
 import '../services/product_service.dart';
-import '../widgets/reviews_section.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -49,7 +48,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _scrollController.addListener(_onScroll);
     
     _updateProductViewData();
@@ -410,58 +409,144 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormatter = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+    final currencyFormat = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: 'đ',
+    );
     
-    return Scaffold(
-      body: NestedScrollView(
-        controller: _scrollController,
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              expandedHeight: 300,
-              pinned: true,
-              title: _showAppBarTitle ? Text(widget.product.title) : null,
-              flexibleSpace: FlexibleSpaceBar(
-                background: _buildImageGallery(),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        body: NestedScrollView(
+          controller: _scrollController,
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              SliverAppBar(
+                expandedHeight: 300,
+                pinned: true,
+                floating: false,
+                title: _showAppBarTitle ? Text(widget.product.title) : null,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: _buildImageGallery(),
+                ),
+                actions: [
+                  IconButton(
+                    icon: Icon(
+                      _isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: _isFavorite ? Colors.red : Colors.white,
+                    ),
+                    onPressed: _toggleFavorite,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.share, color: Colors.white),
+                    onPressed: _shareProduct,
+                  ),
+                  const CartBadge(),
+                ],
               ),
-              actions: [
-                IconButton(
-                  icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border),
-                  onPressed: _toggleFavorite,
-                  tooltip: 'Yêu thích',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.share),
-                  onPressed: _shareProduct,
-                  tooltip: 'Chia sẻ',
-                ),
-                const CartBadge(),
-              ],
-            ),
-            SliverPersistentHeader(
-              delegate: _SliverAppBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  tabs: const [
-                    Tab(text: 'Chi tiết'),
-                    Tab(text: 'Đánh giá'),
-                  ],
-                  labelColor: Theme.of(context).colorScheme.primary,
-                  indicatorColor: Theme.of(context).colorScheme.primary,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.product.title,
+                        style: const TextStyle(
+                          fontSize: 20, 
+                          fontWeight: FontWeight.bold
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        currencyFormat.format(widget.product.price),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Seller info
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundImage: widget.product.sellerAvatar.isNotEmpty
+                                ? NetworkImage(widget.product.sellerAvatar)
+                                : null,
+                            child: widget.product.sellerAvatar.isEmpty
+                                ? const Icon(Icons.person, size: 18)
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.product.sellerName.isNotEmpty
+                                      ? widget.product.sellerName
+                                      : 'Người bán',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (widget.product.location.isNotEmpty)
+                                  Text(
+                                    widget.product.location,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => UserProfilePage(
+                                    userId: widget.product.sellerId,
+                                    username: widget.product.sellerName,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
+                            child: const Text('Xem shop', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              pinned: true,
-            ),
-          ];
-        },
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            // Tab 1: Chi tiết sản phẩm
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    labelColor: Theme.of(context).colorScheme.primary,
+                    unselectedLabelColor: Colors.grey,
+                    tabs: const [
+                      Tab(text: 'Thông tin'),
+                      Tab(text: 'Đánh giá'),
+                    ],
+                  ),
+                ),
+                pinned: true,
+              ),
+            ];
+          },
+          body: TabBarView(
+            children: [
+              // Product info tab
+              ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
                   // Quick info cards
                   Card(
@@ -531,99 +616,240 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   // Related products - with minimal fixed height design
                   RelatedProductsSection(
                     category: widget.product.category,
-                    excludeProductId: widget.product.id,
+                    currentProductId: widget.product.id,
                   ),
                   // Add significant bottom padding to ensure no overflow
                   const SizedBox(height: 120),
                 ],
               ),
-            ),
+              
+              // Reviews tab
+              ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  StreamBuilder<List<Review>>(
+                    stream: Provider.of<ReviewService>(context).getReviewsByProductId(widget.product.id),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-            // Tab 2: Đánh giá
-            SingleChildScrollView(
-              child: ReviewsSection(
-                productId: widget.product.id,
-                productName: widget.product.title,
-                rating: widget.product.rating,
-                reviewCount: widget.product.reviewCount,
-              ),
-            ),
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text('Lỗi: ${snapshot.error}'),
+                        );
+                      }
 
+                      final reviews = snapshot.data ?? [];
 
-          ],
-        ),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(width: 32), // Offset for the floating action button
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).padding.bottom > 0 
-                      ? MediaQuery.of(context).padding.bottom 
-                      : 8,
-                ),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                      if (reviews.isEmpty) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Text('Chưa có đánh giá nào'),
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Review summary
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Column(
+                                    children: [
+                                      Text(
+                                        reviews.isNotEmpty
+                                            ? (reviews.map((r) => r.rating).reduce((a, b) => a + b) /
+                                                reviews.length)
+                                                .toStringAsFixed(1)
+                                            : '0.0',
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: List.generate(5, (index) {
+                                          final rating = reviews.isNotEmpty
+                                              ? reviews.map((r) => r.rating).reduce((a, b) => a + b) /
+                                                  reviews.length
+                                              : 0.0;
+                                          return Icon(
+                                            index < rating ? Icons.star : Icons.star_border,
+                                            color: Colors.amber,
+                                            size: 16,
+                                          );
+                                        }),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${reviews.length} đánh giá',
+                                        style: const TextStyle(color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Review list
+                          ...reviews.map((review) => _buildReviewItem(review)).toList(),
+                          const SizedBox(height: 16),
+                          // Add review form
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Viết đánh giá',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Text('Đánh giá:'),
+                                      const SizedBox(width: 8),
+                                      ...List.generate(5, (index) {
+                                        return IconButton(
+                                          icon: Icon(
+                                            index < _rating ? Icons.star : Icons.star_border,
+                                            color: Colors.amber,
+                                            size: 20,
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          onPressed: () {
+                                            setState(() {
+                                              _rating = index + 1.0;
+                                            });
+                                          },
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _reviewController,
+                                    maxLines: 2,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Nhập đánh giá của bạn...',
+                                      border: OutlineInputBorder(),
+                                      contentPadding: EdgeInsets.all(12),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading ? null : () {},
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            )
+                                          : const Text('Gửi đánh giá'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Add padding at the bottom
+                          const SizedBox(height: 80),
+                        ],
+                      );
+                    },
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Expanded(
-                          child: TextButton.icon(
-                            onPressed: () {
-                              // TODO: Chat with seller
-                            },
-                            icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                            label: const Text('Nhắn tin', style: TextStyle(fontSize: 11)),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              minimumSize: Size.zero,
+                ],
+              ),
+            ],
+          ),
+        ),
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(width: 32), // Offset for the floating action button
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).padding.bottom > 0 
+                        ? MediaQuery.of(context).padding.bottom 
+                        : 8,
+                  ),
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Expanded(
+                            child: TextButton.icon(
+                              onPressed: () {
+                                // TODO: Chat with seller
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                              label: const Text('Nhắn tin', style: TextStyle(fontSize: 11)),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                minimumSize: Size.zero,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _addToCart(context),
-                            icon: const Icon(Icons.shopping_cart_outlined, size: 16),
-                            label: const Text('Thêm giỏ', style: TextStyle(fontSize: 11)),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              minimumSize: Size.zero,
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _addToCart(context),
+                              icon: const Icon(Icons.shopping_cart_outlined, size: 16),
+                              label: const Text('Thêm giỏ', style: TextStyle(fontSize: 11)),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                minimumSize: Size.zero,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _showPurchaseDialog(context),
-                            icon: const Icon(Icons.payment, size: 16),
-                            label: const Text('Mua ngay', style: TextStyle(fontSize: 11)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              minimumSize: Size.zero,
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showPurchaseDialog(context),
+                              icon: const Icon(Icons.payment, size: 16),
+                              label: const Text('Mua ngay', style: TextStyle(fontSize: 11)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                minimumSize: Size.zero,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -692,6 +918,64 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
       ],
+    );
+  }
+  
+  Widget _buildReviewItem(Review review) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 16,
+                  child: Icon(Icons.person, size: 18),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        review.userEmail,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('dd/MM/yyyy').format(review.createdAt),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < review.rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 14,
+                    );
+                  }),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              review.comment,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

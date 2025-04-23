@@ -31,8 +31,6 @@ class UserModel {
   final List<String> preferredCategories; // Các danh mục sản phẩm quan tâm
   final bool completedSurvey; // Đã hoàn thành khảo sát hay chưa
   final List<String> recentlyViewed; // Thêm trường lưu sản phẩm đã xem gần đây
-  final bool isAdmin; // Quyền quản trị viên
-  final List<Map<String, dynamic>> locations; // Danh sách địa điểm người dùng đã thêm
 
   UserModel({
     required this.id,
@@ -65,8 +63,6 @@ class UserModel {
     this.preferredCategories = const [],
     this.completedSurvey = false,
     this.recentlyViewed = const [], // Khởi tạo mảng rỗng
-    this.isAdmin = false,
-    this.locations = const [], // Khởi tạo mảng rỗng
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
@@ -82,8 +78,8 @@ class UserModel {
       followers: List<String>.from(map['followers'] ?? []),
       isShipper: map['isShipper'] ?? false,
       isStudent: map['isStudent'] ?? false,
-      studentId: map['studentId'],
-      department: map['department'],
+      studentId: map['studentId'] ?? '',
+      department: map['department'] ?? '',
       createdAt: map['createdAt'] != null 
         ? (map['createdAt'] as Timestamp).toDate() 
         : DateTime.now(),
@@ -93,15 +89,7 @@ class UserModel {
       settings: Map<String, dynamic>.from(map['settings'] ?? {'darkMode': false, 'notifications': true}),
       nttPoint: map['nttPoint'] ?? 0,
       nttCredit: map['nttCredit'] ?? 0,
-      recentlyViewed: List<String>.from(map['recentlyViewed'] ?? []),
-      studentYear: map['studentYear'],
-      major: map['major'],
-      specialization: map['specialization'],
-      interests: List<String>.from(map['interests'] ?? []),
-      preferredCategories: List<String>.from(map['preferredCategories'] ?? []),
-      completedSurvey: map['completedSurvey'] ?? false,
-      isAdmin: map['isAdmin'] ?? false,
-      locations: List<Map<String, dynamic>>.from(map['locations'] ?? []),
+      recentlyViewed: List<String>.from(map['recentlyViewed'] ?? []), // Lấy danh sách từ Firestore
     );
   }
 
@@ -125,14 +113,6 @@ class UserModel {
       'nttPoint': nttPoint,
       'nttCredit': nttCredit,
       'recentlyViewed': recentlyViewed, // Lưu danh sách vào Firestore
-      'studentYear': studentYear,
-      'major': major,
-      'specialization': specialization,
-      'interests': interests,
-      'preferredCategories': preferredCategories,
-      'completedSurvey': completedSurvey,
-      'isAdmin': isAdmin,
-      'locations': locations,
     };
   }
 
@@ -156,14 +136,6 @@ class UserModel {
     int? nttPoint,
     int? nttCredit,
     List<String>? recentlyViewed, // Thêm vào phương thức copyWith
-    int? studentYear,
-    String? major,
-    String? specialization,
-    List<String>? interests,
-    List<String>? preferredCategories,
-    bool? completedSurvey,
-    bool? isAdmin,
-    List<Map<String, dynamic>>? locations,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -185,14 +157,6 @@ class UserModel {
       nttPoint: nttPoint ?? this.nttPoint,
       nttCredit: nttCredit ?? this.nttCredit,
       recentlyViewed: recentlyViewed ?? this.recentlyViewed, // Sử dụng trong copyWith
-      studentYear: studentYear ?? this.studentYear,
-      major: major ?? this.major,
-      specialization: specialization ?? this.specialization,
-      interests: interests ?? this.interests,
-      preferredCategories: preferredCategories ?? this.preferredCategories,
-      completedSurvey: completedSurvey ?? this.completedSurvey,
-      isAdmin: isAdmin ?? this.isAdmin,
-      locations: locations ?? this.locations,
     );
   }
 

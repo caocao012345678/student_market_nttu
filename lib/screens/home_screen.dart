@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/screens/product_list_screen.dart';
@@ -13,12 +12,11 @@ import 'package:student_market_nttu/models/product.dart';
 import 'package:student_market_nttu/widgets/product_card_standard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
-import 'package:student_market_nttu/screens/chatbot_screen.dart';
-import 'package:student_market_nttu/widgets/app_drawer.dart';
-import 'package:student_market_nttu/screens/ai_hub_screen.dart';
-import 'package:student_market_nttu/screens/ai_onboarding_screen.dart';
+import 'package:student_market_nttu/screens/cart_screen.dart';
+import 'package:student_market_nttu/widgets/cart_badge.dart';
 
 import '../services/user_service.dart';
+import '../services/cart_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,9 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   final List<String> _bannerImages = [
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner1.jpg?alt=media',
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner2.jpg?alt=media', 
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner3.jpg?alt=media',
+    'assets/images/banner/banner1.jpg',
+    'assets/images/banner/banner2.jpg',
+    'assets/images/banner/banner3.jpg',
   ];
 
   @override
@@ -105,10 +103,30 @@ class _HomeContentState extends State<HomeContent> {
   int _currentBannerIndex = 0;
   
   final List<String> _bannerImages = [
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner1.jpg?alt=media',
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner2.jpg?alt=media',
-    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner3.jpg?alt=media',
+    'assets/images/banner/banner1.jpg',
+    'assets/images/banner/banner2.jpg',
+    'assets/images/banner/banner3.jpg',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Khởi tạo giỏ hàng khi màn hình được mở
+    _initCartIfNeeded();
+  }
+  
+  // Phương thức khởi tạo giỏ hàng
+  void _initCartIfNeeded() {
+    Future.microtask(() {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final cartService = Provider.of<CartService>(context, listen: false);
+      
+      // Nếu người dùng đã đăng nhập, tải giỏ hàng
+      if (authService.currentUser != null) {
+        cartService.fetchCartItems(authService.currentUser!.uid);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -119,7 +137,6 @@ class _HomeContentState extends State<HomeContent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const AppDrawer(),
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Student Market NTTU'),
@@ -137,42 +154,8 @@ class _HomeContentState extends State<HomeContent> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => Scaffold(
-                    appBar: AppBar(title: const Text('Giỏ hàng')),
-                    body: const Center(child: Text('Chức năng giỏ hàng đang phát triển.')), // Placeholder
-                  ),
-                ),
-              );
-            },
-          ),
+          const CartBadge(),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          // Check if onboarding is completed
-          final prefs = await SharedPreferences.getInstance();
-          final bool onboardingCompleted = prefs.getBool('ai_onboarding_completed') ?? false;
-          
-          if (onboardingCompleted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AIHubScreen()),
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AIOnboardingScreen()),
-            );
-          }
-        },
-        backgroundColor: Colors.blue[900],
-        child: const Icon(Icons.smart_toy_outlined, color: Colors.white),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -218,7 +201,9 @@ class _HomeContentState extends State<HomeContent> {
                   fit: BoxFit.cover,
                   placeholder: (context, url) => Container(
                     color: Colors.grey[200],
-                    child: const Center(child: CircularProgressIndicator()),
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
                   ),
                   errorWidget: (context, url, error) => Container(
                     color: Colors.grey[200],
@@ -279,6 +264,12 @@ class _HomeContentState extends State<HomeContent> {
                 TextButton(
                   onPressed: () {
                     // Navigate to see all
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) => const ProductListScreen(),
+                      ),
+                    );
                   },
                   child: Text(
                     'Xem tất cả',
@@ -292,9 +283,9 @@ class _HomeContentState extends State<HomeContent> {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 300,
+              height: 350,
               child: FutureBuilder<List<Product>>(
-                future: Provider.of<ProductService>(context, listen: false).getRecommendedProducts(),
+                future: _getPersonalizedRecommendations(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -315,7 +306,7 @@ class _HomeContentState extends State<HomeContent> {
                         margin: const EdgeInsets.only(right: 12),
                         child: ProductCardStandard(
                           product: products[index],
-                          isCompact: true,
+                          isCompact: false,
                         ),
                       );
                     },
@@ -329,30 +320,47 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
+  // Phương thức lấy sản phẩm đề xuất cá nhân hóa cho người dùng
+  Future<List<Product>> _getPersonalizedRecommendations() async {
+    final productService = Provider.of<ProductService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    // Nếu người dùng đã đăng nhập, lấy đề xuất dựa trên hành vi của họ
+    if (authService.currentUser != null) {
+      return productService.getRecommendedProductsForUser(
+        authService.currentUser!.uid,
+        limit: 10,
+      );
+    } else {
+      // Nếu chưa đăng nhập, lấy đề xuất chung
+      return productService.getRecommendedProducts(limit: 10);
+    }
+  }
+
   Widget _buildFeaturedShops() {
     // This would be replaced with actual data from a service
     final List<Map<String, dynamic>> featuredShops = [
       {
         'name': 'Shop NTTU Books',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop1.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop1.jpg?alt=media',
         'rating': 4.8,
         'productCount': 56,
       },
       {
         'name': 'Điện tử sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop2.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop2.jpg?alt=media',
         'rating': 4.5,
         'productCount': 42,
       },
       {
         'name': 'Second Hand NTTU',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop3.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop3.jpg?alt=media',
         'rating': 4.6,
         'productCount': 78,
       },
       {
         'name': 'Thời trang sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop4.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop4.jpg?alt=media',
         'rating': 4.7,
         'productCount': 63,
       },
@@ -411,11 +419,6 @@ class _HomeContentState extends State<HomeContent> {
                           backgroundImage: CachedNetworkImageProvider(
                             shop['avatar'],
                           ),
-                          backgroundColor: Colors.grey[200],
-                          onBackgroundImageError: (exception, stackTrace) {
-                            // Handle error without returning anything
-                            debugPrint('Error loading shop avatar: $exception');
-                          },
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -466,17 +469,17 @@ class _HomeContentState extends State<HomeContent> {
     final List<Map<String, dynamic>> topDonors = [
       {
         'name': 'Nguyễn Văn A',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/donors%2Fdonor1.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor1.jpg?alt=media',
         'donationCount': 15,
       },
       {
         'name': 'Trần Thị B',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/donors%2Fdonor2.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor2.jpg?alt=media',
         'donationCount': 12,
       },
       {
         'name': 'Lê Văn C',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/donors%2Fdonor3.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor3.jpg?alt=media',
         'donationCount': 10,
       },
     ];
@@ -504,15 +507,7 @@ class _HomeContentState extends State<HomeContent> {
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => Scaffold(
-                          appBar: AppBar(title: const Text('Tất cả nhà tài trợ')),
-                          body: const Center(child: Text('Danh sách nhà tài trợ đang phát triển.')), // Placeholder
-                        ),
-                      ),
-                    );
+                    // Navigate to see all donors
                   },
                   child: Text(
                     'Xem tất cả',
@@ -567,10 +562,6 @@ class _HomeContentState extends State<HomeContent> {
                                       : 'https://via.placeholder.com/80',
                                 ),
                                 backgroundColor: Colors.grey[200],
-                                onBackgroundImageError: (exception, stackTrace) {
-                                  // Handle error without returning anything
-                                  debugPrint('Error loading donor avatar: $exception');
-                                },
                               ),
                               Positioned(
                                 bottom: 0,
@@ -703,6 +694,7 @@ class _HomeContentState extends State<HomeContent> {
                     return ProductCardStandard(
                       product: products[index],
                       showFavoriteButton: true,
+                      isCompact: false,
                     );
                   },
                 );
