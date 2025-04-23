@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/screens/product_list_screen.dart';
@@ -13,10 +12,6 @@ import 'package:student_market_nttu/models/product.dart';
 import 'package:student_market_nttu/widgets/product_card_standard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
-import 'package:student_market_nttu/screens/chatbot_screen.dart';
-import 'package:student_market_nttu/widgets/app_drawer.dart';
-import 'package:student_market_nttu/screens/ai_hub_screen.dart';
-import 'package:student_market_nttu/screens/ai_onboarding_screen.dart';
 
 import '../services/user_service.dart';
 
@@ -119,7 +114,6 @@ class _HomeContentState extends State<HomeContent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const AppDrawer(),
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Student Market NTTU'),
@@ -144,27 +138,6 @@ class _HomeContentState extends State<HomeContent> {
             },
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          // Check if onboarding is completed
-          final prefs = await SharedPreferences.getInstance();
-          final bool onboardingCompleted = prefs.getBool('ai_onboarding_completed') ?? false;
-          
-          if (onboardingCompleted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AIHubScreen()),
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AIOnboardingScreen()),
-            );
-          }
-        },
-        backgroundColor: Colors.blue[900],
-        child: const Icon(Icons.smart_toy_outlined, color: Colors.white),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -205,10 +178,16 @@ class _HomeContentState extends State<HomeContent> {
               },
               itemCount: _bannerImages.length,
               itemBuilder: (context, index) {
-                return Image.asset(
-                  _bannerImages[index],
+                return CachedNetworkImage(
+                  imageUrl: _bannerImages[index],
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
                     color: Colors.grey[200],
                     child: const Icon(Icons.error),
                   ),

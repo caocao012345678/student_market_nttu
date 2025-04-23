@@ -429,6 +429,61 @@ class UserService extends ChangeNotifier {
     }
   }
 
+  // Thêm sản phẩm vào lịch sử xem gần đây của người dùng
+  Future<void> addToRecentlyViewed(String productId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return; // Không làm gì nếu người dùng chưa đăng nhập
+      
+      // Lấy dữ liệu người dùng hiện tại
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (!userDoc.exists) return;
+      
+      // Lấy danh sách sản phẩm đã xem gần đây
+      List<String> recentlyViewed = List<String>.from(userDoc.data()?['recentlyViewed'] ?? []);
+      
+      // Xóa sản phẩm khỏi danh sách nếu đã tồn tại (để sau đó thêm lại vào đầu)
+      recentlyViewed.remove(productId);
+      
+      // Thêm sản phẩm vào đầu danh sách
+      recentlyViewed.insert(0, productId);
+      
+      // Giới hạn danh sách chỉ lưu tối đa 20 sản phẩm gần nhất
+      if (recentlyViewed.length > 20) {
+        recentlyViewed = recentlyViewed.sublist(0, 20);
+      }
+      
+      // Cập nhật Firestore
+      await _firestore.collection('users').doc(user.uid).update({
+        'recentlyViewed': recentlyViewed,
+      });
+      
+      // Cập nhật dữ liệu người dùng local nếu cần
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(recentlyViewed: recentlyViewed);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error adding to recently viewed: $e');
+    }
+  }
+  
+  // Lấy danh sách sản phẩm đã xem gần đây
+  Future<List<String>> getRecentlyViewed() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return [];
+      
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (!userDoc.exists) return [];
+      
+      return List<String>.from(userDoc.data()?['recentlyViewed'] ?? []);
+    } catch (e) {
+      print('Error getting recently viewed products: $e');
+      return [];
+    }
+  }
+
   // Cập nhật điểm uy tín (NTTCredit)
   Future<void> updateNTTCredit(int points, String reason) async {
     try {

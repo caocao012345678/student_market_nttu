@@ -15,6 +15,8 @@ import '../screens/product_list_screen.dart';
 import '../screens/cart_screen.dart';
 import '../widgets/cart_badge.dart';
 import '../widgets/related_products_section.dart';
+import '../services/user_service.dart';
+import '../services/product_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -48,6 +50,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _scrollController.addListener(_onScroll);
+    
+    _updateProductViewData();
   }
 
   void _onScroll() {
@@ -973,6 +977,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ),
       ),
     );
+  }
+
+  Future<void> _updateProductViewData() async {
+    final productService = Provider.of<ProductService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    // Always increment view count
+    await productService.incrementProductViewCount(widget.product.id);
+    
+    // Only add to recently viewed if user is logged in
+    if (authService.currentUser != null) {
+      await productService.addToRecentlyViewed(
+        authService.currentUser!.uid,
+        widget.product.id
+      );
+    }
   }
 }
 

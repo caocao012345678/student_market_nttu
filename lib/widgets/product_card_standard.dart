@@ -184,7 +184,7 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
         );
       },
       child: Container(
-        height: cardHeight,
+        height: cardHeight.toDouble(),
         decoration: BoxDecoration(
           borderRadius: cardRadius,
           color: theme.cardColor,
@@ -486,7 +486,7 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                   ],
                 ),
                 
-                // Add to cart button (for non-sold products)
+                // Add to cart button (for non-sold products in ListView mode)
                 if (!widget.product.isSold)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),

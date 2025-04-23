@@ -30,6 +30,7 @@ class UserModel {
   final List<String> interests; // Sở thích cá nhân
   final List<String> preferredCategories; // Các danh mục sản phẩm quan tâm
   final bool completedSurvey; // Đã hoàn thành khảo sát hay chưa
+  final List<String> recentlyViewed; // Thêm trường lưu sản phẩm đã xem gần đây
 
   UserModel({
     required this.id,
@@ -61,6 +62,7 @@ class UserModel {
     this.interests = const [],
     this.preferredCategories = const [],
     this.completedSurvey = false,
+    this.recentlyViewed = const [], // Khởi tạo mảng rỗng
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
@@ -71,29 +73,23 @@ class UserModel {
       photoURL: map['photoURL'] ?? '',
       phoneNumber: map['phoneNumber'] ?? '',
       address: map['address'] ?? '',
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastActive: (map['lastActive'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      preferences: Map<String, dynamic>.from(map['preferences'] ?? {}),
-      settings: Map<String, dynamic>.from(map['settings'] ?? {}),
       favoriteProducts: List<String>.from(map['favoriteProducts'] ?? []),
-      followers: List<String>.from(map['followers'] ?? []),
       following: List<String>.from(map['following'] ?? []),
+      followers: List<String>.from(map['followers'] ?? []),
       isShipper: map['isShipper'] ?? false,
-      isVerified: map['isVerified'] ?? false,
-      bio: map['bio'],
-      productCount: map['productCount'] ?? 0,
-      rating: (map['rating'] ?? 0.0).toDouble(),
-      nttPoint: map['nttPoint'] ?? 0,
-      nttCredit: map['nttCredit'] ?? 100,
       isStudent: map['isStudent'] ?? false,
-      studentId: map['studentId'],
-      department: map['department'],
-      studentYear: map['studentYear'],
-      major: map['major'],
-      specialization: map['specialization'],
-      interests: List<String>.from(map['interests'] ?? []),
-      preferredCategories: List<String>.from(map['preferredCategories'] ?? []),
-      completedSurvey: map['completedSurvey'] ?? false,
+      studentId: map['studentId'] ?? '',
+      department: map['department'] ?? '',
+      createdAt: map['createdAt'] != null 
+        ? (map['createdAt'] as Timestamp).toDate() 
+        : DateTime.now(),
+      lastActive: map['lastActive'] != null 
+        ? (map['lastActive'] as Timestamp).toDate() 
+        : DateTime.now(),
+      settings: Map<String, dynamic>.from(map['settings'] ?? {'darkMode': false, 'notifications': true}),
+      nttPoint: map['nttPoint'] ?? 0,
+      nttCredit: map['nttCredit'] ?? 0,
+      recentlyViewed: List<String>.from(map['recentlyViewed'] ?? []), // Lấy danh sách từ Firestore
     );
   }
 
@@ -104,29 +100,19 @@ class UserModel {
       'photoURL': photoURL,
       'phoneNumber': phoneNumber,
       'address': address,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'lastActive': Timestamp.fromDate(lastActive),
-      'preferences': preferences,
-      'settings': settings,
       'favoriteProducts': favoriteProducts,
-      'followers': followers,
       'following': following,
+      'followers': followers,
       'isShipper': isShipper,
-      'isVerified': isVerified,
-      'bio': bio,
-      'productCount': productCount,
-      'rating': rating,
-      'nttPoint': nttPoint,
-      'nttCredit': nttCredit,
       'isStudent': isStudent,
       'studentId': studentId,
       'department': department,
-      'studentYear': studentYear,
-      'major': major,
-      'specialization': specialization,
-      'interests': interests,
-      'preferredCategories': preferredCategories,
-      'completedSurvey': completedSurvey,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'lastActive': Timestamp.fromDate(lastActive),
+      'settings': settings,
+      'nttPoint': nttPoint,
+      'nttCredit': nttCredit,
+      'recentlyViewed': recentlyViewed, // Lưu danh sách vào Firestore
     };
   }
 
@@ -137,29 +123,19 @@ class UserModel {
     String? photoURL,
     String? phoneNumber,
     String? address,
-    DateTime? createdAt,
-    DateTime? lastActive,
-    Map<String, dynamic>? preferences,
-    Map<String, dynamic>? settings,
     List<String>? favoriteProducts,
-    List<String>? followers,
     List<String>? following,
+    List<String>? followers,
     bool? isShipper,
-    bool? isVerified,
-    String? bio,
-    int? productCount,
-    double? rating,
-    int? nttPoint,
-    int? nttCredit,
     bool? isStudent,
     String? studentId,
     String? department,
-    int? studentYear,
-    String? major,
-    String? specialization,
-    List<String>? interests,
-    List<String>? preferredCategories,
-    bool? completedSurvey,
+    DateTime? createdAt,
+    DateTime? lastActive,
+    Map<String, dynamic>? settings,
+    int? nttPoint,
+    int? nttCredit,
+    List<String>? recentlyViewed, // Thêm vào phương thức copyWith
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -168,29 +144,19 @@ class UserModel {
       photoURL: photoURL ?? this.photoURL,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       address: address ?? this.address,
-      createdAt: createdAt ?? this.createdAt,
-      lastActive: lastActive ?? this.lastActive,
-      preferences: preferences ?? this.preferences,
-      settings: settings ?? this.settings,
       favoriteProducts: favoriteProducts ?? this.favoriteProducts,
-      followers: followers ?? this.followers,
       following: following ?? this.following,
+      followers: followers ?? this.followers,
       isShipper: isShipper ?? this.isShipper,
-      isVerified: isVerified ?? this.isVerified,
-      bio: bio ?? this.bio,
-      productCount: productCount ?? this.productCount,
-      rating: rating ?? this.rating,
-      nttPoint: nttPoint ?? this.nttPoint,
-      nttCredit: nttCredit ?? this.nttCredit,
       isStudent: isStudent ?? this.isStudent,
       studentId: studentId ?? this.studentId,
       department: department ?? this.department,
-      studentYear: studentYear ?? this.studentYear,
-      major: major ?? this.major,
-      specialization: specialization ?? this.specialization,
-      interests: interests ?? this.interests,
-      preferredCategories: preferredCategories ?? this.preferredCategories,
-      completedSurvey: completedSurvey ?? this.completedSurvey,
+      createdAt: createdAt ?? this.createdAt,
+      lastActive: lastActive ?? this.lastActive,
+      settings: settings ?? this.settings,
+      nttPoint: nttPoint ?? this.nttPoint,
+      nttCredit: nttCredit ?? this.nttCredit,
+      recentlyViewed: recentlyViewed ?? this.recentlyViewed, // Sử dụng trong copyWith
     );
   }
 
