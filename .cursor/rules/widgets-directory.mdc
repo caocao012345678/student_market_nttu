@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Widgets Directory Guide
+
+The [lib/widgets/](mdc:lib/widgets) directory contains reusable UI components for the Flutter app:
+
+- Each Dart file defines a widget, such as product cards, app drawers, badges, and section layouts.
+- Widgets are designed to be used across multiple screens to ensure consistency and reduce code duplication.
+
+Refer to this directory to find or add reusable UI components.
+

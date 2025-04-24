@@ -1,0 +1,22 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Project Structure Guide
+
+This project is a Flutter application with backend functions and a well-organized directory structure:
+
+- The main Flutter app code is in [lib/](mdc:lib), with the entry point at [main.dart](mdc:lib/main.dart).
+- UI screens are in [lib/screens/](mdc:lib/screens), with an [admin/](mdc:lib/screens/admin) subdirectory for admin pages.
+- Reusable widgets are in [lib/widgets/](mdc:lib/widgets).
+- Data models are in [lib/models/](mdc:lib/models).
+- Business logic and API calls are in [lib/services/](mdc:lib/services).
+- Utility functions are in [lib/utils/](mdc:lib/utils).
+- Static assets (images, icons) are in [assets/](mdc:assets).
+- Backend/serverless functions are in [functions/src/](mdc:functions/src).
+- Tests are in [test/](mdc:test).
+- Project configuration is in [pubspec.yaml](mdc:pubspec.yaml), [firebase.json](mdc:firebase.json), and [firestore.rules](mdc:firestore.rules).
+
+Refer to the respective directories for more details on their contents and purposes.
+

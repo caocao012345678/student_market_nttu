@@ -918,7 +918,11 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
                   icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
                   onSelected: (value) async {
                     if (value == 'edit') {
-                      // TODO: Navigate to edit product screen
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AddProductScreen(),
+                        ),
+                      );
                     } else if (value == 'status') {
                       try {
                         await Provider.of<ProductService>(context, listen: false)

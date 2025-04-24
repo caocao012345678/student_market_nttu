@@ -5,6 +5,9 @@ class ThemeService with ChangeNotifier {
   bool _isDarkMode = false;
   bool get isDarkMode => _isDarkMode;
 
+  bool _isNotificationEnabled = true;
+  bool get isNotificationEnabled => _isNotificationEnabled;
+
   ThemeService() {
     _loadThemeMode();
   }
@@ -23,6 +26,11 @@ class ThemeService with ChangeNotifier {
     _isDarkMode = !_isDarkMode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isDarkMode', _isDarkMode);
+    notifyListeners();
+  }
+
+  void toggleNotification(bool value) {
+    _isNotificationEnabled = value;
     notifyListeners();
   }
 

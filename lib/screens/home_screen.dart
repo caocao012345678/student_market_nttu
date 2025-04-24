@@ -140,7 +140,15 @@ class _HomeContentState extends State<HomeContent> {
           IconButton(
             icon: const Icon(Icons.shopping_cart_outlined),
             onPressed: () {
-              // Navigate to cart
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    appBar: AppBar(title: const Text('Giỏ hàng')),
+                    body: const Center(child: Text('Chức năng giỏ hàng đang phát triển.')), // Placeholder
+                  ),
+                ),
+              );
             },
           ),
         ],
@@ -487,7 +495,15 @@ class _HomeContentState extends State<HomeContent> {
                 ),
                 TextButton(
                   onPressed: () {
-                    // Navigate to see all donors
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => Scaffold(
+                          appBar: AppBar(title: const Text('Tất cả nhà tài trợ')),
+                          body: const Center(child: Text('Danh sách nhà tài trợ đang phát triển.')), // Placeholder
+                        ),
+                      ),
+                    );
                   },
                   child: Text(
                     'Xem tất cả',

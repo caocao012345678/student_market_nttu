@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Assets Directory Guide
+
+The [assets/](mdc:assets) directory contains static resources for the Flutter app:
+
+- [images/](mdc:assets/images): Contains image assets, such as [logo.png](mdc:assets/images/logo.png) and banners.
+- [icons/](mdc:assets/icons): Intended for icon assets (currently empty).
+
+Assets are referenced in the app for UI elements, branding, and visual content. Add new images or icons here and update [pubspec.yaml](mdc:pubspec.yaml) to include them.
+

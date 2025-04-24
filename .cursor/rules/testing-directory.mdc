@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Testing Directory Guide
+
+The [test/](mdc:test) directory contains test files for the Flutter app:
+
+- Includes widget tests and backup test files.
+- Tests are used to verify the correctness of UI components and app logic.
+
+Refer to this directory to find, run, or add tests for the application.
+
