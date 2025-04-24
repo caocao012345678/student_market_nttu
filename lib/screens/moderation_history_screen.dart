@@ -92,7 +92,7 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'Tất cả'),
+            Tab(text: 'Đang duyệt'),
             Tab(text: 'Đã duyệt'),
             Tab(text: 'Bị từ chối'),
           ],
@@ -105,8 +105,8 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
           : TabBarView(
               controller: _tabController,
               children: [
-                // Tab Tất cả
-                _buildHistoryList(null),
+                // Tab Đang duyệt
+                _buildHistoryList(ModerationStatus.pending),
                 // Tab Đã duyệt
                 _buildHistoryList(ModerationStatus.approved),
                 // Tab Bị từ chối
@@ -122,10 +122,18 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
   }
 
   Widget _buildHistoryList(ModerationStatus? filterStatus) {
-    final filteredItems = filterStatus == null
-        ? _historyItems
-        : _historyItems.where((item) => 
-            (item['moderation'] as ModerationResult).status == filterStatus).toList();
+    List<Map<String, dynamic>> filteredItems;
+
+    if (filterStatus == ModerationStatus.pending) {
+      // Hiển thị cả pending và in_review trong tab "Đang duyệt"
+      filteredItems = _historyItems.where((item) {
+        final status = (item['moderation'] as ModerationResult).status;
+        return status == ModerationStatus.pending || status == ModerationStatus.in_review;
+      }).toList();
+    } else {
+      filteredItems = _historyItems.where((item) => 
+          (item['moderation'] as ModerationResult).status == filterStatus).toList();
+    }
 
     if (filteredItems.isEmpty) {
       return Center(
@@ -143,7 +151,7 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
                   ? 'Không có sản phẩm nào đã được duyệt'
                   : filterStatus == ModerationStatus.rejected
                       ? 'Không có sản phẩm nào bị từ chối'
-                      : 'Không có lịch sử kiểm duyệt',
+                      : 'Không có sản phẩm nào đang chờ duyệt',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
@@ -182,6 +190,7 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
         final item = filteredItems[index];
         final product = item['product'] as Product;
         final moderation = item['moderation'] as ModerationResult;
+        final List<String>? images = product.images;
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -194,15 +203,34 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
                 children: [
                   Row(
                     children: [
-                      if (product.images.isNotEmpty)
+                      if (images != null && images.isNotEmpty && images.first.isNotEmpty)
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: CachedNetworkImage(
-                            imageUrl: product.images.first,
-                            width: 64,
-                            height: 64,
+                            imageUrl: images.first,
+                            width: 60,
+                            height: 60,
                             fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              width: 60,
+                              height: 60,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.image, color: Colors.grey),
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              width: 60,
+                              height: 60,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.error, color: Colors.grey),
+                            ),
                           ),
+                        )
+                      else
+                        Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.image_not_supported, color: Colors.grey),
                         ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -215,53 +243,48 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              NumberFormat.currency(locale: 'vi_VN', symbol: 'đ')
-                                  .format(product.price),
-                              style: TextStyle(
-                                color: Theme.of(context).primaryColor,
-                                fontWeight: FontWeight.bold,
-                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               DateFormat('dd/MM/yyyy HH:mm').format(moderation.createdAt),
                               style: TextStyle(
-                                color: Colors.grey[600],
                                 fontSize: 12,
+                                color: Colors.grey[600],
                               ),
                             ),
                           ],
                         ),
                       ),
-                      _buildStatusChip(moderation.status),
+                      const SizedBox(width: 8),
+                      _buildStatusBadge(moderation.status),
                     ],
                   ),
-                  if (moderation.status == ModerationStatus.rejected &&
-                      moderation.rejectionReason != null &&
-                      moderation.rejectionReason!.isNotEmpty) ...[
-                    const Divider(),
-                    Text(
-                      'Lý do: ${moderation.rejectionReason}',
-                      style: const TextStyle(color: Colors.red),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  if (moderation.status == ModerationStatus.rejected && moderation.rejectionReason != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Lý do từ chối:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            moderation.rejectionReason!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                  const Divider(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildScoreBadge('Nội dung', moderation.contentScore),
-                      _buildScoreBadge('Hình ảnh', moderation.imageScore),
-                      _buildScoreBadge('Tuân thủ', moderation.complianceScore),
-                      _buildScoreBadge('Tổng', moderation.totalScore, true),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -271,75 +294,218 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
     );
   }
 
-  Widget _buildStatusChip(ModerationStatus status) {
-    String label;
+  Widget _buildStatusBadge(ModerationStatus status) {
     Color color;
+    IconData icon;
+    String text;
 
     switch (status) {
       case ModerationStatus.approved:
-        label = 'Đã duyệt';
         color = Colors.green;
+        icon = Icons.check_circle;
+        text = 'Đã duyệt';
         break;
       case ModerationStatus.rejected:
-        label = 'Bị từ chối';
         color = Colors.red;
-        break;
-      case ModerationStatus.in_review:
-        label = 'Đang xem xét';
-        color = Colors.orange;
+        icon = Icons.cancel;
+        text = 'Từ chối';
         break;
       case ModerationStatus.pending:
-      default:
-        label = 'Đang chờ';
-        color = Colors.grey;
+        color = Colors.orange;
+        icon = Icons.hourglass_empty;
+        text = 'Đang duyệt';
+        break;
+      case ModerationStatus.in_review:
+        color = Colors.blue;
+        icon = Icons.rate_review;
+        text = 'Đang xem xét';
+        break;
     }
 
-    return Chip(
-      label: Text(
-        label,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color),
       ),
-      backgroundColor: color,
-      visualDensity: VisualDensity.compact,
-      padding: EdgeInsets.zero,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildScoreBadge(String label, int score, [bool isTotal = false]) {
-    Color getScoreColor(int value) {
-      if (value >= 80) return Colors.green;
-      if (value >= 60) return Colors.orange;
-      return Colors.red;
-    }
-
-    return Tooltip(
-      message: '$label: $score/100',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isTotal ? getScoreColor(score).withOpacity(0.2) : Colors.grey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isTotal ? getScoreColor(score) : Colors.grey.withOpacity(0.3),
-          ),
-        ),
-        child: Row(
+  void _showModerationDetails(Product product, ModerationResult moderation) {
+    final List<String>? images = product.images;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              label,
+            // Header
+            Row(
+              children: [
+                const Text(
+                  'Chi tiết kiểm duyệt',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const Divider(),
+            // Product info
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (images != null && images.isNotEmpty && images.first.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: images.first,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else
+                  Container(
+                    width: 80,
+                    height: 80,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image_not_supported),
+                  ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        NumberFormat.currency(locale: 'vi_VN', symbol: 'đ')
+                            .format(product.price),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          _buildStatusBadge(moderation.status),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Moderation details
+            const Text(
+              'Thông tin kiểm duyệt',
               style: TextStyle(
-                fontSize: 10,
-                color: isTotal ? getScoreColor(score) : Colors.black87,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(width: 4),
-            Text(
-              '$score',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 10,
-                color: getScoreColor(score),
+            const SizedBox(height: 8),
+            _buildInfoRow('Thời gian:', DateFormat('dd/MM/yyyy HH:mm').format(moderation.createdAt)),
+            _buildInfoRow('Trạng thái:', _getStatusText(moderation.status)),
+            if (moderation.status == ModerationStatus.rejected && moderation.rejectionReason != null)
+              _buildInfoRow('Lý do từ chối:', moderation.rejectionReason!),
+            if (moderation.issues != null && moderation.issues!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Các vấn đề được phát hiện:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+              const SizedBox(height: 4),
+              ...moderation.issues!.map((issue) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.warning_amber, size: 16, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            issue.description,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+            ],
+            const SizedBox(height: 24),
+            // Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                if (moderation.status == ModerationStatus.rejected)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Chỉnh sửa sản phẩm'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        // Navigate to edit product
+                        // TODO: Navigate to edit product screen
+                      },
+                    ),
+                  ),
+                if (moderation.status == ModerationStatus.approved) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.visibility),
+                      label: const Text('Xem sản phẩm'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProductDetailScreen(product: product),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -347,144 +513,39 @@ class _ModerationHistoryScreenState extends State<ModerationHistoryScreen> with 
     );
   }
 
-  void _showModerationDetails(Product product, ModerationResult moderationResult) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Chi tiết kiểm duyệt: ${product.title}'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Trạng thái:'),
-                subtitle: Text(
-                  moderationResult.status == ModerationStatus.approved ? 'Đã duyệt' :
-                  moderationResult.status == ModerationStatus.rejected ? 'Bị từ chối' :
-                  moderationResult.status == ModerationStatus.in_review ? 'Đang xem xét' : 'Đang chờ duyệt',
-                  style: TextStyle(
-                    color: moderationResult.status == ModerationStatus.approved ? Colors.green :
-                    moderationResult.status == ModerationStatus.rejected ? Colors.red : Colors.orange,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
               ),
-              ListTile(
-                title: const Text('Thời gian:'),
-                subtitle: Text(
-                  DateFormat('dd/MM/yyyy - HH:mm').format(moderationResult.createdAt),
-                ),
-              ),
-              if (moderationResult.rejectionReason != null && moderationResult.rejectionReason!.isNotEmpty) 
-                ListTile(
-                  title: const Text('Lý do từ chối:'),
-                  subtitle: Text(moderationResult.rejectionReason!),
-                ),
-              const Divider(),
-              const Text('Điểm đánh giá:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              _buildScoreItem('Nội dung', moderationResult.contentScore / 10),
-              _buildScoreItem('Hình ảnh', moderationResult.imageScore / 10),
-              _buildScoreItem('Tuân thủ', moderationResult.complianceScore / 10),
-              _buildScoreItem('Tổng', moderationResult.totalScore / 10),
-              if (moderationResult.issues != null && moderationResult.issues!.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                const Text('Vấn đề được phát hiện:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 5),
-                ...moderationResult.issues!.map((issue) => Padding(
-                  padding: const EdgeInsets.only(left: 8, bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        issue.severity == 'high' ? Icons.error : 
-                        issue.severity == 'medium' ? Icons.warning : Icons.info_outline,
-                        color: issue.severity == 'high' ? Colors.red : 
-                              issue.severity == 'medium' ? Colors.orange : Colors.blue,
-                        size: 16
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(issue.description)),
-                    ],
-                  ),
-                )).toList(),
-              ],
-              if (moderationResult.suggestedTags != null && moderationResult.suggestedTags!.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                const Text('Thẻ gợi ý:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 5),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: moderationResult.suggestedTags!.map((tag) => Chip(
-                    label: Text(tag, style: const TextStyle(fontSize: 12)),
-                    backgroundColor: Colors.blue[50],
-                    visualDensity: VisualDensity.compact,
-                  )).toList(),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          if (product.status == ProductStatus.rejected)
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // TODO: Navigate to edit product screen to fix issues
-              },
-              child: const Text('Chỉnh sửa sản phẩm'),
             ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ProductDetailScreen(product: product),
-                ),
-              ).then((_) => Navigator.of(context).pop());
-            },
-            child: const Text('Xem sản phẩm'),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Đóng'),
+          Expanded(
+            child: Text(value),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildScoreItem(String label, double score) {
-    Color color;
-    if (score >= 8) {
-      color = Colors.green;
-    } else if (score >= 6) {
-      color = Colors.orange;
-    } else {
-      color = Colors.red;
+  String _getStatusText(ModerationStatus status) {
+    switch (status) {
+      case ModerationStatus.approved:
+        return 'Đã được phê duyệt';
+      case ModerationStatus.rejected:
+        return 'Đã bị từ chối';
+      case ModerationStatus.pending:
+        return 'Đang chờ phê duyệt';
+      case ModerationStatus.in_review:
+        return 'Đang được xem xét';
     }
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Row(
-        children: [
-          Text('$label: '),
-          Text(
-            score.toStringAsFixed(1),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const Text('/10'),
-        ],
-      ),
-    );
   }
 } 

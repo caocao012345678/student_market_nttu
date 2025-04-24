@@ -1034,18 +1034,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       // Hiển thị thông báo thành công và rời khỏi màn hình
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sản phẩm đã được thêm và đang chờ kiểm duyệt'),
-          action: SnackBarAction(
-            label: 'Xem kết quả',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ModerationResultScreen(productId: productId),
-                ),
-              );
-            },
-          ),
+          content: Text('Sản phẩm đã được thêm và đang chờ kiểm duyệt')          
         ),
       );
     } catch (e) {

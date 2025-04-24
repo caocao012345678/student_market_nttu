@@ -64,6 +64,7 @@ class ProductService extends ChangeNotifier {
     return _firestore
         .collection('products')
         .where('isSold', isEqualTo: false)
+        .where('status', whereNotIn: ['pending_review', 'rejected'])
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
@@ -180,7 +181,9 @@ class ProductService extends ChangeNotifier {
     String? condition,
     String? sortBy,
   }) {
-    Query productsQuery = _firestore.collection('products').where('isSold', isEqualTo: false);
+    Query productsQuery = _firestore.collection('products')
+        .where('isSold', isEqualTo: false)
+        .where('status', whereNotIn: ['pending_review', 'rejected']);
     
     // Apply category filter
     if (category != null && category != 'Tất cả') {
@@ -485,6 +488,7 @@ class ProductService extends ChangeNotifier {
     return _firestore
         .collection('products')
         .where('isSold', isEqualTo: false)
+        .where('status', whereNotIn: ['pending_review', 'rejected'])
         .orderBy('title')
         .startAt([query])
         .endAt([query + '\uf8ff'])
@@ -502,12 +506,14 @@ class ProductService extends ChangeNotifier {
     if (categoryId == 'all') {
       query = _firestore
         .collection('products')
-        .where('isSold', isEqualTo: false);
+        .where('isSold', isEqualTo: false)
+        .where('status', whereNotIn: ['pending_review', 'rejected']);
     } else {
       query = _firestore
         .collection('products')
         .where('category', isEqualTo: categoryId)
-        .where('isSold', isEqualTo: false);
+        .where('isSold', isEqualTo: false)
+        .where('status', whereNotIn: ['pending_review', 'rejected']);
     }
     
     // Check if sorting by price (will be done client-side)
@@ -557,6 +563,7 @@ class ProductService extends ChangeNotifier {
         .collection('products')
         .where('category', isEqualTo: category)
         .where('isSold', isEqualTo: false)
+        .where('status', whereNotIn: ['pending_review', 'rejected'])
         .orderBy('createdAt', descending: true)
         .limit(limit + 1) // Fetch one extra to account for filtering
         .snapshots()
