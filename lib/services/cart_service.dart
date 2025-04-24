@@ -8,11 +8,13 @@ class CartService extends ChangeNotifier {
   List<CartItem> _cartItems = [];
   bool _isLoading = false;
   String _error = '';
+  String? _currentUserId;
 
   // Getters
   List<CartItem> get cartItems => _cartItems;
   bool get isLoading => _isLoading;
   String get error => _error;
+  String? get currentUserId => _currentUserId;
 
   // Tính tổng số lượng sản phẩm trong giỏ hàng
   int get itemCount {
@@ -22,6 +24,20 @@ class CartService extends ChangeNotifier {
   // Tính tổng giá trị giỏ hàng
   double get totalPrice {
     return _cartItems.fold(0.0, (sum, item) => sum + item.total);
+  }
+
+  // Kiểm tra và khởi tạo giỏ hàng nếu cần
+  void initialize(String? userId) {
+    // Chỉ tải lại nếu người dùng thay đổi hoặc chưa tải
+    if (userId != null && userId.isNotEmpty && userId != _currentUserId) {
+      _currentUserId = userId;
+      fetchCartItems(userId);
+    } else if (userId == null) {
+      // Người dùng đăng xuất
+      _currentUserId = null;
+      _cartItems = [];
+      notifyListeners();
+    }
   }
 
   // Lấy danh sách sản phẩm trong giỏ hàng của người dùng

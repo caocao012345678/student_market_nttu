@@ -7,6 +7,7 @@ import 'package:student_market_nttu/models/product.dart';
 import 'package:student_market_nttu/services/product_service.dart';
 import 'package:student_market_nttu/widgets/product_card_standard.dart';
 import 'package:student_market_nttu/screens/product_detail_screen.dart';
+import 'package:student_market_nttu/services/auth_service.dart';
 
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
@@ -31,6 +32,8 @@ class _SearchScreenState extends State<SearchScreen> {
   RangeValues _priceRange = const RangeValues(0, 10000000);
   bool _isGridView = true;
   List<String> _recentSearches = [];
+  bool _isLoading = false;
+  String _searchQuery = '';
   List<String> _popularSearchTerms = [
     'Sách giáo khoa', 'Laptop cũ', 'Điện thoại', 'Quần áo nam',
     'Quần áo nữ', 'Đồ dùng học tập', 'Tặng free', 'Đồ dùng ký túc xá'
@@ -124,20 +127,34 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  void _performSearch() {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) {
-      setState(() {
-        _isSearching = false;
-      });
-      return;
-    }
-
+  void _performSearch(String query) {
+    if (query.trim().isEmpty) return;
+    
     setState(() {
-      _isSearching = true;
-      // When performing a search, save it to recent searches
-      _saveSearchQuery(query);
+      _searchQuery = query;
+      _isLoading = true;
     });
+    
+    // Save search history for logged in users
+    _saveSearchToFirebase(query);
+    
+    // Lưu vào SharedPreferences
+    _saveSearchQuery(query);
+    
+    // ... existing code (search logic) ...
+  }
+
+  void _saveSearchToFirebase(String query) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final productService = Provider.of<ProductService>(context, listen: false);
+    
+    // Only save search history if user is logged in
+    if (authService.currentUser != null) {
+      productService.addToSearchHistory(
+        authService.currentUser!.uid,
+        query
+      );
+    }
   }
 
   @override
@@ -165,7 +182,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 : const Icon(Icons.search, color: Colors.white),
           ),
-          onSubmitted: (value) => _performSearch(),
+          onSubmitted: (value) => _performSearch(value),
         ),
         actions: [
           IconButton(
@@ -313,7 +330,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               onPressed: () {
                 // Apply filters and perform search
-                _performSearch();
+                _performSearch(_searchController.text.trim());
               },
               child: const Text('Áp dụng'),
             ),
@@ -459,7 +476,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         onPressed: () {
                           setState(() {
                             _searchController.text = term;
-                            _performSearch();
+                            _performSearch(term);
                           });
                         },
                       );
@@ -505,7 +522,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       onPressed: () {
                         setState(() {
                           _searchController.text = term;
-                          _performSearch();
+                          _performSearch(term);
                         });
                       },
                     );
@@ -554,7 +571,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       onTap: () {
                         setState(() {
                           _selectedCategory = _categories[index]['name'];
-                          _performSearch();
+                          _performSearch(_categories[index]['name']);
                         });
                       },
                       child: Column(
