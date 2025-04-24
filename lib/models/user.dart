@@ -80,8 +80,8 @@ class UserModel {
       followers: List<String>.from(map['followers'] ?? []),
       isShipper: map['isShipper'] ?? false,
       isStudent: map['isStudent'] ?? false,
-      studentId: map['studentId'] ?? '',
-      department: map['department'] ?? '',
+      studentId: map['studentId'],
+      department: map['department'],
       createdAt: map['createdAt'] != null 
         ? (map['createdAt'] as Timestamp).toDate() 
         : DateTime.now(),
@@ -91,9 +91,7 @@ class UserModel {
       settings: Map<String, dynamic>.from(map['settings'] ?? {'darkMode': false, 'notifications': true}),
       nttPoint: map['nttPoint'] ?? 0,
       nttCredit: map['nttCredit'] ?? 0,
-      recentlyViewed: List<String>.from(map['recentlyViewed'] ?? []), // Lấy danh sách từ Firestore
-      studentId: map['studentId'],
-      department: map['department'],
+      recentlyViewed: List<String>.from(map['recentlyViewed'] ?? []),
       studentYear: map['studentYear'],
       major: map['major'],
       specialization: map['specialization'],
