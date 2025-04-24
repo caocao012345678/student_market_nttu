@@ -1109,4 +1109,49 @@ class ProductService extends ChangeNotifier {
       };
     }
   }
+
+  // Update product
+  Future<void> updateProduct({
+    required String productId,
+    required String title,
+    required String description,
+    required double price,
+    double? originalPrice,
+    required String category,
+    required List<String> images,
+    required int quantity,
+    required String condition,
+    required String location,
+    List<String> tags = const [],
+    Map<String, String> specifications = const {},
+  }) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final productData = {
+        'title': title,
+        'description': description,
+        'price': price,
+        'originalPrice': originalPrice ?? 0.0,
+        'category': category,
+        'images': images,
+        'quantity': quantity,
+        'condition': condition,
+        'location': location,
+        'tags': tags,
+        'specifications': specifications,
+        'updatedAt': Timestamp.now(),
+      };
+
+      await _firestore.collection('products').doc(productId).update(productData);
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      throw e;
+    }
+  }
 } 

@@ -32,6 +32,7 @@ class UserModel {
   final bool completedSurvey; // Đã hoàn thành khảo sát hay chưa
   final List<String> recentlyViewed; // Thêm trường lưu sản phẩm đã xem gần đây
   final bool isAdmin; // Quyền quản trị viên
+  final List<Map<String, dynamic>> locations; // Danh sách địa điểm người dùng đã thêm
 
   UserModel({
     required this.id,
@@ -65,6 +66,7 @@ class UserModel {
     this.completedSurvey = false,
     this.recentlyViewed = const [], // Khởi tạo mảng rỗng
     this.isAdmin = false,
+    this.locations = const [], // Khởi tạo mảng rỗng
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
@@ -99,6 +101,7 @@ class UserModel {
       preferredCategories: List<String>.from(map['preferredCategories'] ?? []),
       completedSurvey: map['completedSurvey'] ?? false,
       isAdmin: map['isAdmin'] ?? false,
+      locations: List<Map<String, dynamic>>.from(map['locations'] ?? []),
     );
   }
 
@@ -129,6 +132,7 @@ class UserModel {
       'preferredCategories': preferredCategories,
       'completedSurvey': completedSurvey,
       'isAdmin': isAdmin,
+      'locations': locations,
     };
   }
 
@@ -159,6 +163,7 @@ class UserModel {
     List<String>? preferredCategories,
     bool? completedSurvey,
     bool? isAdmin,
+    List<Map<String, dynamic>>? locations,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -187,6 +192,7 @@ class UserModel {
       preferredCategories: preferredCategories ?? this.preferredCategories,
       completedSurvey: completedSurvey ?? this.completedSurvey,
       isAdmin: isAdmin ?? this.isAdmin,
+      locations: locations ?? this.locations,
     );
   }
 

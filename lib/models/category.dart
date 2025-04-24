@@ -10,6 +10,7 @@ class Category {
   final bool isActive;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final String? description;
   
   Category({
     required this.id,
@@ -21,6 +22,7 @@ class Category {
     this.isActive = true,
     required this.createdAt,
     this.updatedAt,
+    this.description,
   });
 
   factory Category.fromMap(Map<String, dynamic> map, String id) {
@@ -81,11 +83,12 @@ class Category {
       name: map['name'] ?? '',
       iconName: map['iconName'] ?? '',
       icon: getIconFromName(map['iconName'] ?? ''),
-      color: Color(map['color'] ?? 0xFF2196F3),
+      color: _getColorFromValue(map['color']),
       parentId: map['parentId'] ?? '',
       isActive: map['isActive'] ?? true,
       createdAt: map['createdAt']?.toDate() ?? DateTime.now(),
       updatedAt: map['updatedAt']?.toDate(),
+      description: map['description'],
     );
   }
 
@@ -98,6 +101,7 @@ class Category {
       'isActive': isActive,
       'createdAt': createdAt,
       'updatedAt': updatedAt ?? DateTime.now(),
+      'description': description,
     };
   }
 
@@ -111,6 +115,7 @@ class Category {
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? description,
   }) {
     return Category(
       id: id ?? this.id,
@@ -122,6 +127,29 @@ class Category {
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      description: description ?? this.description,
     );
+  }
+
+  // Phương thức để chuyển đổi giá trị màu từ nhiều định dạng khác nhau
+  static Color _getColorFromValue(dynamic colorValue) {
+    if (colorValue == null) return Color(0xFF2196F3); // Màu mặc định
+    
+    // Nếu là số nguyên (int)
+    if (colorValue is int) {
+      return Color(colorValue);
+    }
+    
+    // Nếu là chuỗi hex bắt đầu bằng # (ví dụ: #4CAF50)
+    if (colorValue is String && colorValue.startsWith('#')) {
+      String hex = colorValue.replaceFirst('#', '');
+      if (hex.length == 6) {
+        hex = 'FF' + hex; // Thêm alpha channel
+      }
+      return Color(int.parse(hex, radix: 16));
+    }
+    
+    // Trường hợp khác trả về màu mặc định
+    return Color(0xFF2196F3);
   }
 } 

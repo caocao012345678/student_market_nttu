@@ -10,6 +10,7 @@ import '../services/category_service.dart';
 import 'product_detail_screen.dart';
 import 'add_product_screen.dart';
 import 'moderation_history_screen.dart';
+import 'edit_product_screen.dart';
 
 class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({Key? key}) : super(key: key);
@@ -515,7 +516,17 @@ class _MyProductsScreenState extends State<MyProductsScreen> with SingleTickerPr
   Future<void> _handlePopupAction(String value, Product product) async {
     switch (value) {
       case 'edit':
-        // TODO: Navigate to edit product screen
+        // Chuyển đến màn hình chỉnh sửa sản phẩm
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EditProductScreen(product: product),
+          ),
+        );
+        
+        // Nếu có sự thay đổi, refresh lại danh sách sản phẩm
+        if (result == true) {
+          setState(() {});
+        }
         break;
       case 'view_moderation':
         _showModerationDetails(product);
@@ -685,7 +696,12 @@ class _MyProductsScreenState extends State<MyProductsScreen> with SingleTickerPr
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // TODO: Navigate to edit product screen to fix issues
+                // Chuyển đến màn hình chỉnh sửa sản phẩm để sửa lỗi
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => EditProductScreen(product: product),
+                  ),
+                );
               },
               child: const Text('Chỉnh sửa sản phẩm'),
             ),

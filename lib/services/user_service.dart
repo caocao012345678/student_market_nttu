@@ -835,4 +835,128 @@ class UserService extends ChangeNotifier {
       return [];
     }
   }
+
+  // Phương thức thêm địa điểm mới
+  Future<void> addLocation(Map<String, dynamic> location) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Lấy danh sách địa điểm hiện tại
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final user = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      final currentLocations = List<Map<String, dynamic>>.from(user.locations);
+      
+      // Thêm ID cho địa điểm
+      final newLocation = {
+        ...location,
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'createdAt': DateTime.now(),
+      };
+      
+      // Thêm địa điểm mới và cập nhật Firestore
+      currentLocations.add(newLocation);
+      await _firestore.collection('users').doc(userId).update({
+        'locations': currentLocations,
+      });
+      
+      // Cập nhật user data
+      await loadUserData();
+      notifyListeners();
+    } catch (e) {
+      print('Error adding location: $e');
+      throw e;
+    }
+  }
+  
+  // Phương thức cập nhật địa điểm
+  Future<void> updateLocation(String locationId, Map<String, dynamic> updatedData) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Lấy danh sách địa điểm hiện tại
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final user = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      final currentLocations = List<Map<String, dynamic>>.from(user.locations);
+      
+      // Tìm và cập nhật địa điểm
+      final locationIndex = currentLocations.indexWhere((loc) => loc['id'] == locationId);
+      if (locationIndex >= 0) {
+        currentLocations[locationIndex] = {
+          ...currentLocations[locationIndex],
+          ...updatedData,
+          'updatedAt': DateTime.now(),
+        };
+        
+        // Cập nhật Firestore
+        await _firestore.collection('users').doc(userId).update({
+          'locations': currentLocations,
+        });
+        
+        // Cập nhật user data
+        await loadUserData();
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error updating location: $e');
+      throw e;
+    }
+  }
+  
+  // Phương thức xóa địa điểm
+  Future<void> deleteLocation(String locationId) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Lấy danh sách địa điểm hiện tại
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final user = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      final currentLocations = List<Map<String, dynamic>>.from(user.locations);
+      
+      // Lọc ra địa điểm cần xóa
+      final updatedLocations = currentLocations.where((loc) => loc['id'] != locationId).toList();
+      
+      // Cập nhật Firestore
+      await _firestore.collection('users').doc(userId).update({
+        'locations': updatedLocations,
+      });
+      
+      // Cập nhật user data
+      await loadUserData();
+      notifyListeners();
+    } catch (e) {
+      print('Error deleting location: $e');
+      throw e;
+    }
+  }
+  
+  // Phương thức lấy tất cả địa điểm của người dùng
+  List<Map<String, dynamic>> getUserLocations() {
+    if (_currentUser == null) return [];
+    return List<Map<String, dynamic>>.from(_currentUser!.locations);
+  }
+
+  // Phương thức tải dữ liệu người dùng hiện tại
+  Future<void> loadUserData() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        _currentUser = null;
+        return;
+      }
+
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        _currentUser = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      } else {
+        _currentUser = null;
+      }
+      notifyListeners();
+    } catch (e) {
+      print('Error loading user data: $e');
+      _currentUser = null;
+    }
+  }
 } 

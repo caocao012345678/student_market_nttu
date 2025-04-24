@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import '../services/auth_service.dart';
 import '../services/product_service.dart';
 import '../services/category_service.dart';
+import '../services/user_service.dart';
 import '../models/product.dart';
 import '../models/category.dart';
 import '../screens/moderation_result_screen.dart';
@@ -35,6 +36,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _isLoadingCategories = true;
   List<Category> _filteredCategories = [];
   
+  // Biến kiểm tra đây có phải là đồ tặng không
+  bool _isGiftItem = false;
+  
+  // Thêm biến lưu địa điểm đã chọn
+  String? _selectedLocationId;
+  
   final List<String> _conditionOptions = [
     'Mới',
     'Như mới (99%)',
@@ -49,11 +56,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final Map<String, String> _specifications = {};
   bool _isLoading = false;
   bool _showCategorySearch = false;
+  bool _showLocationSelect = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeCategories();
+    // Sử dụng addPostFrameCallback để đảm bảo context hoàn thiện
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeCategories();
+    });
   }
 
   Future<void> _initializeCategories() async {
@@ -61,15 +72,38 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _isLoadingCategories = true;
     });
 
-    final categoryService = Provider.of<CategoryService>(context, listen: false);
-    
-    // Always refresh categories from Firestore
-    await categoryService.fetchCategories();
-    
-    setState(() {
-      _filteredCategories = categoryService.activeCategories;
-      _isLoadingCategories = false;
-    });
+    try {
+      final categoryService = Provider.of<CategoryService>(context, listen: false);
+      
+      // Kiểm tra xem CategoryService đã được khởi tạo chưa
+      if (!categoryService.isInitialized) {
+        await categoryService.initialize();
+      } else if (categoryService.categories.isEmpty) {
+        // Nếu đã khởi tạo nhưng danh sách trống, thử tải lại
+        await categoryService.fetchCategories();
+      }
+      
+      setState(() {
+        _filteredCategories = categoryService.activeCategories;
+        _isLoadingCategories = false;
+      });
+      
+    } catch (e) {
+      print('Lỗi khi tải danh mục: $e');
+      setState(() {
+        _isLoadingCategories = false;
+      });
+      
+      // Hiển thị thông báo lỗi
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi tải danh mục: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _searchCategory(String query) {
@@ -233,144 +267,207 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  Future<void> _submitProduct() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    
+  // Mở giao diện chọn địa điểm từ danh sách đã lưu
+  void _openLocationSelectDialog() {
     setState(() {
-      _isLoading = true;
+      _showLocationSelect = true;
     });
     
-    final List<String> imageUrls = [];
+    final userService = Provider.of<UserService>(context, listen: false);
+    final locations = userService.getUserLocations();
     
-    try {
-      if (_images.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vui lòng chọn ít nhất một hình ảnh')),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-      
-      // Upload hình ảnh
-      for (int i = 0; i < _images.length; i++) {
-        List<String> urls = await Provider.of<ProductService>(context, listen: false)
-            .uploadProductImages([_images[i] as File]);
-        imageUrls.addAll(urls);
-      }
-      
-      // Hiển thị thông báo kiểm duyệt
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đang gửi sản phẩm để kiểm duyệt...'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      
-      // Tạo Map specifications
-      final Map<String, String> specifications = {};
-      for (var entry in _specifications.entries) {
-        specifications[entry.key] = entry.value;
-      }
-      
-      // Thêm sản phẩm với kiểm duyệt
-      final productId = await Provider.of<ProductService>(context, listen: false)
-          .addProductWithModeration(
-        title: _titleController.text,
-        description: _descriptionController.text,
-        price: double.parse(_priceController.text),
-        category: _selectedCategoryId,
-        images: imageUrls,
-        condition: _condition,
-        location: _locationController.text,
-        tags: _tags,
-        specifications: specifications,
-      );
-      
-      setState(() {
-        _isLoading = false;
-      });
-      
-      if (!mounted) return;
-      
-      // Hiển thị thông báo thành công và rời khỏi màn hình
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sản phẩm đã được thêm và đang chờ kiểm duyệt'),
-          action: SnackBarAction(
-            label: 'Xem kết quả',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ModerationResultScreen(productId: productId),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: ${e.toString()}')),
-      );
-    }
-  }
-
-  // Hiển thị modal chọn danh mục
-  void _showCategorySelectionModal() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (BuildContext context) {
+      builder: (context) {
         return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setState) {
+          builder: (context, setState) {
             return DraggableScrollableSheet(
-              initialChildSize: 0.7,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
+              initialChildSize: 0.6,
+              maxChildSize: 0.8,
+              minChildSize: 0.4,
               expand: false,
-              builder: (_, scrollController) {
-                return Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 1,
+              builder: (context, scrollController) {
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Chọn địa điểm',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
                           ),
                         ],
                       ),
-                      child: Column(
-                        children: [
-                          // Thanh kéo
-                          Center(
-                            child: Container(
-                              width: 50,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 16),
+                      
+                      // Danh sách địa điểm
+                      Expanded(
+                        child: locations.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Bạn chưa thêm địa điểm nào.\nVui lòng thêm địa điểm tại trang cá nhân.',
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: scrollController,
+                                itemCount: locations.length,
+                                itemBuilder: (context, index) {
+                                  final location = locations[index];
+                                  final address = [
+                                    location['addressDetail'],
+                                    location['ward'],
+                                    location['district'],
+                                    location['province'],
+                                  ].where((e) => e != null && e.isNotEmpty).join(', ');
+                                  
+                                  return RadioListTile<String>(
+                                    title: Text(
+                                      address,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    value: location['id'],
+                                    groupValue: _selectedLocationId,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedLocationId = value;
+                                      });
+                                    },
+                                  );
+                                },
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 15),
-                          
-                          // Tiêu đề
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      // Nút chọn
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (_selectedLocationId != null) {
+                              final location = locations.firstWhere(
+                                (loc) => loc['id'] == _selectedLocationId,
+                              );
+                              
+                              final address = [
+                                location['addressDetail'],
+                                location['ward'],
+                                location['district'],
+                                location['province'],
+                              ].where((e) => e != null && e.isNotEmpty).join(', ');
+                              
+                              this.setState(() {
+                                _locationController.text = address;
+                              });
+                            }
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Chọn địa điểm'),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          }
+        );
+      },
+    );
+  }
+
+  // Kiểm tra xem danh mục đã chọn có phải là "Đồ tặng" không
+  void _checkIfGiftCategory(String categoryId) {
+    if (categoryId.isEmpty) {
+      setState(() {
+        _isGiftItem = false;
+      });
+      return;
+    }
+    
+    final categoryService = Provider.of<CategoryService>(context, listen: false);
+    final category = categoryService.activeCategories.firstWhere(
+      (cat) => cat.id == categoryId,
+      orElse: () => Category(
+        id: '',
+        name: '',
+        iconName: '',
+        icon: Icons.category,
+        color: Colors.blue,
+        createdAt: DateTime.now(),
+      ),
+    );
+    
+    setState(() {
+      _isGiftItem = category.name == 'Đồ tặng';
+      
+      // Nếu là đồ tặng, đặt giá = 0
+      if (_isGiftItem) {
+        _priceController.text = '0';
+        _originalPriceController.text = '0';
+      }
+    });
+  }
+
+  // Cập nhật phương thức hiển thị danh mục
+  void _showCategoryDialog() {
+    // Load lại danh mục nếu danh sách trống
+    if (_filteredCategories.isEmpty && !_isLoadingCategories) {
+      _initializeCategories();
+    }
+    
+    setState(() {
+      _showCategorySearch = true;
+    });
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        final scrollController = ScrollController();
+        
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Lọc danh mục với từ khóa tìm kiếm hiện tại
+            void filterCategories(String value) {
+              final categoryService = Provider.of<CategoryService>(context, listen: false);
+              setState(() {
+                _filteredCategories = categoryService.searchCategories(value);
+              });
+            }
+            
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              maxChildSize: 0.9,
+              minChildSize: 0.5,
+              expand: false,
+              builder: (context, scrollController) {
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
                           const Text(
                             'Chọn danh mục',
                             style: TextStyle(
@@ -378,77 +475,125 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 15),
-                          
-                          // Thanh tìm kiếm
-                          TextField(
-                            controller: _searchCategoryController,
-                            decoration: InputDecoration(
-                              hintText: 'Tìm kiếm danh mục...',
-                              prefixIcon: const Icon(Icons.search),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            onChanged: (value) {
-                              _searchCategory(value);
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              _searchCategoryController.clear();
+                              Navigator.pop(context);
                             },
                           ),
                         ],
                       ),
-                    ),
-                    
-                    // Danh sách danh mục
-                    Expanded(
-                      child: _isLoadingCategories
-                        ? const Center(child: CircularProgressIndicator())
-                        : _filteredCategories.isEmpty
-                          ? const Center(child: Text('Không tìm thấy danh mục phù hợp'))
-                          : ListView.builder(
-                              controller: scrollController,
-                              itemCount: _filteredCategories.length,
-                              itemBuilder: (context, index) {
-                                final category = _filteredCategories[index];
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: category.color.withOpacity(0.1),
-                                    child: Icon(
-                                      category.icon,
-                                      color: category.color,
-                                    ),
-                                  ),
-                                  title: Text(category.name),
-                                  subtitle: category.parentId.isNotEmpty
-                                    ? FutureBuilder<Category?>(
-                                        future: Provider.of<CategoryService>(context, listen: false)
-                                            .getCategoryById(category.parentId),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.connectionState == ConnectionState.waiting) {
-                                            return const Text('Đang tải...');
-                                          }
-                                          if (snapshot.hasData && snapshot.data != null) {
-                                            return Text('Thuộc ${snapshot.data!.name}');
-                                          }
-                                          return const SizedBox();
-                                        },
-                                      )
-                                    : null,
-                                  onTap: () {
+                      const SizedBox(height: 16),
+                      // Search box
+                      TextField(
+                        controller: _searchCategoryController,
+                        decoration: const InputDecoration(
+                          hintText: 'Tìm kiếm danh mục',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          filterCategories(value);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Refresh button
+                      if (_isLoadingCategories)
+                        const Center(child: CircularProgressIndicator())
+                      else if (_filteredCategories.isEmpty)
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('Không tìm thấy danh mục phù hợp'),
+                              const SizedBox(height: 8),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _isLoadingCategories = true;
+                                  });
+                                  
+                                  // Tải lại danh mục
+                                  final categoryService = Provider.of<CategoryService>(context, listen: false);
+                                  categoryService.fetchCategories().then((_) {
                                     setState(() {
-                                      _selectedCategoryId = category.id;
-                                      _selectedCategoryName = category.name;
+                                      _filteredCategories = categoryService.activeCategories;
+                                      _isLoadingCategories = false;
                                     });
-                                    _searchCategoryController.clear();
-                                    Navigator.pop(context);
-                                    // Cập nhật state của màn hình chính
-                                    this.setState(() {});
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                  ],
+                                  }).catchError((e) {
+                                    setState(() {
+                                      _isLoadingCategories = false;
+                                    });
+                                  });
+                                },
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Tải lại'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      
+                      // Danh sách danh mục
+                      Expanded(
+                        child: _isLoadingCategories
+                          ? const Center(child: CircularProgressIndicator())
+                          : _filteredCategories.isEmpty
+                            ? const Center(child: Text('Không tìm thấy danh mục phù hợp'))
+                            : ListView.builder(
+                                controller: scrollController,
+                                itemCount: _filteredCategories.length,
+                                itemBuilder: (context, index) {
+                                  final category = _filteredCategories[index];
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: category.color.withOpacity(0.1),
+                                      child: Icon(
+                                        category.icon,
+                                        color: category.color,
+                                      ),
+                                    ),
+                                    title: Text(category.name),
+                                    subtitle: category.description != null 
+                                      ? Text(
+                                          category.description!,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        )
+                                      : category.parentId.isNotEmpty
+                                        ? FutureBuilder<Category?>(
+                                            future: Provider.of<CategoryService>(context, listen: false)
+                                                .getCategoryById(category.parentId),
+                                            builder: (context, snapshot) {
+                                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                                return const Text('Đang tải...');
+                                              }
+                                              if (snapshot.hasData && snapshot.data != null) {
+                                                return Text('Thuộc ${snapshot.data!.name}');
+                                              }
+                                              return const SizedBox();
+                                            },
+                                          )
+                                        : null,
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedCategoryId = category.id;
+                                        _selectedCategoryName = category.name;
+                                      });
+                                      _searchCategoryController.clear();
+                                      Navigator.pop(context);
+                                      // Cập nhật state của màn hình chính
+                                      this.setState(() {});
+                                      // Kiểm tra nếu là đồ tặng
+                                      _checkIfGiftCategory(category.id);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
                 );
               },
             );
@@ -568,10 +713,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           child: TextFormField(
                             controller: _priceController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            enabled: !_isGiftItem, // Vô hiệu hóa nếu là đồ tặng
+                            decoration: InputDecoration(
                               labelText: 'Giá',
-                              border: OutlineInputBorder(),
+                              border: const OutlineInputBorder(),
                               prefixText: 'đ ',
+                              helperText: _isGiftItem ? 'Đồ tặng miễn phí' : null,
+                              filled: _isGiftItem,
+                              fillColor: _isGiftItem ? Colors.grey[200] : null,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -591,10 +740,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           child: TextFormField(
                             controller: _originalPriceController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            enabled: !_isGiftItem, // Vô hiệu hóa nếu là đồ tặng
+                            decoration: InputDecoration(
                               labelText: 'Giá gốc (nếu có)',
-                              border: OutlineInputBorder(),
+                              border: const OutlineInputBorder(),
                               prefixText: 'đ ',
+                              filled: _isGiftItem,
+                              fillColor: _isGiftItem ? Colors.grey[200] : null,
                             ),
                           ),
                         ),
@@ -603,34 +755,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     const SizedBox(height: 16),
 
                     // Category
-                    const Text(
-                      'Danh mục',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: _showCategorySelectionModal,
+                    GestureDetector(
+                      onTap: _showCategoryDialog,
                       child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 15,
+                        ),
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.grey),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              _selectedCategoryName.isEmpty 
-                                ? 'Chọn danh mục'
-                                : _selectedCategoryName,
-                              style: TextStyle(
-                                color: _selectedCategoryName.isEmpty ? Colors.grey : Colors.black,
+                            const Icon(Icons.category, color: Colors.grey),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _selectedCategoryId.isNotEmpty
+                                    ? _selectedCategoryName
+                                    : 'Chọn danh mục',
+                                style: TextStyle(
+                                  color: _selectedCategoryId.isNotEmpty
+                                      ? Colors.black
+                                      : Colors.grey[600],
+                                ),
                               ),
                             ),
-                            const Icon(Icons.arrow_drop_down),
+                            const Icon(Icons.arrow_drop_down, color: Colors.grey),
                           ],
                         ),
                       ),
@@ -689,13 +841,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Location
-                    TextFormField(
-                      controller: _locationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Địa điểm',
-                        border: OutlineInputBorder(),
+                    // Location (Now uses saved locations)
+                    GestureDetector(
+                      onTap: _openLocationSelectDialog,
+                      child: TextFormField(
+                        controller: _locationController,
+                        decoration: const InputDecoration(
+                          labelText: 'Địa điểm',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on),
+                          suffixIcon: Icon(Icons.arrow_drop_down),
+                        ),
+                        enabled: false, // Disable direct editing, only select from list
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Vui lòng chọn địa điểm';
+                          }
+                          return null;
+                        },
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Chọn từ danh sách địa điểm đã lưu trong trang cá nhân',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
 
@@ -772,13 +941,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _submitProduct,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue[900],
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
                         ),
-                        child: const Text('Đăng sản phẩm'),
+                        onPressed: _images.isEmpty || _isLoading
+                            ? null
+                            : _submitProduct,
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Đăng sản phẩm'),
                       ),
                     ),
                   ],
@@ -786,5 +966,96 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ),
     );
+  }
+
+  Future<void> _submitProduct() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    final List<String> imageUrls = [];
+    
+    try {
+      if (_images.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng chọn ít nhất một hình ảnh')),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      // Upload hình ảnh
+      for (int i = 0; i < _images.length; i++) {
+        List<String> urls = await Provider.of<ProductService>(context, listen: false)
+            .uploadProductImages([_images[i] as File]);
+        imageUrls.addAll(urls);
+      }
+      
+      // Hiển thị thông báo kiểm duyệt
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đang gửi sản phẩm để kiểm duyệt...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Tạo Map specifications
+      final Map<String, String> specifications = {};
+      for (var entry in _specifications.entries) {
+        specifications[entry.key] = entry.value;
+      }
+      
+      // Thêm sản phẩm với kiểm duyệt
+      final productId = await Provider.of<ProductService>(context, listen: false)
+          .addProductWithModeration(
+        title: _titleController.text,
+        description: _descriptionController.text,
+        price: double.parse(_priceController.text),
+        category: _selectedCategoryId,
+        images: imageUrls,
+        condition: _condition,
+        location: _locationController.text,
+        tags: _tags,
+        specifications: specifications,
+      );
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (!mounted) return;
+      
+      // Hiển thị thông báo thành công và rời khỏi màn hình
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sản phẩm đã được thêm và đang chờ kiểm duyệt'),
+          action: SnackBarAction(
+            label: 'Xem kết quả',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ModerationResultScreen(productId: productId),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: ${e.toString()}')),
+      );
+    }
   }
 } 
