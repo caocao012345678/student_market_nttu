@@ -8,6 +8,7 @@ import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/screens/models_info_screen.dart';
 import 'package:student_market_nttu/services/app_layout_service.dart';
 import 'package:student_market_nttu/widgets/app_drawer.dart';
+import 'package:student_market_nttu/services/product_service.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({Key? key}) : super(key: key);
@@ -110,63 +111,202 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     final formattedTime = DateFormat('HH:mm').format(timestamp);
     final themeService = Provider.of<ThemeService>(context, listen: false);
     final isDarkMode = themeService.isDarkMode;
+    
+    // Kiểm tra có thông tin sản phẩm không
+    final hasProductDetails = message['hasProductDetails'] == true;
+    final List<dynamic> productDetails = message['productDetails'] ?? [];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          if (!isUser)
-            CircleAvatar(
-              backgroundColor: Colors.blue[900],
-              radius: 16,
-              child: const Icon(Icons.assistant, size: 18, color: Colors.white),
-            ),
-            
-          const SizedBox(width: 8),
-          
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: isUser 
-                  ? Colors.blue[900] 
-                  : isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                borderRadius: BorderRadius.circular(16),
+          Row(
+            mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isUser)
+                CircleAvatar(
+                  backgroundColor: Colors.blue[900],
+                  radius: 16,
+                  child: const Icon(Icons.assistant, size: 18, color: Colors.white),
+                ),
+                
+              const SizedBox(width: 8),
+              
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isUser 
+                      ? Colors.blue[900] 
+                      : isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message['content'],
+                        style: TextStyle(
+                          color: isUser ? Colors.white : null,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        formattedTime,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isUser ? Colors.white70 : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
+              
+              if (isUser)
+                const SizedBox(width: 8),
+                
+              if (isUser)
+                CircleAvatar(
+                  backgroundColor: Colors.blue[700],
+                  radius: 16,
+                  child: const Icon(Icons.person, size: 18, color: Colors.white),
+                ),
+            ],
+          ),
+          
+          // Hiển thị thông tin sản phẩm nếu có
+          if (!isUser && hasProductDetails && productDetails.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0, left: 40.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message['content'],
+                  const Text(
+                    'Sản phẩm liên quan:',
                     style: TextStyle(
-                      color: isUser ? Colors.white : null,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formattedTime,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isUser ? Colors.white70 : Colors.grey,
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 180,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: productDetails.length,
+                      itemBuilder: (context, index) {
+                        final product = productDetails[index];
+                        return _buildProductCard(product);
+                      },
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          
-          if (isUser)
-            const SizedBox(width: 8),
-            
-          if (isUser)
-            CircleAvatar(
-              backgroundColor: Colors.blue[700],
-              radius: 16,
-              child: const Icon(Icons.person, size: 18, color: Colors.white),
-            ),
         ],
+      ),
+    );
+  }
+
+  // Widget hiển thị product card trong chat
+  Widget _buildProductCard(Map<String, dynamic> productData) {
+    final String imageUrl = (productData['images'] is List && (productData['images'] as List).isNotEmpty) 
+        ? productData['images'][0]
+        : 'https://via.placeholder.com/150';
+    
+    final double price = productData['price'] is double 
+        ? productData['price'] 
+        : double.tryParse(productData['price'].toString()) ?? 0.0;
+    
+    return Card(
+      margin: const EdgeInsets.only(right: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      elevation: 2,
+      child: InkWell(
+        onTap: () async {
+          try {
+            // Lấy thông tin sản phẩm từ Firestore
+            final productService = Provider.of<ProductService>(context, listen: false);
+            final product = await productService.getProductById(productData['id']);
+            
+            if (product != null) {
+              // Điều hướng đến ProductDetailScreen với đối tượng Product
+              Navigator.pushNamed(
+                context, 
+                '/product_detail',
+                arguments: product,
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Không tìm thấy thông tin sản phẩm')),
+              );
+            }
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Lỗi: $e')),
+            );
+          }
+        },
+        child: Container(
+          width: 160,
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  imageUrl,
+                  height: 100,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 100,
+                      width: double.infinity,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image_not_supported),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                productData['title'] ?? 'Sản phẩm không có tiêu đề',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${price.toStringAsFixed(0)}đ',
+                style: TextStyle(
+                  color: Colors.blue[900],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                productData['seller'] ?? 'Không rõ người bán',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey[700],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -198,71 +338,65 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     // Lưu lại tin nhắn hiện tại để phòng trường hợp trùng lặp
     final currentMessage = message.trim();
     
-    // Kiểm tra xem tin nhắn đã có trong lịch sử gần đây chưa
-    // Sử dụng thời gian để tránh trùng lặp tin nhắn trong vòng 3 giây
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final recentMessages = context.read<GeminiService>().chatHistory
-        .where((msg) => 
-            msg['role'] == 'user' && 
-            msg['content'] == currentMessage &&
-            (now - (msg['timestamp'] as int) < 3000)) // 3 giây
-        .toList();
+    // 2. Lấy services
+    final geminiService = Provider.of<GeminiService>(context, listen: false);
+    final ragService = Provider.of<RAGService>(context, listen: false);
     
-    if (recentMessages.isNotEmpty) {
-      debugPrint('Phát hiện tin nhắn trùng lặp gần đây, bỏ qua: $currentMessage');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bạn vừa gửi tin nhắn này, vui lòng đợi phản hồi'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    // 2. Cài đặt trạng thái loading và cập nhật UI
+    // 3. Đánh dấu đang gửi tin nhắn
     setState(() {
       _isSendingMessage = true;
-      _messageController.clear();
     });
     
-    // Xóa text field và focus lại để chuẩn bị cho tin nhắn tiếp theo
-    _messageController.clear();
-    _focusNode.requestFocus();
-
-    // 3. Thêm tin nhắn người dùng vào danh sách trước khi gửi
-    final geminiService = context.read<GeminiService>();
-    geminiService.addUserMessageToHistory(currentMessage);
+    // 4. Thêm tin nhắn người dùng vào lịch sử
+    geminiService.addToHistory({
+      'role': 'user',
+      'content': currentMessage,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
     
-    // Cuộn xuống tin nhắn mới nhất
-    _scrollToBottom();
-
     try {
-      // 4. Gửi tin nhắn đến RAG Service và nhận phản hồi
-      final response = await context.read<RAGService>().generateRAGResponse(currentMessage);
-
-      // 5. Cập nhật UI với phản hồi từ RAG
-      if (mounted) {
-        setState(() {
-          // Thêm tin nhắn từ bot vào danh sách chat
-          geminiService.addBotMessageToHistory(response);
-          _isSendingMessage = false;
-        });
-        
-        // Lưu lịch sử chat
-        await geminiService.saveChatHistory();
-        
-        // Cuộn xuống để hiển thị phản hồi mới
-        _scrollToBottom();
+      // 5. Gọi RAG service để tạo phản hồi
+      final Map<String, dynamic> ragResponse = await ragService.generateRAGResponse(currentMessage);
+      
+      if (!_isMounted) return;
+      
+      // 6. Xử lý kết quả
+      final String responseText = ragResponse['response'] as String;
+      final List<dynamic> productDetails = ragResponse['productDetails'] ?? [];
+      
+      // 7. Thêm phản hồi từ assistant vào lịch sử
+      geminiService.addToHistory({
+        'role': 'assistant',
+        'content': responseText,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'hasProductDetails': productDetails.isNotEmpty,
+        'productDetails': productDetails,
+      });
+      
+      // 8. Hiển thị product card nếu có
+      if (productDetails.isNotEmpty) {
+        // Sẽ được hiển thị trong widget _buildChatBubble
+        debugPrint('Tìm thấy ${productDetails.length} sản phẩm liên quan');
       }
     } catch (e) {
-      // 6. Xử lý lỗi và hiển thị thông báo
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: ${e.toString()}')),
-        );
+      if (!_isMounted) return;
+      
+      // 9. Xử lý lỗi và hiển thị thông báo lỗi
+      geminiService.addToHistory({
+        'role': 'assistant',
+        'content': 'Đã xảy ra lỗi khi xử lý yêu cầu: $e',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'isError': true
+      });
+      
+      debugPrint('Lỗi khi gửi tin nhắn RAG: $e');
+    } finally {
+      // 10. Đánh dấu hoàn thành gửi tin nhắn
+      if (_isMounted) {
         setState(() {
           _isSendingMessage = false;
         });
+        _scrollToBottom();
       }
     }
   }

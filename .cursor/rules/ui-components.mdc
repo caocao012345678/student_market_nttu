@@ -1,0 +1,211 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# UI Components - Student Market NTTU
+
+Dự án sử dụng nhiều UI components tái sử dụng để đảm bảo giao diện nhất quán. Các components được tổ chức trong thư mục `lib/widgets`.
+
+## ProductCard
+
+[lib/widgets/product_card_standard.dart](mdc:lib/widgets/product_card_standard.dart) là component hiển thị sản phẩm trong danh sách:
+
+```dart
+class ProductCardStandard extends StatelessWidget {
+  final Product product;
+  final Function()? onTap;
+  final bool showActions;
+  
+  const ProductCardStandard({
+    Key? key,
+    required this.product,
+    this.onTap,
+    this.showActions = true,
+  }) : super(key: key);
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      // Hiển thị thông tin sản phẩm
+      // - Hình ảnh
+      // - Tiêu đề
+      // - Giá
+      // - Trạng thái
+      // - Nút thao tác (nếu showActions = true)
+    );
+  }
+}
+```
+
+Sử dụng:
+```dart
+ProductCardStandard(
+  product: product,
+  onTap: () => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ProductDetailScreen(productId: product.id),
+    ),
+  ),
+)
+```
+
+## AppDrawer
+
+[lib/widgets/app_drawer.dart](mdc:lib/widgets/app_drawer.dart) cung cấp drawer navigation cho ứng dụng:
+
+```dart
+class AppDrawer extends StatelessWidget {
+  const AppDrawer({Key? key}) : super(key: key);
+  
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      // Menu navigation:
+      // - Trang chủ
+      // - Sản phẩm của tôi
+      // - Đơn hàng
+      // - Cài đặt
+      // - Đăng xuất
+    );
+  }
+}
+```
+
+## ReviewsSection
+
+[lib/widgets/reviews_section.dart](mdc:lib/widgets/reviews_section.dart) hiển thị đánh giá cho sản phẩm:
+
+```dart
+class ReviewsSection extends StatelessWidget {
+  final String productId;
+  
+  const ReviewsSection({Key? key, required this.productId}) : super(key: key);
+  
+  @override
+  Widget build(BuildContext context) {
+    // Hiển thị danh sách đánh giá và nút thêm đánh giá mới
+  }
+}
+```
+
+## CartBadge
+
+[lib/widgets/cart_badge.dart](mdc:lib/widgets/cart_badge.dart) hiển thị badge với số lượng sản phẩm trong giỏ hàng:
+
+```dart
+class CartBadge extends StatelessWidget {
+  final Widget child;
+  
+  const CartBadge({Key? key, required this.child}) : super(key: key);
+  
+  @override
+  Widget build(BuildContext context) {
+    // Hiển thị badge trên icon giỏ hàng
+  }
+}
+```
+
+## Quy Ước UI
+
+### Theme
+
+Ứng dụng sử dụng theme đã được định nghĩa trong [lib/main.dart](mdc:lib/main.dart):
+
+```dart
+theme: ThemeData(
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: Colors.blue[900]!,
+    brightness: Brightness.light,
+    primary: Colors.blue[900],
+    secondary: Colors.blue[700],
+    // Các màu khác...
+  ),
+  useMaterial3: true,
+  textTheme: GoogleFonts.notoSansTextTheme(),
+  // Các theme khác...
+)
+```
+
+### Layout Chuẩn
+
+Các màn hình tuân theo layout chuẩn:
+
+```dart
+Scaffold(
+  appBar: AppBar(
+    title: Text('Tiêu đề màn hình'),
+    actions: [
+      // Các nút thao tác
+    ],
+  ),
+  drawer: const AppDrawer(), // Nếu cần
+  body: SafeArea(
+    child: SingleChildScrollView(
+      child: Column(
+        children: [
+          // Nội dung màn hình
+        ],
+      ),
+    ),
+  ),
+  floatingActionButton: FloatingActionButton(
+    // Nút thao tác chính
+  ),
+  bottomNavigationBar: BottomNavigationBar(
+    // Navigation chính (nếu cần)
+  ),
+)
+```
+
+### Responsive Design
+
+Các màn hình nên hỗ trợ responsive bằng cách:
+
+1. Sử dụng `MediaQuery` để lấy kích thước màn hình:
+```dart
+final screenWidth = MediaQuery.of(context).size.width;
+```
+
+2. Điều chỉnh layout dựa trên kích thước:
+```dart
+screenWidth > 600
+    ? GridView.builder(...) // Tablet/Desktop
+    : ListView.builder(...) // Mobile
+```
+
+3. Sử dụng `LayoutBuilder` cho các component phức tạp:
+```dart
+LayoutBuilder(
+  builder: (context, constraints) {
+    // Điều chỉnh layout dựa trên constraints
+  },
+)
+```
+
+### Error & Loading
+
+Sử dụng patterns nhất quán:
+
+```dart
+// Hiển thị loading
+if (isLoading) {
+  return const Center(child: CircularProgressIndicator());
+}
+
+// Hiển thị lỗi
+if (error != null) {
+  return Center(
+    child: Text('Đã xảy ra lỗi: $error'),
+  );
+}
+
+// Hiển thị trạng thái trống
+if (items.isEmpty) {
+  return const Center(
+    child: Text('Không có dữ liệu'),
+  );
+}
+```
+

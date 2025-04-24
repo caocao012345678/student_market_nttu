@@ -1,0 +1,175 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Services trong Student Market NTTU
+
+Services là lớp chứa logic nghiệp vụ chính của ứng dụng, xử lý tương tác với Firebase và cung cấp dữ liệu cho UI.
+
+## Kiến Trúc Service
+
+Hầu hết các services đều extend từ `ChangeNotifier` để tích hợp với Provider:
+
+```dart
+class ExampleService extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = false;
+  
+  bool get isLoading => _isLoading;
+  
+  Future<void> someOperation() async {
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      // Thực hiện thao tác
+    } catch (e) {
+      // Xử lý lỗi
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+}
+```
+
+## Các Services Chính
+
+### AuthService
+
+[lib/services/auth_service.dart](mdc:lib/services/auth_service.dart) quản lý xác thực người dùng:
+
+```dart
+class AuthService extends ChangeNotifier {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  // Đăng nhập bằng email và mật khẩu
+  Future<User?> signInWithEmailAndPassword(String email, String password) async { ... }
+  
+  // Đăng ký tài khoản mới
+  Future<User?> signUpWithEmailAndPassword(String email, String password) async { ... }
+  
+  // Đăng xuất
+  Future<void> signOut() async { ... }
+}
+```
+
+### ProductService
+
+[lib/services/product_service.dart](mdc:lib/services/product_service.dart) quản lý sản phẩm:
+
+```dart
+class ProductService extends ChangeNotifier {
+  // Lấy danh sách sản phẩm
+  Future<List<Product>> getProducts() async { ... }
+  
+  // Lấy chi tiết sản phẩm
+  Future<Product?> getProductById(String productId) async { ... }
+  
+  // Thêm sản phẩm mới
+  Future<String> addProduct(Product product) async { ... }
+  
+  // Cập nhật sản phẩm
+  Future<void> updateProduct(Product product) async { ... }
+  
+  // Xóa sản phẩm
+  Future<void> deleteProduct(String productId) async { ... }
+}
+```
+
+### UserService
+
+[lib/services/user_service.dart](mdc:lib/services/user_service.dart) quản lý thông tin người dùng:
+
+```dart
+class UserService extends ChangeNotifier {
+  UserModel? _currentUser;
+  
+  UserModel? get currentUser => _currentUser;
+  
+  // Lấy thông tin người dùng
+  Future<UserModel> getUserData(String userId) async { ... }
+  
+  // Cập nhật thông tin người dùng
+  Future<void> updateUserProfile({ ... }) async { ... }
+  
+  // Cập nhật ảnh đại diện
+  Future<void> updateUserPhoto(dynamic image) async { ... }
+}
+```
+
+### ChatService
+
+[lib/services/chat_service.dart](mdc:lib/services/chat_service.dart) quản lý trò chuyện:
+
+```dart
+class ChatService extends ChangeNotifier {
+  // Tạo phòng chat mới
+  Future<String> createChatRoom(String buyerId, String sellerId, String productId) async { ... }
+  
+  // Gửi tin nhắn
+  Future<void> sendMessage(String chatRoomId, String senderId, String text) async { ... }
+  
+  // Đánh dấu tin nhắn đã đọc
+  Future<void> markAsRead(String chatRoomId, String messageId) async { ... }
+}
+```
+
+### ThemeService
+
+[lib/services/theme_service.dart](mdc:lib/services/theme_service.dart) quản lý theme của ứng dụng:
+
+```dart
+class ThemeService extends ChangeNotifier {
+  bool _isDarkMode = false;
+  
+  bool get isDarkMode => _isDarkMode;
+  
+  // Chuyển đổi theme
+  void toggleTheme() {
+    _isDarkMode = !_isDarkMode;
+    notifyListeners();
+  }
+}
+```
+
+## Đăng Ký Services
+
+Tất cả services được đăng ký trong [lib/main.dart](mdc:lib/main.dart) sử dụng `MultiProvider`:
+
+```dart
+MultiProvider(
+  providers: [
+    ChangeNotifierProvider(create: (_) => AuthService()),
+    ChangeNotifierProvider(create: (_) => ProductService()),
+    ChangeNotifierProvider(create: (_) => UserService()),
+    // Các services khác...
+  ],
+  child: MaterialApp( ... ),
+)
+```
+
+## Mẫu Sử Dụng Service
+
+Trong màn hình và widgets, sử dụng Provider để truy cập services:
+
+```dart
+// Lấy service
+final productService = Provider.of<ProductService>(context);
+
+// Sử dụng service trong hàm bất đồng bộ
+Future<void> loadProducts() async {
+  final products = await productService.getProducts();
+  // Xử lý dữ liệu
+}
+
+// Listen các thay đổi
+Consumer<UserService>(
+  builder: (context, userService, child) {
+    final user = userService.currentUser;
+    // Sử dụng dữ liệu user
+  },
+)
+```
+

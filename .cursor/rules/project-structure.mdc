@@ -3,20 +3,55 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Project Structure Guide
+# Cấu Trúc Dự Án Student Market NTTU
 
-This project is a Flutter application with backend functions and a well-organized directory structure:
+Dự án Student Market NTTU là một ứng dụng thị trường trực tuyến được xây dựng bằng Flutter, Firebase và tích hợp AI thông qua Gemini API.
 
-- The main Flutter app code is in [lib/](mdc:lib), with the entry point at [main.dart](mdc:lib/main.dart).
-- UI screens are in [lib/screens/](mdc:lib/screens), with an [admin/](mdc:lib/screens/admin) subdirectory for admin pages.
-- Reusable widgets are in [lib/widgets/](mdc:lib/widgets).
-- Data models are in [lib/models/](mdc:lib/models).
-- Business logic and API calls are in [lib/services/](mdc:lib/services).
-- Utility functions are in [lib/utils/](mdc:lib/utils).
-- Static assets (images, icons) are in [assets/](mdc:assets).
-- Backend/serverless functions are in [functions/src/](mdc:functions/src).
-- Tests are in [test/](mdc:test).
-- Project configuration is in [pubspec.yaml](mdc:pubspec.yaml), [firebase.json](mdc:firebase.json), and [firestore.rules](mdc:firestore.rules).
+## Thư Mục Chính
 
-Refer to the respective directories for more details on their contents and purposes.
+- [lib/main.dart](mdc:lib/main.dart) - Điểm khởi đầu của ứng dụng, thiết lập Firebase và providers
+- [lib/firebase_options.dart](mdc:lib/firebase_options.dart) - Cấu hình Firebase cho các nền tảng khác nhau
+
+### Cấu Trúc Thư Mục
+
+- **screens/** - Chứa các màn hình chính
+  - [lib/screens/home_screen.dart](mdc:lib/screens/home_screen.dart) - Màn hình trang chủ
+  - [lib/screens/product_detail_screen.dart](mdc:lib/screens/product_detail_screen.dart) - Màn hình chi tiết sản phẩm
+  - [lib/screens/login_screen.dart](mdc:lib/screens/login_screen.dart) - Màn hình đăng nhập
+  - [lib/screens/add_product_screen.dart](mdc:lib/screens/add_product_screen.dart) - Màn hình thêm sản phẩm mới
+  - [lib/screens/ai_hub_screen.dart](mdc:lib/screens/ai_hub_screen.dart) - Trung tâm tính năng AI
+
+- **models/** - Chứa các lớp dữ liệu
+  - [lib/models/product.dart](mdc:lib/models/product.dart) - Model sản phẩm
+  - [lib/models/user.dart](mdc:lib/models/user.dart) - Model người dùng
+  - [lib/models/chat_message.dart](mdc:lib/models/chat_message.dart) - Model tin nhắn chat
+
+- **services/** - Chứa logic business
+  - [lib/services/auth_service.dart](mdc:lib/services/auth_service.dart) - Xử lý xác thực
+  - [lib/services/product_service.dart](mdc:lib/services/product_service.dart) - Quản lý sản phẩm
+  - [lib/services/user_service.dart](mdc:lib/services/user_service.dart) - Quản lý người dùng
+  - [lib/services/gemini_service.dart](mdc:lib/services/gemini_service.dart) - Tích hợp Gemini AI
+  - [lib/services/rag_service.dart](mdc:lib/services/rag_service.dart) - Retrieval Augmented Generation
+
+- **widgets/** - Chứa các components UI
+  - [lib/widgets/product_card_standard.dart](mdc:lib/widgets/product_card_standard.dart) - Card hiển thị sản phẩm
+  - [lib/widgets/app_drawer.dart](mdc:lib/widgets/app_drawer.dart) - Drawer ứng dụng
+
+- **utils/** - Chứa các tiện ích
+  - [lib/utils/web_utils.dart](mdc:lib/utils/web_utils.dart) - Các tiện ích cho web
+
+## Luồng Người Dùng
+
+1. Người dùng đăng nhập qua [login_screen.dart](mdc:lib/screens/login_screen.dart)
+2. Người dùng duyệt sản phẩm trên [home_screen.dart](mdc:lib/screens/home_screen.dart)
+3. Người dùng xem chi tiết sản phẩm trên [product_detail_screen.dart](mdc:lib/screens/product_detail_screen.dart)
+4. Người dùng trò chuyện với người bán qua [chat_screen.dart](mdc:lib/screens/chat_screen.dart)
+5. Người dùng thêm sản phẩm vào giỏ hàng và thanh toán qua [cart_screen.dart](mdc:lib/screens/cart_screen.dart)
+
+## Tài Nguyên & Cấu Hình
+
+- [pubspec.yaml](mdc:pubspec.yaml) - Cấu hình packages và dependencies
+- [android/](mdc:android) - Cấu hình cho Android
+- [ios/](mdc:ios) - Cấu hình cho iOS
+- [web/](mdc:web) - Cấu hình cho Web
 

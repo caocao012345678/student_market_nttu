@@ -884,418 +884,500 @@ class RAGService extends ChangeNotifier {
     }
   }
 
-  /// Tạo câu trả lời với RAG
-  Future<String> generateRAGResponse(String query) async {
-    if (_disposed) {
-      return 'Không thể xử lý yêu cầu vì service đã bị hủy. Vui lòng thử lại.';
+  /// Phương thức tạo phản hồi RAG và bổ sung thông tin sản phẩm nếu phát hiện
+  Future<Map<String, dynamic>> generateRAGResponse(String query, {bool recordInteraction = true}) async {
+    if (_disposed) return {'response': 'Service đã bị đóng', 'relevantDocsIds': []};
+    
+    if (_isProcessingQuery) {
+      return {'response': 'Đang xử lý yêu cầu trước đó, vui lòng đợi...', 'relevantDocsIds': []};
     }
     
-    // Kiểm tra xem đang xử lý query không và nếu là cùng một truy vấn
-    if (_isProcessingQuery) {
-      if (query == _lastProcessedQuery) {
-        debugPrint('Đang xử lý truy vấn trùng lặp, bỏ qua: $query');
-        return 'Đang xử lý câu hỏi này, vui lòng đợi...';
-      } else {
-        // Nếu đang xử lý một truy vấn khác, trả về thông báo rõ ràng hơn
-        debugPrint('Đang xử lý truy vấn khác: $_lastProcessedQuery, bỏ qua truy vấn mới: $query');
-        return 'Đang xử lý một câu hỏi khác, vui lòng đợi...';
-      }
-    }
-
-    // Đánh dấu đang xử lý query và lưu lại query hiện tại
+    try {
     _isProcessingQuery = true;
     _lastProcessedQuery = query;
-    notifyListeners();
 
-    try {
-      debugPrint('Đang thực hiện tìm kiếm cho: $query');
+      // Lớp Xử lý và Hiểu (Processing & Understanding Layer)
+      final queryType = _analyzeQueryType(query);
+      debugPrint('Loại truy vấn được phát hiện: ${queryType.toString()}');
 
-      // Tìm kiếm các tài liệu liên quan
+      // Lớp Truy cập Thông tin và Kiến thức (Information & Knowledge Access Layer)
       final relevantDocs = await retrieveRelevantData(query);
+      List<Map<String, dynamic>> productDetails = [];
       
-      if (_disposed) {
-        _isProcessingQuery = false;
-        notifyListeners();
-        return 'Không thể xử lý yêu cầu vì service đã bị hủy. Vui lòng thử lại.';
+      // Xử lý dữ liệu sản phẩm nếu có
+      if (queryType == QueryType.product || query.toLowerCase().contains('mua') || query.toLowerCase().contains('sách')) {
+        productDetails = await _fetchProductDetails(relevantDocs);
+        debugPrint('Tìm thấy ${productDetails.length} sản phẩm liên quan');
       }
       
-      String response = '';
+      // Chuẩn bị dữ liệu ngữ cảnh
+      String context = '';
+      List<String> relevantDocsIds = [];
       
-      // Nếu không có dữ liệu truy xuất được, sử dụng mô hình thông thường
-      if (relevantDocs.isEmpty) {
-        debugPrint('Không tìm thấy dữ liệu liên quan, chuyển sang sử dụng Gemini trực tiếp');
-        // Tạo hướng dẫn mô hình
-        final systemPrompt = _createSystemPrompt();
-        // Truyền addToHistory=false để tránh thêm trùng lặp vào lịch sử
-        response = await _geminiService.sendPromptedMessage(systemPrompt, query, addToHistory: false);
+      if (relevantDocs.isNotEmpty) {
+        for (final doc in relevantDocs) {
+          context += "--- ${doc['title'] ?? 'Thông tin'} ---\n";
+          context += "${doc['content']}\n\n";
+          
+          if (doc['id'] != null) {
+            relevantDocsIds.add(doc['id']);
+          }
+        }
+      }
+      
+      // Lớp Tạo Phản hồi (Response Generation Layer)
+      String productDetailsInfo = '';
+      if (productDetails.isNotEmpty) {
+        productDetailsInfo = 'DANH SÁCH SẢN PHẨM CHÍNH XÁC TỪ CƠ SỞ DỮ LIỆU:\n';
+        for (var product in productDetails) {
+          productDetailsInfo += """
+- Tên sản phẩm: ${product['title']}
+  Giá: ${product['price']}đ
+  Mô tả: ${product['description']}
+  Tình trạng: ${product['condition']}
+  Người bán: ${product['seller']}
+""";
+        }
+      }
+      
+      // Tạo hướng dẫn dựa trên loại truy vấn
+      String typeSpecificInstructions = '';
+      if (queryType == QueryType.product) {
+        typeSpecificInstructions = """
+TRẢ LỜI VỀ SẢN PHẨM - YÊU CẦU CHÍNH XÁC CAO:
+1. CHỈ đề cập đến các sản phẩm trong danh sách bên trên. KHÔNG BAO GIỜ đề cập hoặc đưa thông tin về sản phẩm không có trong danh sách.
+2. KHÔNG tạo ra sản phẩm mới, giá cả khác, hoặc bất kỳ thuộc tính nào khác với dữ liệu đã cung cấp.
+3. Nếu không có sản phẩm nào trong danh sách, hãy nói rõ "Hiện tại chưa có sản phẩm phù hợp với yêu cầu của bạn trong hệ thống" và đề xuất danh mục hoặc từ khóa tìm kiếm khác.
+4. Không bao giờ sử dụng kiến thức bên ngoài về sản phẩm; CHỈ dùng dữ liệu từ danh sách đã cung cấp.
+5. Khuyến khích người dùng nhấp vào thẻ sản phẩm để xem chi tiết.
+""";
+      } else if (queryType == QueryType.appUsage) {
+        typeSpecificInstructions = """
+TRẢ LỜI VỀ CÁCH SỬ DỤNG ỨNG DỤNG:
+1. Cung cấp hướng dẫn cụ thể, chi tiết và dễ làm theo.
+2. Mô tả từng bước với giao diện người dùng (nút bấm, menu, v.v.).
+3. Nêu rõ các lựa chọn thay thế nếu có.
+4. CHỈ sử dụng thông tin về tính năng có trong ứng dụng, không đề cập đến tính năng không tồn tại.
+""";
       } else {
-        // Tạo context từ dữ liệu đã truy xuất
-        String context = _createContextFromDocs(relevantDocs);
-        // Tạo hướng dẫn mô hình
-        final systemPrompt = _createSystemPrompt();
-        
-        debugPrint('Tìm thấy ${relevantDocs.length} tài liệu có điểm tương đồng >= $_similarityThreshold');
-        
-        // Sử dụng context và system prompt
-        response = await _geminiService.sendContextAndPrompt(context, systemPrompt, query);
+        typeSpecificInstructions = """
+LƯU Ý QUAN TRỌNG CHO MỌI LOẠI CÂU TRẢ LỜI:
+1. CHỈ sử dụng thông tin đã cung cấp, KHÔNG tạo ra thông tin mới.
+2. KHÔNG đưa ra thông tin về sản phẩm, danh mục, hoặc tính năng nếu không được đề cập trong ngữ cảnh.
+3. Nếu không có thông tin, hãy thành thật nói rằng "Tôi không có thông tin về điều đó trong hệ thống" thay vì tạo ra câu trả lời không chính xác.
+""";
       }
       
-      // Tinh chỉnh câu trả lời để loại bỏ định dạng hoặc kết quả không phù hợp
-      response = _refineResponse(response);
+      // Vòng lặp cải thiện câu trả lời
+      String response = '';
+      int attemptCount = 0;
+      const maxAttempts = 3; // Giới hạn số lần thử cải thiện câu trả lời
+      double responseScore = 0;
+      Map<String, dynamic> evaluationResult = {};
       
-      // Lưu tương tác của người dùng để cải thiện dữ liệu trong tương lai
-      _saveInteractionForImprovement(query, response, relevantDocs);
+      // Thực hiện vòng lặp cải thiện câu trả lời
+      while (attemptCount < maxAttempts) {
+        // Xây dựng prompt dựa trên kết quả đánh giá trước đó (nếu có)
+        String additionalGuidance = '';
+        if (attemptCount > 0 && evaluationResult.isNotEmpty) {
+          additionalGuidance = """
+HƯỚNG DẪN CẢI THIỆN:
+- ${evaluationResult['feedbackPoints'].join('\n- ')}
+""";
+        }
+        
+        // Danh sách chính xác các tên sản phẩm để kiểm tra hallucination
+        final List<String> exactProductNames = productDetails.map((p) => p['title'].toString()).toList();
+        final String exactProductsList = exactProductNames.isEmpty ? "KHÔNG CÓ SẢN PHẨM NÀO TRONG HỆ THỐNG PHÙ HỢP VỚI YÊU CẦU" 
+                                                                  : exactProductNames.map((name) => "- $name").join("\n");
+        
+        // Xây dựng prompt mạnh mẽ hơn với cảnh báo về hallucination
+        final ragPrompt = """
+Bạn là trợ lý ảo Student Market NTTU, một ứng dụng mua bán dành cho sinh viên. Hãy trả lời dựa NGHIÊM NGẶT vào thông tin dưới đây.
+
+THÔNG TIN TỪ CƠ SỞ DỮ LIỆU:
+$context
+
+${productDetails.isNotEmpty ? productDetailsInfo : 'KHÔNG CÓ SẢN PHẨM NÀO PHÙ HỢP TRONG HỆ THỐNG.'}
+
+DANH SÁCH CHÍNH XÁC CÁC SẢN PHẨM THỰC:
+$exactProductsList
+
+CẢNH BÁO VỀ HALLUCINATION:
+- BẠN CHỈ ĐƯỢC PHÉP ĐỀ CẬP ĐẾN CÁC SẢN PHẨM CÓ TRONG DANH SÁCH CHÍNH XÁC TRÊN.
+- TUYỆT ĐỐI KHÔNG ĐƯỢC TẠO RA THÔNG TIN VỀ SẢN PHẨM KHÔNG CÓ TRONG DANH SÁCH.
+- KHÔNG ĐƯỢC THÊM GIÁ, MÔ TẢ HOẶC THUỘC TÍNH KHÁC SO VỚI DỮ LIỆU ĐÃ CUNG CẤP.
+
+CHỈ DẪN CHO CÂU TRẢ LỜI:
+1. Phản hồi phải đầy đủ, chính xác và giải quyết trực tiếp câu hỏi của người dùng.
+2. Văn phong thân thiện, chuyên nghiệp và trả lời ngắn gọn, súc tích.
+3. Nếu không có thông tin cụ thể, thừa nhận điều đó và đề xuất cách tìm hiểu thêm.
+4. Thông tin phải nhất quán và KHÔNG được tạo ra, hãy nói "Hiện tại chưa có sản phẩm phù hợp" nếu không có sản phẩm.
+
+YÊU CẦU VỀ TÍNH LỊCH SỰ VÀ CHUYÊN NGHIỆP:
+- Luôn sử dụng ngôn từ lịch sự, tôn trọng người dùng
+- Thể hiện sự chuyên nghiệp và thân thiện trong cách trả lời
+- Đề xuất giải pháp hữu ích khi không có đủ thông tin
+- Tránh sử dụng từ ngữ tiêu cực hoặc đổ lỗi
+- Cấu trúc câu trả lời rõ ràng, dễ hiểu
+
+$typeSpecificInstructions
+
+$additionalGuidance
+
+CÂU HỎI CỦA NGƯỜI DÙNG: "$query"
+
+Cung cấp câu trả lời chính xác, đáng tin cậy và hữu ích nhất có thể, CHỈ sử dụng dữ liệu đã cung cấp.
+""";
+        
+        // Gửi prompt đến Gemini API để tạo phản hồi
+        response = await _geminiService.sendMessageWithContext(ragPrompt, query);
+        
+        // Kiểm tra hallucination trong câu trả lời
+        bool hasHallucination = await _checkForHallucination(response, productDetails);
+        
+        if (hasHallucination) {
+          debugPrint('Phát hiện hallucination trong câu trả lời, thử lại...');
+          
+          // Thêm cảnh báo vào feedbackPoints
+          if (evaluationResult.isEmpty) {
+            evaluationResult = {
+              'score': 0.0,
+              'feedbackPoints': [
+                'CẢNH BÁO: Câu trả lời có chứa thông tin về sản phẩm không tồn tại trong hệ thống',
+                'Chỉ đề cập đến các sản phẩm trong danh sách đã cung cấp',
+                'Không được tạo ra thông tin mới hoặc giá cả khác với dữ liệu thực tế'
+              ]
+            };
+          } else {
+            evaluationResult['feedbackPoints'].insert(0, 'CẢNH BÁO: Câu trả lời vẫn chứa thông tin về sản phẩm không tồn tại');
+            evaluationResult['score'] = 0.0;
+          }
+          
+          attemptCount++;
+          continue;
+        }
+        
+        // Đánh giá phản hồi
+        evaluationResult = await _evaluateResponse(response, query, productDetails, context);
+        responseScore = evaluationResult['score'];
+        print(ragPrompt);
+        
+        debugPrint('Đánh giá câu trả lời (lần $attemptCount): $responseScore/10');
+        
+        // Nếu câu trả lời đủ tốt, thoát khỏi vòng lặp
+        if (responseScore >= 7.5 || attemptCount == maxAttempts - 1) {
+          break;
+        }
+        
+        attemptCount++;
+      }
+      
+      // Lớp Đầu ra & Định dạng (Output & Formatting Layer)
+      final formattedResponse = _formatResponse(response, productDetails);
+      
+      // Lưu tương tác nếu cần
+      if (recordInteraction) {
+        _recordInteraction(query, formattedResponse, relevantDocs.length, relevantDocsIds);
+      }
       
       _isProcessingQuery = false;
-      notifyListeners();
-      return response;
+      
+      // Trả về kết quả bao gồm phản hồi, ID tài liệu liên quan và thông tin sản phẩm
+      return {
+        'response': formattedResponse,
+        'relevantDocsIds': relevantDocsIds,
+        'productDetails': productDetails,
+        'queryType': queryType.toString().split('.').last,
+        'responseScore': responseScore,
+        'improvementAttempts': attemptCount
+      };
     } catch (e) {
-      if (_disposed) {
-        return 'Không thể xử lý yêu cầu vì service đã bị hủy. Vui lòng thử lại.';
+      debugPrint('Lỗi RAG: $e');
+      _isProcessingQuery = false;
+      return {'response': 'Đã xảy ra lỗi khi xử lý truy vấn: $e', 'relevantDocsIds': []};
+    }
+  }
+  
+  /// Kiểm tra hallucination trong câu trả lời
+  Future<bool> _checkForHallucination(String response, List<Map<String, dynamic>> productDetails) async {
+    try {
+      // Nếu không có sản phẩm, nhưng câu trả lời đề cập đến sản phẩm
+      if (productDetails.isEmpty) {
+        final mentionsProduct = response.toLowerCase().contains('sản phẩm') &&
+                              (response.contains('đ') || response.contains('VND') || response.contains('VNĐ'));
+        
+        if (mentionsProduct) {
+          return true; // Có hallucination vì không có sản phẩm thực nào
+        }
+      } else {
+        // Tạo danh sách tên, giá và thuộc tính sản phẩm thực
+        final realProductNames = productDetails.map((p) => p['title'].toString().toLowerCase()).toList();
+        final realProductPrices = productDetails.map((p) => p['price'].toString()).toList();
+        
+        // Tạo prompt để kiểm tra hallucination
+        final checkPrompt = """
+Dưới đây là danh sách các sản phẩm THỰC có trong hệ thống:
+${productDetails.map((p) => "- ${p['title']} (${p['price']}đ)").join('\n')}
+
+Đây là câu trả lời của chatbot cho người dùng:
+"$response"
+
+NHIỆM VỤ: Kiểm tra xem câu trả lời có đề cập đến sản phẩm KHÔNG CÓ trong danh sách không.
+Chỉ phản hồi "CÓ" hoặc "KHÔNG" dựa trên phân tích sau:
+1. Nếu câu trả lời đề cập đến sản phẩm (tên hoặc mô tả) không có trong danh sách => "CÓ"
+2. Nếu câu trả lời đề cập đến giá khác với giá trong danh sách => "CÓ"
+3. Nếu câu trả lời chỉ đề cập đến sản phẩm có trong danh sách với giá chính xác => "KHÔNG"
+4. Nếu câu trả lời không đề cập đến bất kỳ sản phẩm cụ thể nào => "KHÔNG"
+""";
+
+        final checkResponse = await _geminiService.sendMessageWithContext(checkPrompt, "Kiểm tra tính chính xác");
+        
+        // Phân tích kết quả kiểm tra
+        return checkResponse.trim().toUpperCase().contains('CÓ');
       }
       
-      final errorMsg = 'Lỗi tạo câu trả lời RAG: $e';
-      _isProcessingQuery = false;
-      notifyListeners();
-      debugPrint('RAG Error: $errorMsg');
-      return 'Lỗi xử lý yêu cầu: $e';
+      return false;
+    } catch (e) {
+      debugPrint('Lỗi khi kiểm tra hallucination: $e');
+      return false; // Mặc định là không có hallucination nếu có lỗi
+    }
+  }
+
+  /// Đánh giá chất lượng câu trả lời
+  Future<Map<String, dynamic>> _evaluateResponse(
+    String response, 
+    String query, 
+    List<Map<String, dynamic>> productDetails,
+    String context
+  ) async {
+    try {
+      // Tạo prompt đánh giá
+      final evaluationPrompt = """
+Hãy đánh giá chất lượng câu trả lời dưới đây dựa trên các tiêu chí sau:
+1. Mức độ giải quyết câu hỏi (0-2 điểm): Câu trả lời có giải quyết trực tiếp vấn đề người dùng hỏi không?
+2. Tính chính xác (0-2 điểm): Thông tin trong câu trả lời có chính xác không?
+3. Đầy đủ thông tin (0-1.5 điểm): Câu trả lời có cung cấp đầy đủ thông tin liên quan không?
+4. Tính lịch sự và chuyên nghiệp (0-2.5 điểm): Câu trả lời có lịch sự, tôn trọng và chuyên nghiệp không? Ngôn ngữ có phù hợp với một trợ lý ảo chất lượng cao?
+5. Tính nhất quán (0-2 điểm): Có mâu thuẫn giữa các phần trong câu trả lời không?
+
+TIÊU CHÍ CHI TIẾT VỀ TÍNH LỊCH SỰ VÀ CHUYÊN NGHIỆP (0-2.5 điểm):
+- Câu trả lời sử dụng ngôn từ lịch sự, tôn trọng người dùng (0-0.5)
+- Ngữ điệu chuyên nghiệp, thân thiện nhưng không quá thân mật (0-0.5)
+- Không chứa ngôn từ thô lỗ, mỉa mai hoặc tiêu cực (0-0.5)
+- Đưa ra gợi ý hữu ích và thể hiện sự quan tâm đến người dùng (0-0.5)
+- Cấu trúc câu và đoạn văn rõ ràng, mạch lạc (0-0.5)
+
+CÂU HỎI CỦA NGƯỜI DÙNG: "$query"
+
+CÂU TRẢ LỜI CẦN ĐÁNH GIÁ:
+"$response"
+
+${productDetails.isNotEmpty ? 'LƯU Ý: Câu trả lời phải đề cập đến các sản phẩm sau:\n' + productDetails.map((p) => '- ${p['title']}').join('\n') : ''}
+
+Phân tích kỹ từng tiêu chí và chấm điểm cụ thể. Phản hồi theo định dạng:
+- Điểm giải quyết câu hỏi: [điểm/2]
+- Điểm tính chính xác: [điểm/2]
+- Điểm đầy đủ thông tin: [điểm/1.5]
+- Điểm tính lịch sự và chuyên nghiệp: [điểm/2.5]
+- Điểm tính nhất quán: [điểm/2]
+- Tổng điểm: [tổng/10]
+- Điểm mạnh:
+  - [điểm mạnh 1]
+  - [điểm mạnh 2]
+- Điểm yếu:
+  - [điểm yếu 1]
+  - [điểm yếu 2] 
+- Gợi ý cải thiện:
+  - [gợi ý 1]
+  - [gợi ý 2]
+  - [gợi ý cải thiện tính lịch sự nếu cần]
+""";
+
+      // Gửi đến Gemini để đánh giá
+      final evaluationResponse = await _geminiService.sendMessageWithContext(evaluationPrompt, "Đánh giá chất lượng");
+      
+      // Phân tích kết quả đánh giá
+      double score = 0;
+      final RegExp scoreRegex = RegExp(r'Tổng điểm: (\d+(\.\d+)?)/10');
+      final scoreMatch = scoreRegex.firstMatch(evaluationResponse);
+      
+      if (scoreMatch != null && scoreMatch.groupCount >= 1) {
+        score = double.tryParse(scoreMatch.group(1) ?? '0') ?? 0;
+      }
+      
+      // Trích xuất các điểm yếu và gợi ý cải thiện
+      final List<String> feedbackPoints = [];
+      
+      // Tìm phần gợi ý cải thiện
+      final RegExp suggestionRegex = RegExp(r'Gợi ý cải thiện:(.*?)(?=\n\n|$)', dotAll: true);
+      final suggestionMatch = suggestionRegex.firstMatch(evaluationResponse);
+      
+      if (suggestionMatch != null) {
+        final suggestions = suggestionMatch.group(1) ?? '';
+        final bulletPoints = suggestions.split('\n').where((line) => line.trim().startsWith('-')).toList();
+        feedbackPoints.addAll(bulletPoints.map((point) => point.replaceFirst('-', '').trim()));
+      }
+      
+      // Tìm phần điểm yếu
+      final RegExp weaknessRegex = RegExp(r'Điểm yếu:(.*?)(?=\n\n|- Gợi ý cải thiện|$)', dotAll: true);
+      final weaknessMatch = weaknessRegex.firstMatch(evaluationResponse);
+      
+      if (weaknessMatch != null) {
+        final weaknesses = weaknessMatch.group(1) ?? '';
+        final bulletPoints = weaknesses.split('\n').where((line) => line.trim().startsWith('-')).toList();
+        
+        // Thêm các điểm yếu không trùng với gợi ý cải thiện
+        for (var point in bulletPoints) {
+          final cleanPoint = point.replaceFirst('-', '').trim();
+          if (!feedbackPoints.contains(cleanPoint)) {
+            feedbackPoints.add(cleanPoint);
+          }
+        }
+      }
+      
+      return {
+        'score': score,
+        'feedbackPoints': feedbackPoints,
+        'fullEvaluation': evaluationResponse,
+      };
+    } catch (e) {
+      debugPrint('Lỗi khi đánh giá câu trả lời: $e');
+      return {
+        'score': 5.0, // Điểm mặc định nếu có lỗi
+        'feedbackPoints': ['Cung cấp câu trả lời chính xác, đầy đủ và lịch sự hơn'],
+        'fullEvaluation': 'Lỗi đánh giá: $e',
+      };
     }
   }
   
-  /// Tạo hướng dẫn hệ thống để giúp mô hình sinh ra câu trả lời phù hợp
-  String _createSystemPrompt() {
-    return '''
-    Bạn là trợ lý ảo của ứng dụng Student Market NTTU, một nền tảng mua bán đồ cũ dành riêng cho sinh viên trường Đại học Nguyễn Tất Thành.
-    
-    Quy tắc quan trọng khi trả lời:
-    1. Chỉ trả lời các câu hỏi liên quan trực tiếp đến ứng dụng Student Market NTTU
-    2. Không sử dụng định dạng đậm, nghiêng, gạch chân hoặc Markdown trong câu trả lời
-    3. Tránh sử dụng các từ như "rất", "vô cùng", hay các biểu hiện cảm xúc quá mức
-    4. Không đưa ra các câu trả lời chung chung hoặc mở rộng ra ngoài phạm vi ứng dụng
-    5. Nếu không biết câu trả lời, nói "Tôi không có thông tin về vấn đề này trong ứng dụng Student Market NTTU"
-    6. Câu trả lời ngắn gọn, súc tích, đi thẳng vào vấn đề
-    7. Không sử dụng dấu hiệu như "Câu trả lời:" hoặc "Hướng dẫn:"
-    
-    Phạm vi ứng dụng bao gồm: đăng bán sản phẩm, tìm kiếm sản phẩm, mua hàng, nhắn tin, quản lý tài khoản và các tính năng của ứng dụng.
-    
-    Tránh trả lời các câu hỏi về:
-    - Thông tin cá nhân người dùng
-    - Các dịch vụ không liên quan đến ứng dụng
-    - Câu hỏi về các sản phẩm cụ thể không có trong dữ liệu
-    - Thông tin kỹ thuật chi tiết về cách ứng dụng được phát triển
-    
-    Luôn trả lời bằng tiếng Việt, ngắn gọn và có tính thực tiễn.
-    ''';
-  }
-  
-  /// Tinh chỉnh câu trả lời để đảm bảo phù hợp với quy định
-  String _refineResponse(String response) {
-    // Loại bỏ các định dạng Markdown
-    var refined = response.replaceAll(RegExp(r'\*\*(.*?)\*\*'), r'$1'); // Bold
-    refined = refined.replaceAll(RegExp(r'\*(.*?)\*'), r'$1'); // Italic
-    refined = refined.replaceAll(RegExp(r'__(.*?)__'), r'$1'); // Underline
-    refined = refined.replaceAll(RegExp(r'_(.*?)_'), r'$1'); // Italic underscore
-    refined = refined.replaceAll(RegExp(r'```(.*?)```', dotAll: true), r'$1'); // Code blocks
-    refined = refined.replaceAll(RegExp(r'`(.*?)`'), r'$1'); // Inline code
-    
-    // Loại bỏ các tiêu đề không cần thiết
-    refined = refined.replaceAll(RegExp(r'^(Hướng dẫn|Câu trả lời|Thông tin|Giải thích):\s*', multiLine: true), '');
-    
-    // Loại bỏ các từ diễn đạt cảm xúc quá mức
-    final excessiveWords = [
-      'rất', 'vô cùng', 'tuyệt vời', 'xuất sắc', 'tuyệt đối', 
-      'hoàn toàn', 'cực kỳ', 'vô số', 'đặc biệt', 'bất ngờ',
-      'hoàn hảo', 'tối ưu'
-    ];
-    
-    for (final word in excessiveWords) {
-      refined = refined.replaceAll(' $word ', ' ');
+  /// Định dạng câu trả lời cuối cùng để đảm bảo chất lượng
+  String _formatResponse(String originalResponse, List<Map<String, dynamic>> productDetails) {
+    // Xóa bỏ các ký tự định dạng thừa như **, *, #, - nếu có
+    var response = originalResponse
+        .replaceAll(RegExp(r'\*\*(.*?)\*\*'), r'')
+        .replaceAll(RegExp(r'\*(.*?)\*'), r'');
+        
+    // Nếu phản hồi vẫn nói không có thông tin về sản phẩm trong khi có sản phẩm
+    if (productDetails.isNotEmpty && 
+        (response.contains('chưa có thông tin') || 
+         response.contains('không có thông tin') ||
+         response.contains('tôi không biết'))) {
+      
+      // Thay thế bằng phản hồi mẫu chứa thông tin sản phẩm
+      response = 'Tôi đã tìm thấy một số sản phẩm phù hợp với yêu cầu của bạn:\n\n';
+      
+      for (var product in productDetails) {
+        response += '- ${product['title']} (${product['price']}đ): ${product['description']}\n';
+        if (product['condition'] != null && product['condition'].toString().isNotEmpty) {
+          response += '  Tình trạng: ${product['condition']}\n';
+        }
+      }
+      
+      response += '\nBạn có thể nhấp vào thẻ sản phẩm bên trên để xem thông tin chi tiết và liên hệ với người bán.';
     }
     
-    return refined.trim();
+    return response;
   }
-  
-  /// Lưu tương tác của người dùng để cải thiện dữ liệu trong tương lai
-  Future<void> _saveInteractionForImprovement(String query, String response, List<Map<String, dynamic>> retrievedDocs) async {
+
+  /// Phương thức lấy chi tiết sản phẩm từ danh sách tài liệu liên quan
+  Future<List<Map<String, dynamic>>> _fetchProductDetails(List<Map<String, dynamic>> relevantDocs) async {
+    List<Map<String, dynamic>> productDetails = [];
+    
+    try {
+      // Tìm các ID sản phẩm từ kết quả tìm kiếm
+      List<String> productIds = [];
+      
+      for (var doc in relevantDocs) {
+        // Kiểm tra xem tài liệu có phải là sản phẩm không
+        if (doc['type'] == 'product' && doc['id'] != null) {
+          productIds.add(doc['id']);
+        }
+        
+        // Hoặc kiểm tra trong nội dung xem có chứa ID sản phẩm không (trường hợp ID có trong content)
+        if (doc['content'] != null) {
+          final RegExp productIdRegex = RegExp(r'product_id[:\s]+"?([a-zA-Z0-9]+)"?');
+          final matches = productIdRegex.allMatches(doc['content']);
+          
+          for (final match in matches) {
+            if (match.groupCount >= 1) {
+              productIds.add(match.group(1)!);
+            }
+          }
+        }
+      }
+      
+      // Lọc bỏ trùng lặp
+      productIds = productIds.toSet().toList();
+      
+      // Giới hạn số lượng sản phẩm trả về (tối đa 3)
+      if (productIds.length > 3) {
+        productIds = productIds.sublist(0, 3);
+      }
+      
+      // Lấy thông tin chi tiết sản phẩm từ Firestore
+      for (var productId in productIds) {
+        try {
+          final productDoc = await _firestore.collection('products').doc(productId).get();
+          
+          if (productDoc.exists) {
+            final data = productDoc.data()!;
+            
+            // Tạo một object chứa thông tin cần thiết cho product card
+            productDetails.add({
+              'id': productId,
+              'title': data['title'] ?? 'Sản phẩm không có tiêu đề',
+              'price': data['price'] ?? 0.0,
+              'images': List<String>.from(data['images'] ?? []),
+              'description': data['description'] ?? '',
+              'category': data['category'] ?? '',
+              'seller': data['sellerName'] ?? 'Không rõ người bán',
+              'sellerId': data['sellerId'] ?? '',
+              'condition': data['condition'] ?? 'Không rõ',
+              'createdAt': data['createdAt'] != null 
+                  ? (data['createdAt'] as Timestamp).toDate().toString() 
+                  : DateTime.now().toString(),
+            });
+          }
+        } catch (e) {
+          debugPrint('Lỗi khi lấy thông tin sản phẩm $productId: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi khi truy xuất chi tiết sản phẩm: $e');
+    }
+    
+    return productDetails;
+  }
+
+  /// Ghi lại tương tác của người dùng
+  Future<void> _recordInteraction(String query, String response, int docsCount, List<String> relevantDocsIds) async {
     try {
       // Tạo dữ liệu về tương tác
       final interaction = {
         'query': query,
         'response': response,
-        'timestamp': DateTime.now().millisecondsSinceEpoch, // Thay thế FieldValue.serverTimestamp()
-        'relevantDocsCount': retrievedDocs.length,
-        'relevantDocsIds': retrievedDocs.map((doc) => doc['id']).toList(),
-        'similarityScores': retrievedDocs.map((doc) => doc['similarityScore']).toList(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'relevantDocsCount': docsCount,
+        'relevantDocsIds': relevantDocsIds,
+        'queryType': _analyzeQueryType(query).toString().split('.').last,
       };
       
       // Lưu vào Firestore
       await _firestore.collection('rag_interactions').add(interaction);
       
       // Nếu không có kết quả phù hợp, lưu vào danh sách truy vấn cần cải thiện
-      if (retrievedDocs.isEmpty || retrievedDocs.length < 2) {
+      if (docsCount < 2) {
         await _firestore.collection('queries_to_improve').add({
           'query': query,
-          'timestamp': DateTime.now().millisecondsSinceEpoch, // Thay thế FieldValue.serverTimestamp()
-          'relevantDocsCount': retrievedDocs.length,
+          'timestamp': FieldValue.serverTimestamp(),
+          'relevantDocsCount': docsCount,
           'status': 'pending'
         });
       }
     } catch (e) {
-      debugPrint('Lỗi khi lưu tương tác để cải thiện: $e');
+      debugPrint('Lỗi khi ghi lại tương tác: $e');
     }
-  }
-
-  /// Tạo ngữ cảnh từ các tài liệu đã truy xuất
-  String _createContextFromDocs(List<Map<String, dynamic>> docs) {
-    String context = '';
-    
-    // Thêm tiêu đề và thông tin tổng quan (loại bỏ định dạng đặc biệt)
-    context += "THÔNG TIN HỖ TRỢ\n\n";
-    
-    // Phân loại tài liệu theo loại
-    final productDocs = docs.where((doc) => doc['type'] == 'product').toList();
-    final categoryDocs = docs.where((doc) => doc['type'] == 'category').toList();
-    final instructionDocs = docs.where((doc) => doc['type'] == 'instruction').toList();
-    final appLayoutDocs = docs.where((doc) => doc['type'] == 'app_layout').toList();
-    
-    // Kiểm tra xem có tài liệu task_feature không (kết quả từ tìm kiếm user_tasks)
-    final taskFeatureDocs = appLayoutDocs
-        .where((doc) => doc['subtype'] == 'feature' && doc['id'].toString().startsWith('feature_task_'))
-        .toList();
-    
-    // Nếu có kết quả tác vụ cụ thể, ưu tiên hiển thị trước
-    if (taskFeatureDocs.isNotEmpty) {
-      context += "HƯỚNG DẪN NHIỆM VỤ CỤ THỂ\n";
-      for (var doc in taskFeatureDocs) {
-        final data = doc['data'];
-        context += "TÁC VỤ: ${data['matching_task'] ?? 'Không xác định'}\n";
-        context += "TÍNH NĂNG: ${data['name']}\n";
-        context += "MÔ TẢ: ${data['description']}\n";
-        context += "VỊ TRÍ: ${data['location']}\n";
-        context += "CÁCH THỰC HIỆN: ${data['usage']}\n\n";
-        
-        // Thêm hướng dẫn chi tiết
-        if (data['usage_guide'] != null && data['usage_guide'].toString().isNotEmpty) {
-          context += "HƯỚNG DẪN CHI TIẾT:\n${data['usage_guide']}\n";
-        }
-        
-        // Thêm thông tin đường dẫn nếu có
-        if (data['navigation_paths'] != null && data['navigation_paths'] is List && 
-            (data['navigation_paths'] as List).isNotEmpty) {
-          context += "CÁCH TRUY CẬP:\n";
-          for (var path in data['navigation_paths']) {
-            if (path['steps'] != null && path['steps'] is List) {
-              context += "- Từ ${path['from']}: \n";
-              for (var step in path['steps']) {
-                context += "  * $step\n";
-              }
-            }
-          }
-        }
-        context += "\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Trước tiên, thêm thông tin tổng quan nếu có
-    final overviewDocs = appLayoutDocs.where((doc) => doc['subtype'] == 'overview').toList();
-    if (overviewDocs.isNotEmpty) {
-      context += "TỔNG QUAN ỨNG DỤNG\n";
-      for (var doc in overviewDocs) {
-        context += "${doc['data']['content']}\n\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Thêm thông tin về các tính năng (sắp xếp theo điểm liên quan)
-    final featureDocs = appLayoutDocs
-        .where((doc) => doc['subtype'] == 'feature' && !doc['id'].toString().startsWith('feature_task_'))
-        .toList();
-    
-    if (featureDocs.isNotEmpty) {
-      // Sắp xếp tính năng theo điểm tương đồng giảm dần
-      featureDocs.sort((a, b) => (b['similarityScore'] as double).compareTo(a['similarityScore'] as double));
-      
-      context += "THÔNG TIN TÍNH NĂNG\n";
-      for (var doc in featureDocs) {
-        final data = doc['data'];
-        context += "Tính năng: ${data['name']}\n";
-        context += "Mô tả: ${data['description']}\n";
-        context += "Vị trí: ${data['location']}\n";
-        context += "Cách sử dụng: ${data['usage']}\n";
-        
-        // Thêm hướng dẫn chi tiết nếu có
-        if (data['usage_guide'] != null && data['usage_guide'].toString().isNotEmpty) {
-          context += "Hướng dẫn chi tiết:\n${data['usage_guide']}\n";
-        }
-        
-        // Thêm thông tin về đường dẫn đến tính năng
-        if (data['navigation_paths'] != null && data['navigation_paths'] is List && 
-            (data['navigation_paths'] as List).isNotEmpty) {
-          context += "Cách truy cập:\n";
-          for (var path in data['navigation_paths']) {
-            context += "- Từ ${path['from'] ?? 'màn hình chính'}: ${path['steps'].join(' -> ')}\n";
-          }
-        }
-        context += "\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Thêm thông tin về các màn hình
-    final screenDocs = appLayoutDocs.where((doc) => doc['subtype'] == 'screen').toList();
-    if (screenDocs.isNotEmpty) {
-      context += "THÔNG TIN MÀN HÌNH\n";
-      for (var doc in screenDocs) {
-        final data = doc['data'];
-        context += "Màn hình: ${data['name']}\n";
-        context += "Mô tả: ${data['description']}\n";
-        
-        // Thêm hướng dẫn sử dụng màn hình nếu có
-        if (data['usage_guide'] != null && data['usage_guide'].toString().isNotEmpty) {
-          context += "Hướng dẫn sử dụng:\n${data['usage_guide']}\n";
-        }
-        context += "\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Thêm thông tin về điều hướng
-    final navigationDocs = appLayoutDocs.where((doc) => doc['subtype'] == 'navigation').toList();
-    if (navigationDocs.isNotEmpty) {
-      context += "THÔNG TIN ĐIỀU HƯỚNG\n";
-      for (var doc in navigationDocs) {
-        final data = doc['data'];
-        
-        // Nếu điều hướng đến màn hình
-        if (data['target_screen'] != null) {
-          context += "Điều hướng đến: ${data['target_screen']['name']}\n";
-          
-          if (data['paths'] != null && data['paths'] is List) {
-            context += "Các cách truy cập:\n";
-            for (var path in data['paths']) {
-              context += "- ${path['method']}\n";
-            }
-          }
-        }
-        // Nếu điều hướng đến tính năng
-        else if (data['target_feature'] != null) {
-          context += "Điều hướng đến tính năng: ${data['target_feature']['name']}\n";
-          context += "Vị trí tính năng: ${data['target_feature']['location']}\n";
-          
-          if (data['paths'] != null && data['paths'] is List) {
-            context += "Các bước truy cập:\n";
-            for (var path in data['paths']) {
-              if (path['steps'] != null && path['steps'] is List) {
-                for (var i = 0; i < (path['steps'] as List).length; i++) {
-                  context += "  ${i+1}. ${path['steps'][i]}\n";
-                }
-              }
-            }
-          }
-        }
-        
-        // Thêm hướng dẫn nếu có
-        if (data['usage_guide'] != null && data['usage_guide'].toString().isNotEmpty) {
-          context += "Hướng dẫn:\n${data['usage_guide']}\n";
-        }
-        context += "\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Thêm thông tin về sản phẩm nếu có
-    if (productDocs.isNotEmpty) {
-      context += "THÔNG TIN SẢN PHẨM\n";
-      for (var doc in productDocs) {
-        final data = doc['data'];
-        
-        // Ưu tiên sử dụng summary đã tối ưu hóa nếu có
-        if (data['summary'] != null && data['summary'].toString().isNotEmpty) {
-          context += "${data['summary']}\n";
-        } else {
-          context += "Sản phẩm: ${data['name']}\n";
-          context += "Giá: ${data['price']}\n";
-          context += "Mô tả: ${data['description']}\n";
-          
-          // Thêm thông tin nổi bật nếu có
-          if (data['highlights'] != null && data['highlights'] is Map) {
-            context += "Điểm nổi bật:\n";
-            (data['highlights'] as Map).forEach((key, value) {
-              if (value != null) {
-                context += "- $key: $value\n";
-              }
-            });
-          }
-          
-          // Thêm thông tin người đăng
-          if (data['postedBy'] != null) {
-            context += "Đăng bởi: ${data['postedBy']}\n";
-          }
-        }
-        context += "\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Thêm thông tin về danh mục nếu có
-    if (categoryDocs.isNotEmpty) {
-      context += "THÔNG TIN DANH MỤC\n";
-      for (var doc in categoryDocs) {
-        final data = doc['data'];
-        context += "Danh mục: ${data['name']}\n";
-        context += "Mô tả: ${data['description']}\n";
-        
-        // Thêm thông tin về danh mục liên quan nếu có
-        if (data['related_categories'] != null && data['related_categories'] is List) {
-          final relatedCategories = (data['related_categories'] as List).join(', ');
-          if (relatedCategories.isNotEmpty) {
-            context += "Danh mục liên quan: $relatedCategories\n";
-          }
-        }
-        context += "\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Thêm thông tin về hướng dẫn sử dụng nếu có
-    if (instructionDocs.isNotEmpty) {
-      context += "HƯỚNG DẪN SỬ DỤNG\n";
-      for (var doc in instructionDocs) {
-        final data = doc['data'];
-        context += "Hướng dẫn: ${data['title']}\n";
-        context += "Nội dung: ${data['content']}\n\n";
-      }
-      context += "----------\n\n";
-    }
-    
-    // Thêm hướng dẫn đặc biệt cho các chức năng quản lý sản phẩm
-    final manageProductFeatures = featureDocs.where(
-      (doc) => doc['data']['id'] == 'add_product' || doc['data']['id'] == 'manage_products'
-    ).toList();
-    
-    if (manageProductFeatures.isNotEmpty) {
-      context += "HƯỚNG DẪN QUẢN LÝ SẢN PHẨM NHANH\n";
-      context += "Để đăng bán sản phẩm:\n";
-      context += "1. Từ màn hình chính, nhấn nút + ở góc dưới phải màn hình\n";
-      context += "2. Hoặc vào trang hồ sơ > Sản phẩm của tôi > nhấn nút 'Thêm sản phẩm'\n";
-      context += "3. Điền thông tin sản phẩm: tên, mô tả, giá, danh mục, tình trạng\n";
-      context += "4. Thêm hình ảnh cho sản phẩm\n";
-      context += "5. Nhấn nút 'Đăng bán'\n\n";
-      
-      context += "Để quản lý sản phẩm đã đăng:\n";
-      context += "1. Vào trang hồ sơ (tab cuối cùng ở thanh điều hướng dưới cùng)\n";
-      context += "2. Chọn 'Sản phẩm của tôi'\n";
-      context += "3. Tại đây, bạn có thể:\n";
-      context += "   - Xem danh sách sản phẩm đã đăng\n";
-      context += "   - Nhấn vào sản phẩm để xem chi tiết\n";
-      context += "   - Nhấn nút 'Chỉnh sửa' để sửa thông tin sản phẩm\n";
-      context += "   - Nhấn nút 'Xóa' để xóa sản phẩm\n";
-      context += "   - Nhấn 'Đánh dấu đã bán' nếu sản phẩm đã được bán\n";
-      context += "----------\n\n";
-    }
-    
-    return context;
   }
 }
 

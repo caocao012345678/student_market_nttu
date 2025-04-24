@@ -41,9 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   final List<String> _bannerImages = [
-    'assets/images/banner/banner1.jpg',
-    'assets/images/banner/banner2.jpg',
-    'assets/images/banner/banner3.jpg',
+    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner1.jpg?alt=media',
+    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner2.jpg?alt=media', 
+    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner3.jpg?alt=media',
   ];
 
   @override
@@ -105,9 +105,9 @@ class _HomeContentState extends State<HomeContent> {
   int _currentBannerIndex = 0;
   
   final List<String> _bannerImages = [
-    'assets/images/banner/banner1.jpg',
-    'assets/images/banner/banner2.jpg',
-    'assets/images/banner/banner3.jpg',
+    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner1.jpg?alt=media',
+    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner2.jpg?alt=media',
+    'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner3.jpg?alt=media',
   ];
 
   @override
@@ -213,10 +213,14 @@ class _HomeContentState extends State<HomeContent> {
               },
               itemCount: _bannerImages.length,
               itemBuilder: (context, index) {
-                return Image.asset(
-                  _bannerImages[index],
+                return CachedNetworkImage(
+                  imageUrl: _bannerImages[index],
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (context, url, error) => Container(
                     color: Colors.grey[200],
                     child: const Icon(Icons.error),
                   ),
@@ -330,25 +334,25 @@ class _HomeContentState extends State<HomeContent> {
     final List<Map<String, dynamic>> featuredShops = [
       {
         'name': 'Shop NTTU Books',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop1.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop1.jpg?alt=media',
         'rating': 4.8,
         'productCount': 56,
       },
       {
         'name': 'Điện tử sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop2.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop2.jpg?alt=media',
         'rating': 4.5,
         'productCount': 42,
       },
       {
         'name': 'Second Hand NTTU',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop3.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop3.jpg?alt=media',
         'rating': 4.6,
         'productCount': 78,
       },
       {
         'name': 'Thời trang sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop4.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/shops%2Fshop4.jpg?alt=media',
         'rating': 4.7,
         'productCount': 63,
       },
@@ -407,6 +411,11 @@ class _HomeContentState extends State<HomeContent> {
                           backgroundImage: CachedNetworkImageProvider(
                             shop['avatar'],
                           ),
+                          backgroundColor: Colors.grey[200],
+                          onBackgroundImageError: (exception, stackTrace) {
+                            // Handle error without returning anything
+                            debugPrint('Error loading shop avatar: $exception');
+                          },
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -457,17 +466,17 @@ class _HomeContentState extends State<HomeContent> {
     final List<Map<String, dynamic>> topDonors = [
       {
         'name': 'Nguyễn Văn A',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor1.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/donors%2Fdonor1.jpg?alt=media',
         'donationCount': 15,
       },
       {
         'name': 'Trần Thị B',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor2.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/donors%2Fdonor2.jpg?alt=media',
         'donationCount': 12,
       },
       {
         'name': 'Lê Văn C',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor3.jpg?alt=media',
+        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/donors%2Fdonor3.jpg?alt=media',
         'donationCount': 10,
       },
     ];
@@ -558,6 +567,10 @@ class _HomeContentState extends State<HomeContent> {
                                       : 'https://via.placeholder.com/80',
                                 ),
                                 backgroundColor: Colors.grey[200],
+                                onBackgroundImageError: (exception, stackTrace) {
+                                  // Handle error without returning anything
+                                  debugPrint('Error loading donor avatar: $exception');
+                                },
                               ),
                               Positioned(
                                 bottom: 0,

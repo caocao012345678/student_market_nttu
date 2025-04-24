@@ -261,6 +261,13 @@ class GeminiService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Thêm một tin nhắn tùy chỉnh vào lịch sử chat
+  void addToHistory(Map<String, dynamic> message) {
+    chatHistory.add(message);
+    notifyListeners();
+    saveChatHistory();
+  }
+
   Future<String> sendMessage(String message, {bool addToHistory = false}) async {
     if (message.trim().isEmpty) return '';
 

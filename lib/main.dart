@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:student_market_nttu/screens/splash_screen.dart';
+import 'package:student_market_nttu/screens/product_detail_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/services/shipper_service.dart';
@@ -25,6 +26,7 @@ import 'package:student_market_nttu/services/category_service.dart';
 import 'package:student_market_nttu/services/product_moderation_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
+import 'models/product.dart';
 
 // Thêm lớp MyApp để sử dụng trong widget_test.dart
 class MyApp extends StatelessWidget {
@@ -133,6 +135,12 @@ class MyApp extends StatelessWidget {
             ],
             locale: const Locale('vi', 'VN'),
             home: const SplashScreen(),
+            routes: {
+              '/product_detail': (context) {
+                final product = ModalRoute.of(context)!.settings.arguments as Product;
+                return ProductDetailScreen(product: product);
+              },
+            },
           );
         },
       ),

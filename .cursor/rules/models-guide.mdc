@@ -1,0 +1,125 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Models trong Student Market NTTU
+
+Các models trong dự án được thiết kế để thể hiện cấu trúc dữ liệu của ứng dụng và tương tác với Firestore. Mỗi model đều có các phương thức chuyển đổi từ và đến Firestore.
+
+## Product
+
+[lib/models/product.dart](mdc:lib/models/product.dart) là model chính cho sản phẩm trên thị trường.
+
+```dart
+class Product {
+  final String id;
+  final String title;
+  final String description;
+  final double price;
+  final String category;
+  final List<String> images;
+  final String sellerId;
+  // Các thuộc tính khác...
+
+  // Factory constructor để tạo từ Firestore
+  factory Product.fromMap(Map<String, dynamic> map, String id) { ... }
+
+  // Chuyển đổi sang định dạng Firestore
+  Map<String, dynamic> toMap() { ... }
+
+  // Tạo bản sao với các thuộc tính được cập nhật
+  Product copyWith({ ... }) { ... }
+}
+```
+
+## User
+
+[lib/models/user.dart](mdc:lib/models/user.dart) quản lý thông tin người dùng.
+
+```dart
+class UserModel {
+  final String id;
+  final String email;
+  final String displayName;
+  final String photoURL;
+  // Các thuộc tính khác...
+
+  factory UserModel.fromMap(Map<String, dynamic> map, String id) { ... }
+  Map<String, dynamic> toMap() { ... }
+}
+```
+
+## Chat
+
+Chat được quản lý thông qua hai models:
+- [lib/models/chat_room.dart](mdc:lib/models/chat_room.dart) - Đại diện cho một phòng chat
+- [lib/models/chat_message.dart](mdc:lib/models/chat_message.dart) - Đại diện cho một tin nhắn
+
+```dart
+class ChatMessage {
+  final String id;
+  final String senderId;
+  final String text;
+  final DateTime timestamp;
+  final bool isRead;
+  // Các thuộc tính khác...
+
+  factory ChatMessage.fromMap(Map<String, dynamic> map, String id) { ... }
+  Map<String, dynamic> toMap() { ... }
+}
+```
+
+## Orders
+
+[lib/models/order.dart](mdc:lib/models/order.dart) quản lý đơn hàng và thanh toán.
+
+```dart
+class Order {
+  final String id;
+  final String buyerId;
+  final String sellerId;
+  final String productId;
+  final double amount;
+  final String status;
+  final DateTime createdAt;
+  // Các thuộc tính khác...
+
+  factory Order.fromMap(Map<String, dynamic> map, String id) { ... }
+  Map<String, dynamic> toMap() { ... }
+}
+```
+
+## Reviews
+
+[lib/models/review.dart](mdc:lib/models/review.dart) quản lý đánh giá sản phẩm và người bán.
+
+```dart
+class Review {
+  final String id;
+  final String userId;
+  final String productId;
+  final double rating;
+  final String comment;
+  final DateTime createdAt;
+  // Các thuộc tính khác...
+
+  factory Review.fromMap(Map<String, dynamic> map, String id) { ... }
+  Map<String, dynamic> toMap() { ... }
+}
+```
+
+## Quy Ước Chung Cho Models
+
+1. Mỗi model đều cần có:
+   - Constructor với tham số được đặt tên
+   - Factory method `fromMap()` để chuyển từ Firestore
+   - Method `toMap()` để chuyển đến Firestore
+   - Thuộc tính `id` cho mỗi document
+
+2. Việc xử lý timestamps:
+   - Từ Firestore: `(map['createdAt'] as Timestamp).toDate()`
+   - Đến Firestore: `Timestamp.fromDate(createdAt)`
+
+3. Các models phức tạp có thể cần method `copyWith()` để tạo phiên bản mới với các thuộc tính được cập nhật
+

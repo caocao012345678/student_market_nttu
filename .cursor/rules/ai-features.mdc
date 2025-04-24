@@ -1,0 +1,110 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tính Năng AI - Student Market NTTU
+
+Student Market NTTU tích hợp AI thông qua Google Gemini để nâng cao trải nghiệm người dùng và cung cấp các tính năng thông minh.
+
+## Kiến Trúc AI
+
+Các tính năng AI được xây dựng dựa trên ba service chính:
+
+1. [lib/services/gemini_service.dart](mdc:lib/services/gemini_service.dart) - Service nền tảng giao tiếp với API Gemini
+2. [lib/services/rag_service.dart](mdc:lib/services/rag_service.dart) - Retrieval Augmented Generation cho việc truy vấn thông tin
+3. [lib/services/auto_improvement_service.dart](mdc:lib/services/auto_improvement_service.dart) - Tự động cải thiện metadata và mô tả
+
+## Gemini Service
+
+```dart
+class GeminiService extends ChangeNotifier {
+  GenerativeModel? _model;
+  ChatSession? _chatSession;
+  
+  // Khởi tạo Gemini API
+  Future<void> initialize() async { ... }
+  
+  // Gửi tin nhắn đến model
+  Future<String> sendMessage(String message) async { ... }
+  
+  // Gửi tin nhắn với context bổ sung
+  Future<String> sendMessageWithContext(String context, String message) async { ... }
+}
+```
+
+## Tính Năng Chatbot
+
+[lib/screens/chatbot_screen.dart](mdc:lib/screens/chatbot_screen.dart) cung cấp giao diện trò chuyện với assistant AI.
+
+Chatbot được thiết kế để:
+- Trả lời các câu hỏi về cách sử dụng ứng dụng
+- Giúp tìm kiếm sản phẩm
+- Cung cấp thông tin về danh mục và xu hướng
+- Hỗ trợ người dùng trong quá trình mua bán
+
+## Kiểm Duyệt Nội Dung (Content Moderation)
+
+[lib/services/product_moderation_service.dart](mdc:lib/services/product_moderation_service.dart) sử dụng AI để kiểm tra nội dung sản phẩm:
+
+```dart
+class ProductModerationService extends ChangeNotifier {
+  final GeminiService _geminiService;
+  
+  // Kiểm tra nội dung
+  Future<Map<String, dynamic>> moderateProduct(Product product) async { ... }
+  
+  // Kiểm tra hình ảnh
+  Future<Map<String, dynamic>> moderateImage(String imageUrl) async { ... }
+}
+```
+
+Quy trình kiểm duyệt được hiển thị trong [lib/screens/moderation_result_screen.dart](mdc:lib/screens/moderation_result_screen.dart)
+
+## Gợi Ý Sản Phẩm
+
+[lib/screens/product_recommendation_screen.dart](mdc:lib/screens/product_recommendation_screen.dart) hiển thị các sản phẩm được đề xuất bởi AI dựa trên:
+- Lịch sử xem và mua sắm
+- Sở thích đã khai báo
+- Xu hướng thị trường
+- Tương tác gần đây
+
+## RAG (Retrieval Augmented Generation)
+
+[lib/services/rag_service.dart](mdc:lib/services/rag_service.dart) cung cấp khả năng tìm kiếm thông tin từ cơ sở dữ liệu và tăng cường trả lời của AI:
+
+```dart
+class RAGService extends ChangeNotifier {
+  final GeminiService _geminiService;
+  
+  // Truy vấn với RAG
+  Future<String> query(String userQuery) async {
+    // 1. Truy xuất thông tin liên quan
+    final context = await _retrieveRelevantInfo(userQuery);
+    
+    // 2. Sử dụng context để tăng cường câu trả lời
+    return _geminiService.sendMessageWithContext(context, userQuery);
+  }
+  
+  // Truy xuất thông tin từ cơ sở dữ liệu
+  Future<String> _retrieveRelevantInfo(String query) async { ... }
+}
+```
+
+## Cấu Hình AI
+
+Gemini API được cấu hình trong [GEMINI_CONFIG.md](mdc:GEMINI_CONFIG.md) và sử dụng biến môi trường từ file `.env`:
+
+```
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemma-3-27b-it
+```
+
+## AI Hub
+
+[lib/screens/ai_hub_screen.dart](mdc:lib/screens/ai_hub_screen.dart) là trung tâm cho tất cả các tính năng AI, cho phép người dùng truy cập:
+- Chatbot trợ lý
+- Gợi ý sản phẩm
+- Thông tin về các model AI
+- Khảo sát và phản hồi về tính năng AI
+
