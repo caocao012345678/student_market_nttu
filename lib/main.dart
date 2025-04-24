@@ -22,6 +22,7 @@ import 'package:student_market_nttu/services/app_layout_service.dart';
 import 'package:student_market_nttu/services/db_service.dart';
 import 'package:student_market_nttu/services/auto_improvement_service.dart';
 import 'package:student_market_nttu/services/category_service.dart';
+import 'package:student_market_nttu/services/product_moderation_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
 
@@ -59,6 +60,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: appLayoutService),
         ChangeNotifierProvider(create: (_) => RAGService(geminiService)),
         Provider.value(value: dbService),
+        ChangeNotifierProvider(create: (context) => ProductModerationService(
+          Provider.of<GeminiService>(context, listen: false)
+        )),
       ],
       child: Consumer<ThemeService>(
         builder: (context, themeService, child) {

@@ -12,6 +12,7 @@ import 'package:student_market_nttu/screens/order_history_screen.dart';
 import 'package:student_market_nttu/screens/user_profile_page.dart';
 import 'package:student_market_nttu/screens/register_shipper_screen.dart';
 import 'package:student_market_nttu/screens/user_survey_screen.dart';
+import 'package:student_market_nttu/screens/moderation_history_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -234,6 +235,18 @@ class ProfileScreen extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.inventory_2),
+            title: const Text('Sản phẩm của tôi'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const MyProductsScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.favorite),
             title: const Text('Sản phẩm yêu thích'),
             trailing: Text(
@@ -280,6 +293,17 @@ class ProfileScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const OrderHistoryScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.fact_check),
+            title: const Text('Lịch sử kiểm duyệt sản phẩm'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ModerationHistoryScreen(),
                 ),
               );
             },

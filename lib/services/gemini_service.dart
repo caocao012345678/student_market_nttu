@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'dart:typed_data';
 
 // Import js có điều kiện để tránh lỗi trên mobile
 import 'dart:js_util' if (dart.library.io) 'package:flutter/material.dart' as js_util;
@@ -475,6 +476,55 @@ Trả lời một cách ngắn gọn, chính xác và hữu ích. Chỉ sử d�
     } catch (e) {
       debugPrint('Gemini error: $e');
       return 'Xin lỗi, tôi không thể trả lời câu hỏi này vào lúc này. Lỗi: $e';
+    }
+  }
+
+  // Phân tích hình ảnh với prompt
+  Future<String> sendImageAnalysisPrompt(String prompt, String imageUrl) async {
+    try {
+      _checkInitialized();
+      setLoading(true);
+      
+      // Tải hình ảnh từ URL
+      final imageBytes = await _loadImageFromUrl(imageUrl);
+      if (imageBytes == null) {
+        throw Exception('Không thể tải hình ảnh từ URL');
+      }
+      
+      // Chuyển đổi List<int> thành Uint8List
+      final Uint8List uint8ImageBytes = Uint8List.fromList(imageBytes);
+      
+      // Chuẩn bị nội dung đa phương tiện cho Gemini
+      final content = Content.multi([
+        TextPart(prompt),
+        DataPart('image/jpeg', uint8ImageBytes),
+      ]);
+      
+      // Gửi nội dung đến Gemini
+      final response = await _model!.generateContent([content]);
+      final responseText = response.text ?? 'Không thể phân tích hình ảnh';
+      
+      setLoading(false);
+      return responseText;
+    } catch (e) {
+      setLoading(false);
+      setErrorMessage('Lỗi khi phân tích hình ảnh: $e');
+      debugPrint('Image Analysis Error: $e');
+      return 'Lỗi khi phân tích hình ảnh: $e';
+    }
+  }
+  
+  // Tải hình ảnh từ URL
+  Future<List<int>?> _loadImageFromUrl(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Lỗi khi tải hình ảnh: $e');
+      return null;
     }
   }
 } 

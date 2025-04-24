@@ -71,6 +71,8 @@ class AuthService extends ChangeNotifier {
           'interests': [],
           'preferredCategories': [],
           'completedSurvey': false,
+          'isAdmin': false,
+          'role': 'user',
         });
 
         // Send email verification

@@ -9,6 +9,7 @@ import '../services/product_service.dart';
 import '../services/category_service.dart';
 import '../models/product.dart';
 import '../models/category.dart';
+import '../screens/moderation_result_screen.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({Key? key}) : super(key: key);
@@ -232,75 +233,93 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng thêm ít nhất một ảnh'),
-        ),
-      );
+  Future<void> _submitProduct() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    if (_selectedCategoryId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn danh mục cho sản phẩm'),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    final List<String> imageUrls = [];
+    
     try {
-      final user = Provider.of<AuthService>(context, listen: false).user;
-      if (user == null) throw Exception('Vui lòng đăng nhập để thêm sản phẩm');
-
-      final imageUrls = await Provider.of<ProductService>(context, listen: false)
-          .uploadProductImages(_images);
-
-      final product = Product(
-        id: '',
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        price: double.parse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), '')),
-        originalPrice: _originalPriceController.text.isEmpty 
-            ? 0.0 
-            : double.parse(_originalPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')),
+      if (_images.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng chọn ít nhất một hình ảnh')),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      // Upload hình ảnh
+      for (int i = 0; i < _images.length; i++) {
+        List<String> urls = await Provider.of<ProductService>(context, listen: false)
+            .uploadProductImages([_images[i] as File]);
+        imageUrls.addAll(urls);
+      }
+      
+      // Hiển thị thông báo kiểm duyệt
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đang gửi sản phẩm để kiểm duyệt...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Tạo Map specifications
+      final Map<String, String> specifications = {};
+      for (var entry in _specifications.entries) {
+        specifications[entry.key] = entry.value;
+      }
+      
+      // Thêm sản phẩm với kiểm duyệt
+      final productId = await Provider.of<ProductService>(context, listen: false)
+          .addProductWithModeration(
+        title: _titleController.text,
+        description: _descriptionController.text,
+        price: double.parse(_priceController.text),
         category: _selectedCategoryId,
         images: imageUrls,
-        sellerId: user.uid,
-        sellerName: user.displayName ?? '',
-        sellerAvatar: user.photoURL ?? '',
-        createdAt: DateTime.now(),
-        quantity: int.parse(_quantityController.text),
         condition: _condition,
-        location: _locationController.text.trim(),
+        location: _locationController.text,
         tags: _tags,
-        specifications: _specifications,
+        specifications: specifications,
       );
-
-      await Provider.of<ProductService>(context, listen: false)
-          .createProduct(product);
-
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
       if (!mounted) return;
-
-      Navigator.pop(context);
+      
+      // Hiển thị thông báo thành công và rời khỏi màn hình
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Thêm sản phẩm thành công'),
+        SnackBar(
+          content: Text('Sản phẩm đã được thêm và đang chờ kiểm duyệt'),
+          action: SnackBarAction(
+            label: 'Xem kết quả',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ModerationResultScreen(productId: productId),
+                ),
+              );
+            },
+          ),
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
       
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi: ${e.toString()}'),
-        ),
+        SnackBar(content: Text('Lỗi: ${e.toString()}')),
       );
     }
   }
@@ -753,7 +772,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _submitForm,
+                        onPressed: _submitProduct,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue[900],
                           foregroundColor: Colors.white,
