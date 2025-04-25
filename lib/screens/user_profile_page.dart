@@ -10,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/screens/add_product_screen.dart';
+import 'package:student_market_nttu/screens/edit_product_screen.dart';
 
 class UserProfilePage extends StatefulWidget {
   final String userId;
@@ -243,7 +244,7 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
                         _buildRatingStars(_userProfile?.rating ?? 0),
                         const SizedBox(width: 4),
                         Text(
-                          '(${_userProfile?.rating ?? 0})',
+                          '(${(_userProfile?.rating ?? 0).toStringAsFixed(1)})',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -414,14 +415,52 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(Icons.shopping_bag, 'Sản phẩm', '${_userProfile?.productCount ?? 0}'),
-              _buildStatItem(Icons.star, 'Đánh giá', '${_userProfile?.rating ?? 0}'),
-              _buildStatItem(Icons.people, 'Người theo dõi', '$_followerCount'),
-              _buildStatItem(Icons.person_outline, 'Đang theo dõi', '$_followingCount'),
-            ],
+          // Lấy thống kê sản phẩm để hiển thị
+          StreamBuilder<List<Product>>(
+            stream: Provider.of<ProductService>(context).getUserProducts(widget.userId),
+            builder: (context, snapshot) {
+              // Tính toán thống kê từ sản phẩm
+              int productCount = 0;
+              double avgRating = 0;
+              int ratedProductCount = 0;
+              int soldProductCount = 0;
+              
+              if (snapshot.hasData) {
+                final allProducts = snapshot.data!;
+                // Lấy danh sách sản phẩm hiển thị (không bao gồm đang duyệt)
+                final products = allProducts
+                    .where((p) => p.status != ProductStatus.pending_review)
+                    .toList();
+                
+                productCount = products.length;
+                
+                // Tính đánh giá trung bình chỉ từ sản phẩm có rating > 0
+                var ratedProducts = products.where((p) => p.rating > 0).toList();
+                ratedProductCount = ratedProducts.length;
+                
+                if (ratedProductCount > 0) {
+                  double totalRating = ratedProducts.fold(0, (sum, p) => sum + p.rating);
+                  avgRating = totalRating / ratedProductCount;
+                }
+                
+                // Đếm số sản phẩm đã bán
+                soldProductCount = products.where((p) => p.isSold).length;
+              }
+              
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatItem(Icons.shopping_bag, 'Sản phẩm', '$productCount'),
+                  _buildStatItem(
+                    Icons.star, 
+                    'Đánh giá', 
+                    ratedProductCount > 0 ? avgRating.toStringAsFixed(1) : '0'
+                  ),
+                  _buildStatItem(Icons.people, 'Người theo dõi', '$_followerCount'),
+                  _buildStatItem(Icons.sell, 'Đã bán', '$soldProductCount'),
+                ],
+              );
+            }
           ),
         ],
       ),
@@ -549,7 +588,14 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
                 );
               }
 
-              final products = snapshot.data ?? [];
+              var allProducts = snapshot.data ?? [];
+              
+              // Lọc sản phẩm: 
+              // - Nếu là chủ cửa hàng, hiển thị tất cả các sản phẩm
+              // - Nếu là người xem, chỉ hiển thị các sản phẩm đã được duyệt (available)
+              final products = isOwner 
+                  ? allProducts 
+                  : allProducts.where((p) => p.status == ProductStatus.available).toList();
 
               if (products.isEmpty) {
                 return Center(
@@ -577,8 +623,9 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
               }
 
               // Tách sản phẩm nổi bật (rating ≥ 4.0)
-              final featuredProducts = products.where((p) => p.rating >= 4.0).toList();
-              final regularProducts = products.where((p) => p.rating < 4.0).toList();
+              final featuredProducts = products.where((p) => p.rating >= 4.0 && p.status == ProductStatus.available).toList();
+              final regularProducts = products.where((p) => p.rating < 4.0 && 
+                (isOwner || p.status == ProductStatus.available)).toList();
 
               return featuredProducts.isNotEmpty
                   ? SingleChildScrollView(
@@ -918,7 +965,11 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
                   icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
                   onSelected: (value) async {
                     if (value == 'edit') {
-                      // TODO: Navigate to edit product screen
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EditProductScreen(product: product),
+                        ),
+                      );
                     } else if (value == 'status') {
                       try {
                         await Provider.of<ProductService>(context, listen: false)

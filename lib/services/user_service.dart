@@ -49,7 +49,39 @@ class UserService extends ChangeNotifier {
         // Create a basic user document if it doesn't exist
         final user = _auth.currentUser;
         if (user != null) {
-          final newUser = UserModel(
+          // Tạo map dữ liệu người dùng trực tiếp để đảm bảo đầy đủ các trường
+          final Map<String, dynamic> userData = {
+            'email': user.email ?? '',
+            'displayName': user.displayName ?? '',
+            'photoURL': user.photoURL ?? '',
+            'phoneNumber': user.phoneNumber ?? '',
+            'address': '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastActive': FieldValue.serverTimestamp(),
+            'preferences': {},
+            'settings': {},
+            'favoriteProducts': [],
+            'followers': [],
+            'following': [],
+            'isShipper': false,
+            'isVerified': false,
+            'productCount': 0,
+            'rating': 0.0,
+            'nttPoint': 0,
+            'nttCredit': 100,
+            'isStudent': false,
+            'interests': [],
+            'preferredCategories': [],
+            'completedSurvey': false,
+            'isAdmin': false,
+            'role': 'user',
+          };
+          
+          // Lưu dữ liệu người dùng mới vào Firestore
+          await _firestore.collection('users').doc(userId).set(userData);
+          
+          // Tạo đối tượng UserModel
+          _currentUser = UserModel(
             id: userId,
             email: user.email ?? '',
             displayName: user.displayName ?? '',
@@ -58,9 +90,8 @@ class UserService extends ChangeNotifier {
             address: '',
             createdAt: DateTime.now(),
             lastActive: DateTime.now(),
+            isAdmin: false,
           );
-          await _firestore.collection('users').doc(userId).set(newUser.toMap());
-          _currentUser = newUser;
         }
       }
 
@@ -671,6 +702,261 @@ class UserService extends ChangeNotifier {
     } catch (e) {
       print('Lỗi khi lấy người dùng tăng điểm NTTCredit: $e');
       return [];
+    }
+  }
+
+  // Kiểm tra xem người dùng hiện tại có phải là admin hay không
+  Future<bool> isCurrentUserAdmin() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        return false;
+      }
+      
+      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      
+      if (!userDoc.exists) {
+        return false;
+      }
+      
+      final userData = userDoc.data();
+      // Kiểm tra cả hai trường để đảm bảo tính nhất quán
+      return (userData?['role'] == 'admin' || userData?['isAdmin'] == true);
+    } catch (e) {
+      print('Error checking admin status: $e');
+      return false;
+    }
+  }
+
+  // Phương thức lấy danh sách người dùng có bộ lọc
+  Future<List<Map<String, dynamic>>> getUserListWithFilter({
+    String? roleFilter,
+    String? searchQuery,
+  }) async {
+    try {
+      Query query = _firestore.collection('users');
+      
+      // Áp dụng bộ lọc theo vai trò
+      if (roleFilter != null && roleFilter.isNotEmpty) {
+        if (roleFilter == 'admin') {
+          query = query.where('isAdmin', isEqualTo: true);
+        } else if (roleFilter == 'user') {
+          query = query.where('isAdmin', isEqualTo: false);
+        }
+      }
+      
+      final querySnapshot = await query.get();
+      
+      // Xử lý kết quả và lọc theo từ khóa tìm kiếm
+      List<Map<String, dynamic>> users = [];
+      for (var doc in querySnapshot.docs) {
+        final userData = doc.data() as Map<String, dynamic>;
+        userData['id'] = doc.id;
+        
+        // Áp dụng bộ lọc theo từ khóa tìm kiếm
+        if (searchQuery != null && searchQuery.isNotEmpty) {
+          final String name = (userData['fullName'] ?? '').toLowerCase();
+          final String email = (userData['email'] ?? '').toLowerCase();
+          final String searchLower = searchQuery.toLowerCase();
+          
+          if (!name.contains(searchLower) && !email.contains(searchLower)) {
+            continue; // Bỏ qua nếu không khớp với từ khóa tìm kiếm
+          }
+        }
+        
+        users.add(userData);
+      }
+      
+      return users;
+    } catch (e) {
+      debugPrint('Error fetching users: $e');
+      return [];
+    }
+  }
+
+  // Phương thức cập nhật vai trò người dùng
+  Future<bool> updateUserRole(String userId, bool isAdmin) async {
+    try {
+      // Kiểm tra xem người dùng hiện tại có quyền admin không
+      final hasAdminPermission = await isCurrentUserAdmin();
+      if (!hasAdminPermission) {
+        return false;
+      }
+      
+      await _firestore.collection('users').doc(userId).update({
+        'isAdmin': isAdmin,
+      });
+      
+      return true;
+    } catch (e) {
+      debugPrint('Error updating user role: $e');
+      return false;
+    }
+  }
+
+  // Đặt vai trò của người dùng
+  Future<bool> setUserRole(String userId, String role) async {
+    try {
+      // Kiểm tra xem người dùng hiện tại có phải là admin không
+      final isAdmin = await isCurrentUserAdmin();
+      
+      if (!isAdmin) {
+        throw Exception('Only administrators can change user roles');
+      }
+      
+      await _firestore.collection('users').doc(userId).update({
+        'role': role,
+      });
+      
+      return true;
+    } catch (e) {
+      print('Error setting user role: $e');
+      return false;
+    }
+  }
+  
+  // Lấy tất cả người dùng (chỉ dành cho admin)
+  Future<List<UserModel>> getAllUsers() async {
+    try {
+      // Kiểm tra xem người dùng hiện tại có phải là admin không
+      final isAdmin = await isCurrentUserAdmin();
+      
+      if (!isAdmin) {
+        throw Exception('Only administrators can view all users');
+      }
+      
+      final querySnapshot = await _firestore.collection('users').get();
+      
+      return querySnapshot.docs
+          .map((doc) => UserModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting all users: $e');
+      return [];
+    }
+  }
+
+  // Phương thức thêm địa điểm mới
+  Future<void> addLocation(Map<String, dynamic> location) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Lấy danh sách địa điểm hiện tại
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final user = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      final currentLocations = List<Map<String, dynamic>>.from(user.locations);
+      
+      // Thêm ID cho địa điểm
+      final newLocation = {
+        ...location,
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'createdAt': DateTime.now(),
+      };
+      
+      // Thêm địa điểm mới và cập nhật Firestore
+      currentLocations.add(newLocation);
+      await _firestore.collection('users').doc(userId).update({
+        'locations': currentLocations,
+      });
+      
+      // Cập nhật user data
+      await loadUserData();
+      notifyListeners();
+    } catch (e) {
+      print('Error adding location: $e');
+      throw e;
+    }
+  }
+  
+  // Phương thức cập nhật địa điểm
+  Future<void> updateLocation(String locationId, Map<String, dynamic> updatedData) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Lấy danh sách địa điểm hiện tại
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final user = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      final currentLocations = List<Map<String, dynamic>>.from(user.locations);
+      
+      // Tìm và cập nhật địa điểm
+      final locationIndex = currentLocations.indexWhere((loc) => loc['id'] == locationId);
+      if (locationIndex >= 0) {
+        currentLocations[locationIndex] = {
+          ...currentLocations[locationIndex],
+          ...updatedData,
+          'updatedAt': DateTime.now(),
+        };
+        
+        // Cập nhật Firestore
+        await _firestore.collection('users').doc(userId).update({
+          'locations': currentLocations,
+        });
+        
+        // Cập nhật user data
+        await loadUserData();
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error updating location: $e');
+      throw e;
+    }
+  }
+  
+  // Phương thức xóa địa điểm
+  Future<void> deleteLocation(String locationId) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Lấy danh sách địa điểm hiện tại
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final user = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      final currentLocations = List<Map<String, dynamic>>.from(user.locations);
+      
+      // Lọc ra địa điểm cần xóa
+      final updatedLocations = currentLocations.where((loc) => loc['id'] != locationId).toList();
+      
+      // Cập nhật Firestore
+      await _firestore.collection('users').doc(userId).update({
+        'locations': updatedLocations,
+      });
+      
+      // Cập nhật user data
+      await loadUserData();
+      notifyListeners();
+    } catch (e) {
+      print('Error deleting location: $e');
+      throw e;
+    }
+  }
+  
+  // Phương thức lấy tất cả địa điểm của người dùng
+  List<Map<String, dynamic>> getUserLocations() {
+    if (_currentUser == null) return [];
+    return List<Map<String, dynamic>>.from(_currentUser!.locations);
+  }
+
+  // Phương thức tải dữ liệu người dùng hiện tại
+  Future<void> loadUserData() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        _currentUser = null;
+        return;
+      }
+
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        _currentUser = UserModel.fromMap(userDoc.data()!, userDoc.id);
+      } else {
+        _currentUser = null;
+      }
+      notifyListeners();
+    } catch (e) {
+      print('Error loading user data: $e');
+      _currentUser = null;
     }
   }
 } 

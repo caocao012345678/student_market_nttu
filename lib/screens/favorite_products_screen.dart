@@ -172,7 +172,7 @@ class FavoriteProductsScreen extends StatelessWidget {
           .get();
 
       products.addAll(
-        snapshot.docs.map((doc) => Product.fromMap(doc.data(), doc.id)).toList(),
+        snapshot.docs.map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList(),
       );
     }
 

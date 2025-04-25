@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/screens/register_screen.dart';
 import 'package:student_market_nttu/screens/home_screen.dart';
+import 'package:student_market_nttu/services/user_service.dart';
+import 'package:student_market_nttu/screens/admin/admin_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,10 +36,25 @@ class _LoginScreenState extends State<LoginScreen> {
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
+        
         if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        
+        // Kiểm tra quyền admin
+        final userService = Provider.of<UserService>(context, listen: false);
+        final isAdmin = await userService.isCurrentUserAdmin();
+        
+        if (!mounted) return;
+        
+        // Điều hướng đến màn hình tương ứng với quyền hạn
+        if (isAdmin) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        }
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

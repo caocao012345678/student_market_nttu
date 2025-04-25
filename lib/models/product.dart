@@ -5,7 +5,9 @@ enum ProductStatus {
   sold,
   deleted,
   hidden,
-  reserved
+  reserved,
+  pending_review,
+  rejected
 }
 
 class Product {
@@ -31,6 +33,9 @@ class Product {
   final double rating;
   final int reviewCount;
   final ProductStatus status;
+  final Map<String, dynamic>? moderationInfo;
+  final String moderationStatus;
+  final Map<String, dynamic>? moderationResults;
 
   Product({
     required this.id,
@@ -55,6 +60,9 @@ class Product {
     this.rating = 0.0,
     this.reviewCount = 0,
     this.status = ProductStatus.available,
+    this.moderationInfo,
+    this.moderationStatus = 'pending',
+    this.moderationResults,
   });
 
   factory Product.fromMap(Map<String, dynamic> map, String id) {
@@ -68,6 +76,8 @@ class Product {
       else if (statusString == 'deleted') productStatus = ProductStatus.deleted;
       else if (statusString == 'hidden') productStatus = ProductStatus.hidden;
       else if (statusString == 'reserved') productStatus = ProductStatus.reserved;
+      else if (statusString == 'pending_review') productStatus = ProductStatus.pending_review;
+      else if (statusString == 'rejected') productStatus = ProductStatus.rejected;
     }
 
     return Product(
@@ -93,6 +103,9 @@ class Product {
       rating: (map['rating'] ?? 0.0).toDouble(),
       reviewCount: map['reviewCount'] ?? 0,
       status: productStatus,
+      moderationInfo: map['moderationInfo'],
+      moderationStatus: map['moderationStatus'] ?? 'pending',
+      moderationResults: map['moderationResults'],
     );
   }
 
@@ -102,6 +115,8 @@ class Product {
     else if (status == ProductStatus.deleted) statusString = 'deleted';
     else if (status == ProductStatus.hidden) statusString = 'hidden';
     else if (status == ProductStatus.reserved) statusString = 'reserved';
+    else if (status == ProductStatus.pending_review) statusString = 'pending_review';
+    else if (status == ProductStatus.rejected) statusString = 'rejected';
 
     return {
       'title': title,
@@ -125,6 +140,9 @@ class Product {
       'rating': rating,
       'reviewCount': reviewCount,
       'status': statusString,
+      'moderationInfo': moderationInfo,
+      'moderationStatus': moderationStatus,
+      'moderationResults': moderationResults,
     };
   }
 
@@ -151,6 +169,9 @@ class Product {
     double? rating,
     int? reviewCount,
     ProductStatus? status,
+    Map<String, dynamic>? moderationInfo,
+    String? moderationStatus,
+    Map<String, dynamic>? moderationResults,
   }) {
     return Product(
       id: id ?? this.id,
@@ -175,6 +196,9 @@ class Product {
       rating: rating ?? this.rating,
       reviewCount: reviewCount ?? this.reviewCount,
       status: status ?? this.status,
+      moderationInfo: moderationInfo ?? this.moderationInfo,
+      moderationStatus: moderationStatus ?? this.moderationStatus,
+      moderationResults: moderationResults ?? this.moderationResults,
     );
   }
 } 

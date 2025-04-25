@@ -45,9 +45,12 @@ class SettingsScreen extends StatelessWidget {
             leading: const Icon(Icons.notifications),
             title: const Text('Thông báo'),
             trailing: Switch(
-              value: true, // TODO: Implement notification settings
+              value: Provider.of<ThemeService>(context).isNotificationEnabled,
               onChanged: (value) {
-                // TODO: Update notification settings
+                Provider.of<ThemeService>(context, listen: false).toggleNotification(value);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(value ? 'Đã bật thông báo' : 'Đã tắt thông báo')),
+                );
               },
             ),
           ),
@@ -56,21 +59,63 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Ngôn ngữ'),
             trailing: const Text('Tiếng Việt'),
             onTap: () {
-              // TODO: Implement language selection
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Chọn ngôn ngữ'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        title: const Text('Tiếng Việt'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đã chọn Tiếng Việt')),
+                          );
+                        },
+                      ),
+                      ListTile(
+                        title: const Text('English'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('English selected')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
             },
           ),
           ListTile(
             leading: const Icon(Icons.help),
             title: const Text('Trợ giúp'),
             onTap: () {
-              // TODO: Navigate to help screen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Trợ giúp')),
+                    body: const Center(child: Text('Đây là trang trợ giúp.')), // Placeholder
+                  ),
+                ),
+              );
             },
           ),
           ListTile(
             leading: const Icon(Icons.info),
             title: const Text('Giới thiệu'),
             onTap: () {
-              // TODO: Navigate to about screen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Giới thiệu')), 
+                    body: const Center(child: Text('Ứng dụng Student Market NTTU.')), // Placeholder
+                  ),
+                ),
+              );
             },
           ),
         ],

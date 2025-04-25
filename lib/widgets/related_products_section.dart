@@ -8,12 +8,12 @@ import 'package:intl/intl.dart';
 
 class RelatedProductsSection extends StatelessWidget {
   final String category;
-  final String currentProductId;
+  final String excludeProductId;
 
   const RelatedProductsSection({
     super.key,
     required this.category,
-    required this.currentProductId,
+    required this.excludeProductId,
   });
 
   @override
@@ -21,7 +21,7 @@ class RelatedProductsSection extends StatelessWidget {
     return StreamBuilder<List<Product>>(
       stream: Provider.of<ProductService>(context).getRelatedProducts(
         category: category,
-        excludeProductId: currentProductId,
+        excludeProductId: excludeProductId,
         limit: 4, // Fetch 4 but only display 2
       ),
       builder: (context, snapshot) {
