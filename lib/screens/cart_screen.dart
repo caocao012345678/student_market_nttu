@@ -4,6 +4,7 @@ import '../models/cart_item.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/cart_item_card.dart';
+import '../screens/checkout_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -174,10 +175,13 @@ class _CartScreenState extends State<CartScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                // TODO: Chuyển đến màn hình thanh toán
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Tính năng thanh toán đang được phát triển'),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CheckoutScreen(
+                      cartItems: cartService.cartItems,
+                      totalAmount: cartService.totalPrice,
+                    ),
                   ),
                 );
               },

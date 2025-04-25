@@ -11,6 +11,7 @@ class UserModel {
   final DateTime lastActive;
   final Map<String, dynamic> preferences;
   final Map<String, dynamic> settings;
+  final Map<String, dynamic>? smtpConfig; // Cấu hình SMTP cho người bán
   final List<String> favoriteProducts;
   final List<String> followers;
   final List<String> following;
@@ -43,6 +44,7 @@ class UserModel {
     required this.lastActive,
     this.preferences = const {},
     this.settings = const {},
+    this.smtpConfig,
     this.favoriteProducts = const [],
     this.followers = const [],
     this.following = const [],
@@ -87,6 +89,7 @@ class UserModel {
         ? (map['lastActive'] as Timestamp).toDate() 
         : DateTime.now(),
       settings: Map<String, dynamic>.from(map['settings'] ?? {'darkMode': false, 'notifications': true}),
+      smtpConfig: map['smtpConfig'] as Map<String, dynamic>?,
       nttPoint: map['nttPoint'] ?? 0,
       nttCredit: map['nttCredit'] ?? 0,
       recentlyViewed: List<String>.from(map['recentlyViewed'] ?? []), // Lấy danh sách từ Firestore
@@ -110,6 +113,7 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'lastActive': Timestamp.fromDate(lastActive),
       'settings': settings,
+      'smtpConfig': smtpConfig,
       'nttPoint': nttPoint,
       'nttCredit': nttCredit,
       'recentlyViewed': recentlyViewed, // Lưu danh sách vào Firestore
@@ -133,6 +137,7 @@ class UserModel {
     DateTime? createdAt,
     DateTime? lastActive,
     Map<String, dynamic>? settings,
+    Map<String, dynamic>? smtpConfig,
     int? nttPoint,
     int? nttCredit,
     List<String>? recentlyViewed, // Thêm vào phương thức copyWith
@@ -154,6 +159,7 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       lastActive: lastActive ?? this.lastActive,
       settings: settings ?? this.settings,
+      smtpConfig: smtpConfig ?? this.smtpConfig,
       nttPoint: nttPoint ?? this.nttPoint,
       nttCredit: nttCredit ?? this.nttCredit,
       recentlyViewed: recentlyViewed ?? this.recentlyViewed, // Sử dụng trong copyWith

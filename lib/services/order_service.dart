@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/purchase_order.dart';
+import '../services/payment_service.dart';
 
 class OrderService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -179,6 +180,34 @@ class OrderService extends ChangeNotifier {
             .fold(0.0, (prev, amount) => prev + amount),
       };
     } catch (e) {
+      throw e;
+    }
+  }
+
+  // Thêm method mới
+  Future<void> completeOrder(String orderId, String paymentMethod) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final order = await getOrderById(orderId);
+      
+      // Xử lý thanh toán
+      final paymentService = PaymentService();
+      final orderWithPayment = await paymentService.processPayment(order, paymentMethod);
+
+      if (orderWithPayment.isNotEmpty) {
+        // Cập nhật trạng thái đơn hàng
+        await _firestore.collection('orders').doc(orderWithPayment).update({
+          'status': OrderStatus.confirmed.toString().split('.').last,
+        });
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
       throw e;
     }
   }
