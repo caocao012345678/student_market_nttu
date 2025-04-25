@@ -1,0 +1,14 @@
+[33m9da0d55[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{0}: reset: moving to HEAD
+[33m9da0d55[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{1}: rebase (finish): returning to refs/heads/main
+[33m9da0d55[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{2}: rebase (continue): hoan thanh chuc nang thanh toan
+[33m270f367[m HEAD@{3}: rebase (continue): them chuc nang de suat
+[33m2628b2d[m HEAD@{4}: pull origin main --rebase (start): checkout 2628b2d655d18bdb59b59a19a4702225204aa2b6
+[33mecea04c[m HEAD@{5}: commit: hoan thanh chuc nang thanh toan
+[33m1e79673[m HEAD@{6}: commit: them chuc nang de suat
+[33m93030d0[m HEAD@{7}: merge origin/main: Merge made by the 'ort' strategy.
+[33me896ad9[m HEAD@{8}: commit: Ghi chú về commit
+[33mfcfa8b9[m HEAD@{9}: commit: chuc nang gio hang
+[33me862662[m HEAD@{10}: commit: thirt commit
+[33mb954e80[m HEAD@{11}: commit: Second commit
+[33m6131716[m HEAD@{12}: Branch: renamed refs/heads/master to refs/heads/main
+[33m6131716[m HEAD@{14}: commit (initial): first commit
