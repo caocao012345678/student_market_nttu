@@ -15,6 +15,7 @@ import 'package:student_market_nttu/services/user_service.dart';
 import 'package:student_market_nttu/services/favorites_service.dart';
 import 'package:student_market_nttu/services/chat_service.dart';
 import 'package:student_market_nttu/services/cart_service.dart';
+import 'package:student_market_nttu/services/payment_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
 
@@ -50,6 +51,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FavoritesService()),
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => CartService()),
+        ChangeNotifierProvider(create: (_) => PaymentService()),
       ],
       child: Consumer<ThemeService>(
         builder: (context, themeService, child) {

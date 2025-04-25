@@ -383,16 +383,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         createdAt: DateTime.now(),
       );
 
-      await Provider.of<OrderService>(context, listen: false)
+      final orderId = await Provider.of<OrderService>(context, listen: false)
           .createOrder(order);
 
       if (!mounted) return;
-      Navigator.pop(context); // Close the purchase dialog
+      final paymentMethod = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Chọn phương thức thanh toán'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.money),
+                title: const Text('Thanh toán khi nhận hàng'),
+                onTap: () => Navigator.pop(context, 'COD'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.credit_card),
+                title: const Text('Thẻ tín dụng/ghi nợ'),
+                onTap: () => Navigator.pop(context, 'CARD'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.account_balance_wallet),
+                title: const Text('Ví điện tử'),
+                onTap: () => Navigator.pop(context, 'E_WALLET'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (paymentMethod != null) {
+        await Provider.of<OrderService>(context, listen: false)
+            .completeOrder(orderId, paymentMethod);
+
+        if (!mounted) return;
+        Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đặt hàng thành công'),
         ),
       );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -401,9 +434,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ),
       );
     } finally {
-      if (mounted) {
         setState(() => _isLoading = false);
-      }
     }
   }
 
