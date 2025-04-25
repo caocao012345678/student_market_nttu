@@ -554,6 +554,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                           ),
                         ],
                       ),
+                      // Related Products Section
+                      RelatedProductsSection(
+                        category: widget.product.category,
+                        excludeProductId: widget.product.id,
+                      ),
                     ],
                   ),
                 ),
@@ -647,7 +652,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   // Related products - with minimal fixed height design
                   RelatedProductsSection(
                     category: widget.product.category,
-                    currentProductId: widget.product.id,
+                    excludeProductId: widget.product.id,
                   ),
                   // Add significant bottom padding to ensure no overflow
                   const SizedBox(height: 120),

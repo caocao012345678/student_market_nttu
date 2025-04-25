@@ -23,6 +23,8 @@ class UserModel {
   final int nttPoint;         // Dùng để giảm giá, khuyến mãi (tương tự Shopee Xu)
   final int nttCredit;        // Điểm uy tín, người dùng mặc định là 100
   final bool isStudent;       // Xác định có phải là sinh viên không
+  final bool isAdmin;        // Xác định có phải là admin không
+  final List<Map<String, dynamic>> locations; // Danh sách địa chỉ của người dùng
   final String? studentId;    // Mã số sinh viên (nếu có)
   final String? department;   // Khoa/Ngành học (nếu có)
   final int? studentYear;     // Năm học (1, 2, 3, 4, ...)
@@ -56,6 +58,8 @@ class UserModel {
     this.nttPoint = 0,
     this.nttCredit = 100,
     this.isStudent = false,
+    this.isAdmin = false,
+    this.locations = const [],
     this.studentId,
     this.department,
     this.studentYear,
@@ -80,6 +84,8 @@ class UserModel {
       followers: List<String>.from(map['followers'] ?? []),
       isShipper: map['isShipper'] ?? false,
       isStudent: map['isStudent'] ?? false,
+      isAdmin: map['isAdmin'] ?? false,
+      locations: List<Map<String, dynamic>>.from(map['locations'] ?? []),
       studentId: map['studentId'] ?? '',
       department: map['department'] ?? '',
       createdAt: map['createdAt'] != null 
@@ -108,6 +114,8 @@ class UserModel {
       'followers': followers,
       'isShipper': isShipper,
       'isStudent': isStudent,
+      'isAdmin': isAdmin,
+      'locations': locations,
       'studentId': studentId,
       'department': department,
       'createdAt': Timestamp.fromDate(createdAt),

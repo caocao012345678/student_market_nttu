@@ -8,8 +8,8 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:typed_data';
 
-// Import js có điều kiện để tránh lỗi trên mobile
-import 'dart:js_util' if (dart.library.io) 'package:flutter/material.dart' as js_util;
+// Using foundation.dart for web detection
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class GeminiService extends ChangeNotifier {
   GenerativeModel? _model;
