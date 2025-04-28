@@ -20,8 +20,6 @@ import '../services/product_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../services/rag_service.dart';
-import '../services/gemini_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -49,9 +47,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   int _quantity = 1;
   final _scrollController = ScrollController();
   bool _showAppBarTitle = false;
-  final TextEditingController _questionController = TextEditingController();
-  bool _isLoadingAnswer = false;
-  String _currentAnswer = '';
 
   @override
   void initState() {
@@ -78,7 +73,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     _pageController.dispose();
     _tabController.dispose();
     _scrollController.dispose();
-    _questionController.dispose();
     super.dispose();
   }
 
@@ -569,7 +563,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         excludeProductId: widget.product.id,
                       ),
                       const SizedBox(height: 24),
-                      _buildProductQASection(),
                     ],
                   ),
                 ),
@@ -1039,128 +1032,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         authService.currentUser!.uid,
         widget.product.id
       );
-    }
-  }
-
-  Widget _buildProductQASection() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Hỏi đáp thông minh về sản phẩm',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Bạn có thắc mắc về sản phẩm này? Hãy đặt câu hỏi để được trợ lý AI trả lời.',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _questionController,
-                    decoration: InputDecoration(
-                      hintText: 'Nhập câu hỏi của bạn...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    minLines: 1,
-                    maxLines: 2,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isLoadingAnswer ? null : _handleProductQuestion,
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                  child: _isLoadingAnswer
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Hỏi'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_currentAnswer.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Trả lời:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(_currentAnswer),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleProductQuestion() async {
-    final question = _questionController.text.trim();
-    if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập câu hỏi của bạn')),
-      );
-      return;
-    }
-    
-    setState(() {
-      _isLoadingAnswer = true;
-    });
-    
-    try {
-      // Tạo context với thông tin sản phẩm hiện tại
-      final productContext = "${widget.product.title} - ${widget.product.description} - "
-          "Giá: ${NumberFormat('#,###', 'vi_VN').format(widget.product.price)}đ - "
-          "Tình trạng: ${widget.product.condition} - "
-          "Địa điểm: ${widget.product.location}";
-      
-      // Gọi RAGService để xử lý câu hỏi
-      final geminiService = Provider.of<GeminiService>(context, listen: false);
-      final ragService = RAGService(geminiService);
-      final result = await ragService.processUserQuery(
-        "$question\n\nThông tin sản phẩm: $productContext",
-      );
-      
-      setState(() {
-        _currentAnswer = result['response'] ?? 'Không thể trả lời câu hỏi này lúc này.';
-        _isLoadingAnswer = false;
-      });
-    } catch (e) {
-      setState(() {
-        _currentAnswer = 'Đã xảy ra lỗi khi xử lý câu hỏi. Vui lòng thử lại sau.';
-        _isLoadingAnswer = false;
-      });
-      debugPrint('Lỗi khi xử lý câu hỏi sản phẩm: $e');
     }
   }
 }

@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
-import 'package:student_market_nttu/screens/profile_screen.dart';
 import 'package:student_market_nttu/screens/home_screen.dart';
-import 'package:student_market_nttu/screens/chatbot_screen.dart';
+import 'package:student_market_nttu/screens/profile_screen.dart';
 import 'package:student_market_nttu/screens/settings_screen.dart';
-import 'package:student_market_nttu/screens/favorite_products_screen.dart';
-import 'package:student_market_nttu/screens/order_history_screen.dart';
 import 'package:student_market_nttu/screens/my_products_screen.dart';
+import 'package:student_market_nttu/screens/order_history_screen.dart';
+import 'package:student_market_nttu/screens/favorite_products_screen.dart';
 import 'package:student_market_nttu/screens/notification_screen.dart';
-import 'package:student_market_nttu/screens/models_info_screen.dart';
-import 'package:student_market_nttu/screens/ai_hub_screen.dart';
-import 'package:student_market_nttu/screens/ai_onboarding_screen.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+  const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -114,42 +111,6 @@ class AppDrawer extends StatelessWidget {
           ),
           
           const Divider(),
-          
-          // AI Capabilities Section
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
-            child: Text(
-              'AI & Hỗ trợ',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-          ),
-          
-          ListTile(
-            leading: const Icon(Icons.smart_toy_outlined),
-            title: const Text('AI Hub'),
-            onTap: () async {
-              Navigator.pop(context);
-              // Check if onboarding is completed
-              final prefs = await SharedPreferences.getInstance();
-              final bool onboardingCompleted = prefs.getBool('ai_onboarding_completed') ?? false;
-              
-              if (onboardingCompleted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AIHubScreen()),
-                );
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AIOnboardingScreen()),
-                );
-              }
-            },
-          ),
           
           ListTile(
             leading: const Icon(Icons.notifications_outlined),

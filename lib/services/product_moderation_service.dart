@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:student_market_nttu/models/product.dart';
 import 'package:student_market_nttu/models/moderation_result.dart';
-import 'package:student_market_nttu/services/gemini_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,7 +11,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ProductModerationService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
-  final GeminiService _geminiService;
   
   bool _isLoading = false;
   String _errorMessage = '';
@@ -30,7 +28,7 @@ class ProductModerationService extends ChangeNotifier {
   ];
   
   // Constructor
-  ProductModerationService(this._geminiService);
+  ProductModerationService();
   
   // Getters
   bool get isLoading => _isLoading;
@@ -251,25 +249,10 @@ class ProductModerationService extends ChangeNotifier {
         });
       }
       
-      // 3. Kiểm tra giá trị giá cả
-      if (price <= 0) {
-        contentIssues.add({
-          'severity': 'medium',
-          'description': 'Giá không hợp lệ: $price',
-          'field': 'price',
-        });
-      } else if (price > 100000000) { // Giá quá cao (100 triệu)
-        contentIssues.add({
-          'severity': 'medium',
-          'description': 'Giá có vẻ quá cao: $price',
-          'field': 'price',
-        });
-      }
-      
-      // 4. Kiểm tra độ dài tiêu đề và mô tả
+      // 3. Kiểm tra độ dài của tiêu đề và mô tả
       if (title.length < 5) {
         contentIssues.add({
-          'severity': 'low',
+          'severity': 'medium',
           'description': 'Tiêu đề quá ngắn',
           'field': 'title',
         });
@@ -277,480 +260,69 @@ class ProductModerationService extends ChangeNotifier {
       
       if (description.length < 20) {
         contentIssues.add({
-          'severity': 'low',
+          'severity': 'medium',
           'description': 'Mô tả quá ngắn',
           'field': 'description',
         });
       }
       
-      // 5. Sử dụng Gemini để phân tích ngữ nghĩa nâng cao
-      Map<String, dynamic> geminiAnalysis = await _geminiTextAnalysis(
-        title: title,
-        description: description,
-        category: category,
-        tags: tags,
-      );
+      // 4. Kiểm tra giá
+      if (price <= 0) {
+        contentIssues.add({
+          'severity': 'high',
+          'description': 'Giá không hợp lệ',
+          'field': 'price',
+        });
+      }
       
-      // 6. Đánh giá mức độ liên quan giữa tiêu đề, mô tả và danh mục
-      int relevanceScore = geminiAnalysis['relevanceScore'] ?? 70;
+      // 5. Tính điểm nội dung
+      int contentScore = 100;
       
-      // 7. Gợi ý tags nếu cần
+      // Trừ điểm cho mỗi vấn đề
+      for (var issue in contentIssues) {
+        if (issue['severity'] == 'high') {
+          contentScore -= 30;
+        } else if (issue['severity'] == 'medium') {
+          contentScore -= 15;
+        } else {
+          contentScore -= 5;
+        }
+      }
+      
+      // Đảm bảo điểm không âm
+      contentScore = contentScore < 0 ? 0 : contentScore;
+      
+      // 6. Gợi ý tags nếu không có
       List<String> suggestedTags = [];
-      if (tags.isEmpty || tags.length < 3) {
-        suggestedTags = geminiAnalysis['suggestedTags'] ?? [];
+      if (tags.isEmpty) {
+        // Thêm danh mục làm tag
+        suggestedTags.add(category);
+        
+        // Thêm các từ khóa phổ biến dựa trên tiêu đề và mô tả
+        final keywords = _extractKeywords(title, description);
+        suggestedTags.addAll(keywords);
       }
       
-      // 8. Bổ sung issues từ kết quả phân tích Gemini
-      if (geminiAnalysis['issues'] != null) {
-        contentIssues.addAll(geminiAnalysis['issues']);
-      }
-      
-      // 9. Tính điểm nội dung dựa trên nhiều yếu tố
-      int contentScore = _calculateContentScore(
-        relevanceScore: relevanceScore,
-        titleLength: title.length,
-        descriptionLength: description.length,
-        tagsCount: tags.length,
-        specificationsCount: specifications.length,
-        issues: contentIssues,
-      );
-      
-      // 10. Tạo kết quả phân tích
       return {
         'score': contentScore,
         'issues': contentIssues,
         'suggestedTags': suggestedTags,
-        'relevanceScore': relevanceScore,
-        'geminiAnalysis': geminiAnalysis,
+        'analysis': 'Phân tích nội dung sản phẩm hoàn tất với điểm số $contentScore/100',
       };
     } catch (e) {
-      debugPrint('Lỗi phân tích nội dung: $e');
+      debugPrint('Lỗi khi phân tích nội dung văn bản: $e');
       return {
-        'score': 60, // Điểm mặc định khi có lỗi
-        'issues': [{
-          'severity': 'medium',
-          'description': 'Lỗi khi phân tích nội dung: $e',
-          'field': 'content',
-        }],
-      };
-    }
-  }
-  
-  // Phân tích hình ảnh
-  Future<Map<String, dynamic>> _analyzeImages(List<String> imageUrls) async {
-    try {
-      if (imageUrls.isEmpty) {
-        return {
-          'score': 0,
-          'issues': [{
-            'severity': 'high',
-            'description': 'Không có hình ảnh nào được cung cấp',
-          }],
-        };
-      }
-      
-      List<Map<String, dynamic>> imageIssues = [];
-      List<Map<String, dynamic>> imageResults = [];
-      
-      // Kiểm tra số lượng hình ảnh
-      if (imageUrls.length < 2) {
-        imageIssues.add({
-          'severity': 'low',
-          'description': 'Khuyến nghị cung cấp nhiều hình ảnh hơn để tăng độ tin cậy',
-        });
-      }
-      
-      // Phân tích từng hình ảnh
-      for (int i = 0; i < imageUrls.length; i++) {
-        String url = imageUrls[i];
-        
-        // Phân tích hình ảnh bằng Vision API hoặc Gemini
-        Map<String, dynamic> imageAnalysis = await _analyzeImageContent(url, i);
-        imageResults.add(imageAnalysis);
-        
-        // Kiểm tra vấn đề với hình ảnh
-        if (imageAnalysis['issues'] != null) {
-          for (var issue in imageAnalysis['issues']) {
-            issue['imageIndex'] = i;
-            imageIssues.add(issue);
-          }
-        }
-      }
-      
-      // Tính điểm trung bình cho hình ảnh
-      int totalScore = 0;
-      for (var result in imageResults) {
-        totalScore += (result['score'] as int? ?? 0);
-      }
-      int averageScore = imageResults.isNotEmpty ? (totalScore / imageResults.length).round() : 0;
-      
-      return {
-        'score': averageScore,
-        'issues': imageIssues,
-        'results': imageResults,
-      };
-    } catch (e) {
-      debugPrint('Lỗi phân tích hình ảnh: $e');
-      return {
-        'score': 60, // Điểm mặc định khi có lỗi
-        'issues': [{
-          'severity': 'medium',
-          'description': 'Lỗi khi phân tích hình ảnh: $e',
-        }],
-      };
-    }
-  }
-  
-  // Phân tích hình ảnh sử dụng Gemini hoặc Vision API
-  Future<Map<String, dynamic>> _analyzeImageContent(String imageUrl, int index) async {
-    try {
-      // Sử dụng Gemini để phân tích hình ảnh
-      return await _geminiImageAnalysis(imageUrl);
-    } catch (e) {
-      debugPrint('Lỗi phân tích hình ảnh $index: $e');
-      return {
-        'score': 60,
-        'issues': [{
-          'severity': 'medium', 
-          'description': 'Không thể phân tích hình ảnh này',
-          'imageIndex': index,
-        }],
-      };
-    }
-  }
-  
-  // Phân tích văn bản với Gemini
-  Future<Map<String, dynamic>> _geminiTextAnalysis({
-    required String title,
-    required String description,
-    required String category,
-    required List<String> tags,
-  }) async {
-    try {
-      // Tạo prompt cho Gemini
-      String prompt = '''
-      Phân tích nội dung sản phẩm sau và đánh giá tính phù hợp:
-      
-      Tiêu đề: $title
-      Mô tả: $description
-      Danh mục: $category
-      Tags: ${tags.join(', ')}
-      
-      Phân tích các khía cạnh sau:
-      1. Mức độ phù hợp giữa tiêu đề, mô tả và danh mục (thang điểm 0-100)
-      2. Phát hiện nội dung không phù hợp, vi phạm hoặc lừa đảo
-      3. Đề xuất 3-5 tags liên quan nếu người dùng chưa cung cấp đủ
-      
-      Trả về kết quả dưới dạng JSON với cấu trúc:
-      {
-        "relevanceScore": 85,
-        "suggestedTags": ["tag1", "tag2", "tag3"],
-        "issues": [
-          {"severity": "high/medium/low", "description": "Mô tả vấn đề", "field": "title/description/tags"}
-        ],
-        "analysis": "Phân tích tổng quan và nhận xét"
-      }
-      ''';
-      
-      // Gửi prompt đến Gemini
-      String response = await _geminiService.sendPromptedMessage(prompt, '', addToHistory: false);
-      
-      // Trích xuất JSON từ phản hồi
-      String jsonString = _extractJsonFromText(response);
-      if (jsonString.isEmpty) {
-        return {'relevanceScore': 70};
-      }
-      
-      Map<String, dynamic> result = jsonDecode(jsonString);
-      return result;
-    } catch (e) {
-      debugPrint('Lỗi khi phân tích văn bản với Gemini: $e');
-      return {'relevanceScore': 70};
-    }
-  }
-  
-  // Phân tích hình ảnh với Gemini
-  Future<Map<String, dynamic>> _geminiImageAnalysis(String imageUrl) async {
-    try {
-      // Tạo prompt cho Gemini
-      String prompt = '''
-      Phân tích hình ảnh sản phẩm này và đánh giá tính phù hợp:
-      
-      1. Xác định vật phẩm chính trong hình ảnh
-      2. Đánh giá chất lượng hình ảnh (rõ nét, ánh sáng, góc chụp)
-      3. Phát hiện nội dung không phù hợp hoặc vi phạm (hàng cấm, vũ khí, nội dung người lớn, v.v.)
-      4. Đánh giá mức độ phù hợp cho một nền tảng mua bán cho học sinh, sinh viên
-      
-      Trả về kết quả dưới dạng JSON với cấu trúc:
-      {
-        "objects": ["đối tượng1", "đối tượng2"],
-        "score": 85,
-        "quality": "high/medium/low",
-        "issues": [
-          {"severity": "high/medium/low", "description": "Mô tả vấn đề"}
-        ],
-        "analysis": "Phân tích tổng quan và nhận xét"
-      }
-      ''';
-      
-      // Gửi prompt cùng với hình ảnh đến Gemini
-      String response = await _geminiService.sendImageAnalysisPrompt(prompt, imageUrl);
-      
-      // Trích xuất JSON từ phản hồi
-      String jsonString = _extractJsonFromText(response);
-      if (jsonString.isEmpty) {
-        return {'score': 70};
-      }
-      
-      Map<String, dynamic> result = jsonDecode(jsonString);
-      return result;
-    } catch (e) {
-      debugPrint('Lỗi khi phân tích hình ảnh với Gemini: $e');
-      return {'score': 70};
-    }
-  }
-  
-  // Phân tích hình ảnh với Google Cloud Vision API
-  Future<Map<String, dynamic>> _cloudVisionImageAnalysis(String imageUrl) async {
-    try {
-      final apiKey = dotenv.env['VISION_API_KEY'];
-      if (apiKey == null || apiKey.isEmpty) {
-        throw Exception('API key cho Vision không được cấu hình');
-      }
-      
-      final visionApiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=$apiKey';
-      
-      // Chuẩn bị request body
-      final requestBody = {
-        'requests': [
+        'score': 70, // Điểm mặc định
+        'issues': [
           {
-            'image': {
-              'source': {
-                'imageUri': imageUrl
-              }
-            },
-            'features': [
-              {'type': 'LABEL_DETECTION', 'maxResults': 10},
-              {'type': 'SAFE_SEARCH_DETECTION'},
-              {'type': 'IMAGE_PROPERTIES'},
-              {'type': 'OBJECT_LOCALIZATION', 'maxResults': 5},
-            ]
-          }
-        ]
-      };
-      
-      // Gửi request đến Vision API
-      final response = await http.post(
-        Uri.parse(visionApiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
-      );
-      
-      if (response.statusCode != 200) {
-        throw Exception('Vision API trả về lỗi: ${response.body}');
-      }
-      
-      // Phân tích kết quả
-      final responseData = jsonDecode(response.body);
-      final annotations = responseData['responses'][0];
-      
-      // Phân tích SafeSearch
-      final safeSearch = annotations['safeSearchAnnotation'];
-      List<Map<String, dynamic>> issues = [];
-      int safetyScore = 100;
-      
-      // Kiểm tra kết quả SafeSearch
-      if (safeSearch != null) {
-        // Kiểm tra các nhãn an toàn (adult, violence, racy, etc.)
-        final adultRating = safeSearch['adult'] ?? 'UNKNOWN';
-        final violenceRating = safeSearch['violence'] ?? 'UNKNOWN';
-        final racyRating = safeSearch['racy'] ?? 'UNKNOWN';
-        
-        if (['LIKELY', 'VERY_LIKELY'].contains(adultRating)) {
-          issues.add({
-            'severity': 'high',
-            'description': 'Hình ảnh có thể chứa nội dung người lớn',
-          });
-          safetyScore -= 50;
-        }
-        
-        if (['LIKELY', 'VERY_LIKELY'].contains(violenceRating)) {
-          issues.add({
-            'severity': 'high',
-            'description': 'Hình ảnh có thể chứa nội dung bạo lực',
-          });
-          safetyScore -= 40;
-        }
-        
-        if (['LIKELY', 'VERY_LIKELY'].contains(racyRating)) {
-          issues.add({
             'severity': 'medium',
-            'description': 'Hình ảnh có thể chứa nội dung nhạy cảm',
-          });
-          safetyScore -= 30;
-        }
-      }
-      
-      // Kiểm tra labels
-      final labels = annotations['labelAnnotations'] ?? [];
-      List<String> objects = [];
-      
-      for (var label in labels) {
-        String description = label['description'] ?? '';
-        objects.add(description);
-        
-        // Kiểm tra xem có nhãn liên quan đến vật phẩm bị cấm không
-        for (String keyword in _bannedKeywords) {
-          if (description.toLowerCase().contains(keyword.toLowerCase())) {
-            issues.add({
-              'severity': 'high',
-              'description': 'Hình ảnh có thể chứa vật phẩm bị cấm: $description',
-            });
-            safetyScore -= 50;
-            break;
+            'description': 'Lỗi khi phân tích nội dung: $e',
+            'field': 'general',
           }
-        }
-      }
-      
-      // Đánh giá chất lượng hình ảnh
-      final imageProps = annotations['imagePropertiesAnnotation'];
-      String quality = 'medium';
-      
-      if (imageProps != null) {
-        // Logic phức tạp hơn có thể được thêm vào đây để đánh giá chất lượng
-        quality = 'high';
-      }
-      
-      return {
-        'objects': objects,
-        'score': safetyScore,
-        'quality': quality,
-        'issues': issues,
-        'raw_response': annotations
+        ],
+        'analysis': 'Lỗi khi phân tích nội dung',
       };
-    } catch (e) {
-      debugPrint('Lỗi khi sử dụng Vision API: $e');
-      return {'score': 70};
     }
-  }
-  
-  // Tính điểm nội dung
-  int _calculateContentScore({
-    required int relevanceScore,
-    required int titleLength,
-    required int descriptionLength,
-    required int tagsCount,
-    required int specificationsCount,
-    required List<Map<String, dynamic>> issues,
-  }) {
-    int baseScore = relevanceScore;
-    
-    // Đánh giá độ dài tiêu đề
-    if (titleLength < 5) {
-      baseScore -= 10;
-    } else if (titleLength < 10) {
-      baseScore -= 5;
-    } else if (titleLength > 50) {
-      baseScore -= 5;
-    }
-    
-    // Đánh giá độ dài mô tả
-    if (descriptionLength < 20) {
-      baseScore -= 15;
-    } else if (descriptionLength < 50) {
-      baseScore -= 10;
-    } else if (descriptionLength > 100) {
-      baseScore += 5;
-    }
-    
-    // Đánh giá số lượng tags
-    if (tagsCount == 0) {
-      baseScore -= 10;
-    } else if (tagsCount < 3) {
-      baseScore -= 5;
-    } else if (tagsCount >= 5) {
-      baseScore += 5;
-    }
-    
-    // Đánh giá số lượng thông số kỹ thuật
-    if (specificationsCount > 0) {
-      baseScore += specificationsCount * 2;
-    }
-    
-    // Trừ điểm cho mỗi vấn đề được phát hiện
-    for (var issue in issues) {
-      String severity = issue['severity'] ?? 'low';
-      if (severity == 'high') {
-        baseScore -= 30;
-      } else if (severity == 'medium') {
-        baseScore -= 15;
-      } else {
-        baseScore -= 5;
-      }
-    }
-    
-    // Giới hạn điểm trong khoảng 0-100
-    return baseScore.clamp(0, 100);
-  }
-  
-  // Tính điểm tuân thủ
-  int _calculateComplianceScore({
-    required Map<String, dynamic> contentAnalysisResult,
-    required Map<String, dynamic> imageAnalysisResult,
-    required String category,
-  }) {
-    int baseScore = 100;
-    
-    // Kiểm tra danh mục bị cấm
-    if (_bannedCategories.contains(category.toLowerCase())) {
-      baseScore -= 100;  // Không tuân thủ hoàn toàn
-      return 0;
-    }
-    
-    // Kiểm tra vấn đề nội dung
-    List<dynamic> contentIssues = contentAnalysisResult['issues'] ?? [];
-    for (var issue in contentIssues) {
-      String severity = issue['severity'] ?? 'low';
-      if (severity == 'high') {
-        baseScore -= 40;
-      } else if (severity == 'medium') {
-        baseScore -= 20;
-      } else {
-        baseScore -= 10;
-      }
-    }
-    
-    // Kiểm tra vấn đề hình ảnh
-    List<dynamic> imageIssues = imageAnalysisResult['issues'] ?? [];
-    for (var issue in imageIssues) {
-      String severity = issue['severity'] ?? 'low';
-      if (severity == 'high') {
-        baseScore -= 40;
-      } else if (severity == 'medium') {
-        baseScore -= 20;
-      } else {
-        baseScore -= 10;
-      }
-    }
-    
-    // Giới hạn điểm trong khoảng 0-100
-    return baseScore.clamp(0, 100);
-  }
-  
-  // Tạo lý do từ chối
-  String _generateRejectionReason(List<ModerationIssue> issues) {
-    if (issues.isEmpty) {
-      return 'Sản phẩm không đáp ứng các tiêu chuẩn của nền tảng.';
-    }
-    
-    // Tìm và ưu tiên vấn đề nghiêm trọng
-    List<ModerationIssue> highSeverityIssues = issues.where((i) => i.severity == 'high').toList();
-    if (highSeverityIssues.isNotEmpty) {
-      return highSeverityIssues.map((i) => i.description).join('. ');
-    }
-    
-    // Nếu không có vấn đề nghiêm trọng, liệt kê tất cả vấn đề
-    return 'Sản phẩm bị từ chối vì các lý do sau: ${issues.map((i) => i.description).join('; ')}';
   }
   
   // Xác định trường có vấn đề
@@ -766,23 +338,320 @@ class ProductModerationService extends ChangeNotifier {
         }
       }
     }
-    return 'content';
+    return 'general';
   }
   
-  // Trích xuất JSON từ phản hồi văn bản
-  String _extractJsonFromText(String text) {
+  // Trích xuất từ khóa từ tiêu đề và mô tả
+  List<String> _extractKeywords(String title, String description) {
+    final Set<String> keywords = {};
+    final List<String> stopWords = ['và', 'hoặc', 'là', 'của', 'cho', 'với', 'trong', 'ngoài', 'một', 'các'];
+    
+    // Xử lý tiêu đề
+    final titleWords = title.toLowerCase().split(' ')
+        .where((word) => word.length > 3 && !stopWords.contains(word))
+        .toList();
+    
+    // Xử lý mô tả (chỉ lấy một số từ)
+    final descWords = description.toLowerCase().split(' ')
+        .where((word) => word.length > 4 && !stopWords.contains(word))
+        .take(5)
+        .toList();
+    
+    // Kết hợp từ khóa
+    keywords.addAll(titleWords);
+    keywords.addAll(descWords);
+    
+    // Lấy tối đa 5 từ khóa
+    return keywords.take(5).toList();
+  }
+  
+  // Phân tích hình ảnh
+  Future<Map<String, dynamic>> _analyzeImages(List<String> imageUrls) async {
     try {
-      // Tìm vị trí bắt đầu và kết thúc của JSON
-      int startIndex = text.indexOf('{');
-      int endIndex = text.lastIndexOf('}') + 1;
-      
-      if (startIndex >= 0 && endIndex > startIndex) {
-        return text.substring(startIndex, endIndex);
+      if (imageUrls.isEmpty) {
+        return {
+          'score': 50,
+          'issues': [
+            {
+              'severity': 'high',
+              'description': 'Không có hình ảnh sản phẩm',
+              'imageIndex': -1,
+            }
+          ],
+          'analysis': 'Sản phẩm không có hình ảnh'
+        };
       }
-      return '';
+      
+      List<Map<String, dynamic>> imageResults = [];
+      List<Map<String, dynamic>> imageIssues = [];
+      
+      // Kiểm tra từng hình ảnh
+      int index = 0;
+      for (String imageUrl in imageUrls) {
+        try {
+          // Kiểm tra kích thước và định dạng hình ảnh
+          final imageDetails = await _checkImageProperties(imageUrl);
+          
+          // Tính điểm cho hình ảnh này
+          int imageScore = 100;
+          List<Map<String, dynamic>> issues = [];
+          
+          // Kiểm tra kích thước
+          if (imageDetails['width'] < 400 || imageDetails['height'] < 400) {
+            imageScore -= 20;
+            issues.add({
+              'severity': 'medium',
+              'description': 'Hình ảnh có độ phân giải thấp (${imageDetails['width']}x${imageDetails['height']})',
+            });
+          }
+          
+          // Kiểm tra tỷ lệ kích thước
+          final aspectRatio = imageDetails['width'] / imageDetails['height'];
+          if (aspectRatio < 0.5 || aspectRatio > 2.0) {
+            imageScore -= 10;
+            issues.add({
+              'severity': 'low',
+              'description': 'Tỷ lệ hình ảnh không cân đối (${aspectRatio.toStringAsFixed(2)})',
+            });
+          }
+          
+          // Thêm vào danh sách kết quả
+          imageResults.add({
+            'url': imageUrl,
+            'score': imageScore,
+            'issues': issues,
+            'details': imageDetails,
+          });
+          
+          // Thêm vấn đề vào danh sách chung với chỉ số hình ảnh
+          for (var issue in issues) {
+            imageIssues.add({
+              ...issue,
+              'imageIndex': index,
+            });
+          }
+        } catch (e) {
+          debugPrint('Lỗi khi phân tích hình ảnh $index: $e');
+          imageResults.add({
+            'url': imageUrl,
+            'score': 60,
+            'issues': [
+              {
+                'severity': 'medium',
+                'description': 'Không thể phân tích hình ảnh: $e',
+              }
+            ],
+          });
+          
+          imageIssues.add({
+            'severity': 'medium',
+            'description': 'Lỗi khi phân tích hình ảnh: $e',
+            'imageIndex': index,
+          });
+        }
+        
+        index++;
+      }
+      
+      // Tính điểm trung bình cho tất cả hình ảnh
+      int totalScore = 0;
+      for (var result in imageResults) {
+        totalScore += result['score'] as int;
+      }
+      
+      int averageScore = imageResults.isNotEmpty ? (totalScore / imageResults.length).round() : 0;
+      
+      return {
+        'score': averageScore,
+        'issues': imageIssues,
+        'imageResults': imageResults,
+        'analysis': 'Phân tích ${imageResults.length} hình ảnh hoàn tất với điểm số trung bình $averageScore/100',
+      };
     } catch (e) {
-      debugPrint('Lỗi khi trích xuất JSON: $e');
-      return '';
+      debugPrint('Lỗi khi phân tích hình ảnh: $e');
+      return {
+        'score': 70,
+        'issues': [
+          {
+            'severity': 'medium',
+            'description': 'Lỗi khi phân tích hình ảnh: $e',
+            'imageIndex': -1,
+          }
+        ],
+        'analysis': 'Lỗi khi phân tích hình ảnh',
+      };
+    }
+  }
+  
+  // Kiểm tra thuộc tính của hình ảnh
+  Future<Map<String, dynamic>> _checkImageProperties(String imageUrl) async {
+    try {
+      final response = await http.get(Uri.parse(imageUrl));
+      
+      if (response.statusCode != 200) {
+        throw Exception('Không thể tải hình ảnh (HTTP ${response.statusCode})');
+      }
+      
+      // Kiểm tra kích thước file
+      final fileSizeKB = response.bodyBytes.length / 1024;
+      
+      // TODO: Dùng thư viện image để lấy kích thước hình ảnh
+      // Giả định kích thước trung bình cho bây giờ
+      return {
+        'width': 800,
+        'height': 600,
+        'fileSizeKB': fileSizeKB,
+        'format': 'jpg', // Đoán định dạng
+      };
+    } catch (e) {
+      throw Exception('Lỗi khi kiểm tra thuộc tính hình ảnh: $e');
+    }
+  }
+  
+  // Tính điểm tuân thủ
+  int _calculateComplianceScore({
+    required Map<String, dynamic> contentAnalysisResult,
+    required Map<String, dynamic> imageAnalysisResult,
+    required String category,
+  }) {
+    int score = 100;
+    
+    // Kiểm tra các vấn đề nghiêm trọng từ phân tích nội dung
+    final contentIssues = contentAnalysisResult['issues'] as List<dynamic>? ?? [];
+    for (var issue in contentIssues) {
+      if (issue['severity'] == 'high') {
+        score -= 30;
+      }
+    }
+    
+    // Kiểm tra các vấn đề nghiêm trọng từ phân tích hình ảnh
+    final imageIssues = imageAnalysisResult['issues'] as List<dynamic>? ?? [];
+    for (var issue in imageIssues) {
+      if (issue['severity'] == 'high') {
+        score -= 30;
+      }
+    }
+    
+    // Đảm bảo điểm không âm
+    return score < 0 ? 0 : score;
+  }
+  
+  // Tạo lý do từ chối dựa trên các vấn đề
+  String _generateRejectionReason(List<ModerationIssue> issues) {
+    final highSeverityIssues = issues.where((issue) => issue.severity == 'high').toList();
+    final mediumSeverityIssues = issues.where((issue) => issue.severity == 'medium').toList();
+    
+    if (highSeverityIssues.isNotEmpty) {
+      return highSeverityIssues.map((issue) => issue.description).join('. ');
+    } else if (mediumSeverityIssues.isNotEmpty) {
+      return 'Sản phẩm không đáp ứng các tiêu chuẩn của chúng tôi: ${mediumSeverityIssues.map((issue) => issue.description).join('. ')}';
+    } else {
+      return 'Sản phẩm không đáp ứng các tiêu chuẩn của nền tảng.';
+    }
+  }
+  
+  // Phương thức kiểm duyệt thủ công
+  Future<void> manualModeration(String moderationId, ModerationStatus newStatus, {String? comments}) async {
+    try {
+      _setLoading(true);
+      
+      // Lấy thông tin kết quả kiểm duyệt
+      final doc = await _firestore.collection('moderation_results').doc(moderationId).get();
+      
+      if (!doc.exists) {
+        throw Exception('Không tìm thấy kết quả kiểm duyệt');
+      }
+      
+      final data = doc.data() as Map<String, dynamic>;
+      final productId = data['productId'] as String?;
+      
+      if (productId == null) {
+        throw Exception('Thiếu thông tin productId');
+      }
+      
+      // Cập nhật trạng thái kiểm duyệt
+      await _firestore.collection('moderation_results').doc(moderationId).update({
+        'status': newStatus.toString().split('.').last,
+        'manualReview': true,
+        'reviewComments': comments,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Cập nhật trạng thái sản phẩm
+      await _updateProductStatus(productId, newStatus, {
+        'moderationId': moderationId,
+        'moderationStatus': newStatus.toString().split('.').last,
+        'manualReview': true,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+      
+      _setLoading(false);
+    } catch (e) {
+      _setError('Lỗi khi thực hiện kiểm duyệt thủ công: $e');
+      _setLoading(false);
+      throw e;
+    }
+  }
+  
+  // Lấy danh sách các sản phẩm cần kiểm duyệt
+  Stream<List<Map<String, dynamic>>> getProductsForModeration() {
+    return _firestore
+        .collection('moderation_results')
+        .where('status', isEqualTo: ModerationStatus.in_review.toString().split('.').last)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<Map<String, dynamic>> results = [];
+          
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            final productId = data['productId'] as String?;
+            
+            if (productId != null) {
+              // Lấy thông tin sản phẩm
+              try {
+                final productDoc = await _firestore.collection('products').doc(productId).get();
+                if (productDoc.exists) {
+                  final productData = productDoc.data();
+                  
+                  results.add({
+                    'moderation': data,
+                    'product': productData,
+                    'moderationId': doc.id,
+                  });
+                }
+              } catch (e) {
+                debugPrint('Lỗi khi lấy thông tin sản phẩm $productId: $e');
+              }
+            }
+          }
+          
+          return results;
+        });
+  }
+  
+  // Lấy lịch sử kiểm duyệt sản phẩm
+  Future<List<Map<String, dynamic>>> getModerationHistory({int limit = 20}) async {
+    try {
+      final snapshot = await _firestore
+          .collection('moderation_results')
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+      
+      List<Map<String, dynamic>> results = [];
+      
+      for (var doc in snapshot.docs) {
+        results.add({
+          ...doc.data(),
+          'id': doc.id,
+        });
+      }
+      
+      return results;
+    } catch (e) {
+      debugPrint('Lỗi khi lấy lịch sử kiểm duyệt: $e');
+      return [];
     }
   }
 } 
