@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/screens/product_list_screen.dart';
 import 'package:student_market_nttu/screens/profile_screen.dart';
@@ -14,6 +15,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
 import 'package:student_market_nttu/screens/cart_screen.dart';
 import 'package:student_market_nttu/widgets/cart_badge.dart';
+import 'package:student_market_nttu/screens/ai_hub_screen.dart';
+import 'package:student_market_nttu/screens/ai_onboarding_screen.dart';
 
 import '../services/user_service.dart';
 import '../services/cart_service.dart';
@@ -156,6 +159,27 @@ class _HomeContentState extends State<HomeContent> {
           ),
           const CartBadge(),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          // Check if onboarding is completed
+          final prefs = await SharedPreferences.getInstance();
+          final bool onboardingCompleted = prefs.getBool('ai_onboarding_completed') ?? false;
+          
+          if (onboardingCompleted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AIHubScreen()),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AIOnboardingScreen()),
+            );
+          }
+        },
+        backgroundColor: Colors.blue[900],
+        child: const Icon(Icons.smart_toy_outlined, color: Colors.white),
       ),
       body: RefreshIndicator(
         onRefresh: () async {

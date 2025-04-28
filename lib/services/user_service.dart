@@ -641,9 +641,11 @@ class UserService extends ChangeNotifier {
           // Lấy thông tin tên và avatar
           final userDoc = await _firestore.collection('users').doc(userId).get();
           if (userDoc.exists) {
-            final userData = userDoc.data()!;
-            userNames[userId] = userData['displayName'] ?? '';
-            userAvatars[userId] = userData['photoURL'] ?? '';
+            final userData = userDoc.data();
+            if (userData != null) {
+              userNames[userId] = userData['displayName'] ?? '';
+              userAvatars[userId] = userData['photoURL'] ?? '';
+            }
           }
         }
         
@@ -673,14 +675,29 @@ class UserService extends ChangeNotifier {
             
         for (var doc in usersSnapshot.docs) {
           final userData = doc.data();
-          final user = UserModel.fromMap(userData, doc.id);
-          // Hiển thị NTTCredit hiện tại thay vì creditGain
-          sortedUsers.add({
-            'id': user.id,
-            'name': user.displayName.isNotEmpty ? user.displayName : 'Người dùng',
-            'avatar': user.photoURL.isNotEmpty ? user.photoURL : 'https://via.placeholder.com/80',
-            'creditGain': user.nttCredit > 100 ? user.nttCredit - 100 : 5, // Trừ giá trị mặc định (100)
-          });
+          if (userData != null) {
+            try {
+              final user = UserModel.fromMap(userData, doc.id);
+              // Hiển thị NTTCredit hiện tại thay vì creditGain
+              sortedUsers.add({
+                'id': user.id,
+                'name': user.displayName.isNotEmpty ? user.displayName : 'Người dùng',
+                'avatar': user.photoURL.isNotEmpty ? user.photoURL : 'https://via.placeholder.com/80',
+                'creditGain': user.nttCredit > 100 ? user.nttCredit - 100 : 5, // Trừ giá trị mặc định (100)
+              });
+            } catch (e) {
+              debugPrint('Lỗi khi xử lý dữ liệu người dùng: $e');
+              // Xử lý trực tiếp từ Map nếu không đọc được qua model
+              sortedUsers.add({
+                'id': doc.id,
+                'name': userData['displayName'] ?? 'Người dùng',
+                'avatar': userData['photoURL'] ?? 'https://via.placeholder.com/80',
+                'creditGain': ((userData['nttCredit'] ?? 100) > 100) 
+                    ? (userData['nttCredit'] ?? 100) - 100 
+                    : 5,
+              });
+            }
+          }
         }
       }
       

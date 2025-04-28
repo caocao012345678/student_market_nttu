@@ -387,8 +387,13 @@ class AppLayoutService extends ChangeNotifier {
           _appScreens.clear();
           
           if (data['app_screens'] != null) {
-            for (var screen in data['app_screens']) {
-              _appScreens.add(Map<String, dynamic>.from(screen));
+            if (data['app_screens'] is List) {
+              for (var screen in data['app_screens']) {
+                _appScreens.add(Map<String, dynamic>.from(screen));
+              }
+            } else if (data['app_screens'] is Map) {
+              // Xử lý trường hợp khi nhận được Map thay vì List
+              debugPrint('app_screens là Map thay vì List, dùng dữ liệu mặc định');
             }
           }
           
@@ -396,8 +401,13 @@ class AppLayoutService extends ChangeNotifier {
           _appFeatures.clear();
           
           if (data['app_features'] != null) {
-            for (var feature in data['app_features']) {
-              _appFeatures.add(Map<String, dynamic>.from(feature));
+            if (data['app_features'] is List) {
+              for (var feature in data['app_features']) {
+                _appFeatures.add(Map<String, dynamic>.from(feature));
+              }
+            } else if (data['app_features'] is Map) {
+              // Xử lý trường hợp khi nhận được Map thay vì List
+              debugPrint('app_features là Map thay vì List, dùng dữ liệu mặc định');
             }
           }
         }

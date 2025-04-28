@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:student_market_nttu/screens/splash_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
@@ -16,11 +17,20 @@ import 'package:student_market_nttu/services/favorites_service.dart';
 import 'package:student_market_nttu/services/chat_service.dart';
 import 'package:student_market_nttu/services/cart_service.dart';
 import 'package:student_market_nttu/services/payment_service.dart';
+import 'package:student_market_nttu/services/category_service.dart';
+import 'package:student_market_nttu/services/gemini_service.dart';
+import 'package:student_market_nttu/services/app_layout_service.dart';
+import 'package:student_market_nttu/services/rag_service.dart';
+import 'package:student_market_nttu/services/app_features_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Tải biến môi trường từ file .env
+  await dotenv.load();
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -52,6 +62,19 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => CartService()),
         ChangeNotifierProvider(create: (_) => PaymentService()),
+        ChangeNotifierProvider(create: (_) => CategoryService()),
+        ChangeNotifierProvider(create: (_) => GeminiService()),
+        ChangeNotifierProvider(create: (_) => AppLayoutService()),
+        ChangeNotifierProvider(create: (_) => AppFeaturesService()),
+        ChangeNotifierProxyProvider3<GeminiService, AppLayoutService, AppFeaturesService, RAGService>(
+          create: (context) => RAGService(Provider.of<GeminiService>(context, listen: false)),
+          update: (context, geminiService, appLayoutService, appFeaturesService, previous) {
+            final ragService = previous ?? RAGService(geminiService);
+            ragService.setAppLayoutService(appLayoutService);
+            ragService.setAppFeaturesService(appFeaturesService);
+            return ragService;
+          },
+        ),
       ],
       child: Consumer<ThemeService>(
         builder: (context, themeService, child) {

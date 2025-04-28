@@ -1161,4 +1161,38 @@ class ProductService extends ChangeNotifier {
       throw e;
     }
   }
+
+  // Tìm kiếm sản phẩm theo từ khóa
+  Future<List<Product>> searchProductsByKeyword(String keyword) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('products')
+          .where('isSold', isEqualTo: false)
+          .where('status', whereNotIn: ['pending_review', 'rejected'])
+          .orderBy('createdAt', descending: true)
+          .get();
+      
+      final products = querySnapshot.docs
+          .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+      
+      // Lọc sản phẩm theo từ khóa
+      if (keyword.isNotEmpty) {
+        final lowercaseKeyword = keyword.toLowerCase();
+        return products.where((product) {
+          final titleMatch = product.title.toLowerCase().contains(lowercaseKeyword);
+          final descriptionMatch = product.description.toLowerCase().contains(lowercaseKeyword);
+          final tagMatch = product.tags.any((tag) => tag.toLowerCase().contains(lowercaseKeyword));
+          final categoryMatch = product.category.toLowerCase().contains(lowercaseKeyword);
+          
+          return titleMatch || descriptionMatch || tagMatch || categoryMatch;
+        }).toList();
+      }
+      
+      return products;
+    } catch (e) {
+      debugPrint('Lỗi khi tìm kiếm sản phẩm theo từ khóa: $e');
+      throw e;
+    }
+  }
 } 

@@ -356,7 +356,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     
     try {
       // 5. Gọi RAG service để tạo phản hồi
-      final Map<String, dynamic> ragResponse = await ragService.generateRAGResponse(currentMessage);
+      final Map<String, dynamic> ragResponse = await ragService.generateRAGResponse(
+        currentMessage,
+        '', // historyContext
+        false // disableSearch
+      );
       
       if (!_isMounted) return;
       
