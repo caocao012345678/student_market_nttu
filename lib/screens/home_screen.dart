@@ -14,6 +14,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
 import 'package:student_market_nttu/screens/cart_screen.dart';
 import 'package:student_market_nttu/widgets/cart_badge.dart';
+import 'package:student_market_nttu/widgets/chatbot_button.dart';
 
 import '../services/user_service.dart';
 import '../services/cart_service.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const HomeContent(),
     const ProductListScreen(),
+    Container(), // Placeholder cho màn hình tin nhắn
     const NotificationScreen(),
     const ProfileScreen(),
   ];
@@ -156,6 +158,7 @@ class _HomeContentState extends State<HomeContent> {
           const CartBadge(),
         ],
       ),
+      floatingActionButton: const ChatbotButton(),
       body: RefreshIndicator(
         onRefresh: () async {
           // Refresh data

@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:student_market_nttu/screens/chatbot_screen.dart';
+import 'package:student_market_nttu/screens/chatbot_help_screen.dart';
 import 'package:student_market_nttu/screens/splash_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
@@ -17,6 +19,7 @@ import 'package:student_market_nttu/services/favorites_service.dart';
 import 'package:student_market_nttu/services/cart_service.dart';
 import 'package:student_market_nttu/services/payment_service.dart';
 import 'package:student_market_nttu/services/category_service.dart';
+import 'package:student_market_nttu/services/chatbot_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
 
@@ -57,6 +60,13 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CartService()),
         ChangeNotifierProvider(create: (_) => PaymentService()),
         ChangeNotifierProvider(create: (_) => CategoryService()),
+        ChangeNotifierProxyProvider<ProductService, ChatbotService>(
+          create: (context) => ChatbotService(Provider.of<ProductService>(context, listen: false)),
+          update: (_, productService, previousChatbotService) => 
+              previousChatbotService == null
+                  ? ChatbotService(productService)
+                  : previousChatbotService..updateProductService(productService),
+        ),
       ],
       child: Consumer<ThemeService>(
         builder: (context, themeService, child) {
@@ -127,6 +137,10 @@ class MyApp extends StatelessWidget {
             ],
             locale: const Locale('vi', 'VN'),
             home: const SplashScreen(),
+            routes: {
+              ChatbotScreen.routeName: (ctx) => const ChatbotScreen(),
+              ChatbotHelpScreen.routeName: (ctx) => const ChatbotHelpScreen(),
+            },
           );
         },
       ),

@@ -7,6 +7,7 @@ class AuthService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   User? _user;
   bool _isLoading = false;
+  bool _isAdmin = false;
 
   AuthService() {
     _initializeAuth();
@@ -16,12 +17,37 @@ class AuthService extends ChangeNotifier {
     _user = _auth.currentUser;
     _auth.authStateChanges().listen((User? user) {
       _user = user;
+      _checkAdminStatus();
       notifyListeners();
     });
   }
 
+  // Kiểm tra xem người dùng hiện tại có phải là admin hay không
+  Future<void> _checkAdminStatus() async {
+    _isAdmin = false; // Đặt giá trị mặc định
+    
+    try {
+      if (_user != null) {
+        final userDoc = await _firestore.collection('users').doc(_user!.uid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          // Kiểm tra cả hai trường để đảm bảo tính nhất quán
+          _isAdmin = (userData?['role'] == 'admin' || userData?['isAdmin'] == true);
+        }
+      }
+    } catch (e) {
+      print('Error checking admin status: $e');
+      _isAdmin = false;
+    }
+    
+    notifyListeners();
+  }
+
   User? get user => _user;
   bool get isLoading => _isLoading;
+
+  // Kiểm tra xem người dùng hiện tại có phải là admin hay không
+  bool get isUserAdmin => _isAdmin;
 
   // Auth state changes stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -77,6 +103,9 @@ class AuthService extends ChangeNotifier {
 
         // Send email verification
         await userCredential.user!.sendEmailVerification();
+        
+        // Kiểm tra trạng thái admin
+        await _checkAdminStatus();
       }
 
       _isLoading = false;
