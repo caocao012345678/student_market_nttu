@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -33,6 +34,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   UserModel? _otherUser;
   bool _isLoading = true;
   bool _isSending = false;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -43,28 +46,40 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _init() async {
     setState(() {
       _isLoading = true;
+      _hasError = false;
+      _errorMessage = '';
     });
 
     try {
-      final chatService = Provider.of<ChatService>(context, listen: false);
-      
-      // Đánh dấu tin nhắn đã đọc khi mở màn hình
-      await chatService.markAsRead(widget.chatId);
-      
-      // Lấy thông tin người dùng khác nếu chưa có
-      if (widget.otherUser == null) {
-        _otherUser = await chatService.getOtherUserInChat(widget.chatId, context);
-      } else {
-        _otherUser = widget.otherUser;
-      }
+      await Future.wait([
+        _loadChatData(),
+      ]).timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException('Tải dữ liệu tin nhắn quá thời gian, vui lòng thử lại');
+      });
     } catch (error) {
       debugPrint('Lỗi khi khởi tạo: $error');
+      setState(() {
+        _hasError = true;
+        _errorMessage = error.toString();
+      });
     } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadChatData() async {
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    
+    await chatService.markAsRead(widget.chatId);
+    
+    if (widget.otherUser == null) {
+      _otherUser = await chatService.getOtherUserInChat(widget.chatId, context);
+    } else {
+      _otherUser = widget.otherUser;
     }
   }
 
@@ -75,7 +90,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     super.dispose();
   }
 
-  // Gửi tin nhắn văn bản
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty || _isSending) return;
@@ -89,7 +103,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await chatService.sendTextMessage(widget.chatId, message);
       _messageController.clear();
       
-      // Cuộn xuống dưới cùng sau khi gửi tin nhắn
       Future.delayed(const Duration(milliseconds: 300), () {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -113,7 +126,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  // Chọn và gửi hình ảnh
   Future<void> _pickAndSendImage() async {
     if (_isSending) return;
 
@@ -145,7 +157,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  // Xóa tin nhắn
   Future<void> _deleteMessage(String messageId) async {
     try {
       final chatService = Provider.of<ChatService>(context, listen: false);
@@ -162,7 +173,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  // Widget hiển thị một tin nhắn
   Widget _buildMessageItem(ChatMessageDetail message) {
     final chatService = Provider.of<ChatService>(context, listen: false);
     final isCurrentUser = message.senderId == chatService.currentUserId;
@@ -199,7 +209,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ? CrossAxisAlignment.end 
                 : CrossAxisAlignment.start,
             children: [
-              // Hiển thị nội dung tin nhắn dựa trên loại
               if (message.type == ChatMessageType.text)
                 Text(
                   message.content,
@@ -306,7 +315,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 ),
               
-              // Hiển thị thời gian
               const SizedBox(height: 4),
               Text(
                 timeString,
@@ -324,7 +332,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  // Hiển thị tùy chọn cho tin nhắn
   Future<void> _showMessageOptions(String messageId) async {
     showModalBottomSheet(
       context: context,
@@ -404,113 +411,159 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Danh sách tin nhắn
-                Expanded(
-                  child: StreamBuilder<List<ChatMessageDetail>>(
-                    stream: chatService.getChatMessages(widget.chatId),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Text('Đã xảy ra lỗi: ${snapshot.error}'),
-                        );
-                      }
-
-                      final messages = snapshot.data ?? [];
-
-                      if (messages.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.chat_bubble_outline,
-                                size: 48,
-                                color: Colors.grey,
+          : _hasError 
+              ? _buildErrorView()
+              : Column(
+                  children: [
+                    Expanded(
+                      child: StreamBuilder<List<ChatMessageDetail>>(
+                        stream: chatService.getChatMessages(widget.chatId),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: SizedBox(
+                                width: 30, 
+                                height: 30, 
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Bắt đầu cuộc trò chuyện với ${user?.displayName ?? 'người dùng này'}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
+                            );
+                          }
 
-                      return ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final message = messages[index];
-                          return _buildMessageItem(message);
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Đã xảy ra lỗi: ${snapshot.error}',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _init,
+                                    child: const Text('Thử lại'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final messages = snapshot.data ?? [];
+
+                          if (messages.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.chat_bubble_outline,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Bắt đầu cuộc trò chuyện với ${user?.displayName ?? 'người dùng này'}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            controller: _scrollController,
+                            reverse: true,
+                            itemCount: messages.length,
+                            itemBuilder: (context, index) {
+                              final message = messages[index];
+                              return _buildMessageItem(message);
+                            },
+                          );
                         },
-                      );
-                    },
-                  ),
-                ),
-
-                // Input tin nhắn
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.3),
-                        blurRadius: 3,
-                        offset: const Offset(0, -1),
                       ),
-                    ],
-                  ),
-                  child: SafeArea(
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.add_photo_alternate),
-                          onPressed: _isSending ? null : _pickAndSendImage,
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            decoration: const InputDecoration(
-                              hintText: 'Nhập tin nhắn...',
-                              border: InputBorder.none,
-                            ),
-                            textCapitalization: TextCapitalization.sentences,
-                            keyboardType: TextInputType.multiline,
-                            maxLines: null,
-                            onSubmitted: (_) => _sendMessage(),
-                          ),
-                        ),
-                        IconButton(
-                          icon: _isSending
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.send, color: Colors.blue),
-                          onPressed: _isSending ? null : _sendMessage,
-                        ),
-                      ],
                     ),
-                  ),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.3),
+                            blurRadius: 3,
+                            offset: const Offset(0, -1),
+                          ),
+                        ],
+                      ),
+                      child: SafeArea(
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.add_photo_alternate),
+                              onPressed: _isSending ? null : _pickAndSendImage,
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Nhập tin nhắn...',
+                                  border: InputBorder.none,
+                                ),
+                                textCapitalization: TextCapitalization.sentences,
+                                keyboardType: TextInputType.multiline,
+                                maxLines: null,
+                                onSubmitted: (_) => _sendMessage(),
+                              ),
+                            ),
+                            IconButton(
+                              icon: _isSending
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.send, color: Colors.blue),
+                              onPressed: _isSending ? null : _sendMessage,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Không thể tải dữ liệu tin nhắn: $_errorMessage',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red),
             ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _init,
+            child: const Text('Thử lại'),
+          ),
+        ],
+      ),
     );
   }
 } 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -21,6 +22,9 @@ class ChatService extends ChangeNotifier {
   // Lưu cache các cuộc trò chuyện
   Map<String, Chat> _chats = {};
   Map<String, List<ChatMessageDetail>> _messages = {};
+  
+  // Theo dõi các yêu cầu đang xử lý để tránh trùng lặp
+  final Map<String, Completer<void>> _pendingRequests = {};
 
   // Getter
   Map<String, Chat> get chats => _chats;
@@ -30,13 +34,25 @@ class ChatService extends ChangeNotifier {
   Future<void> initializeChats() async {
     if (currentUserId.isEmpty) return;
 
+    // Nếu đang xử lý, không thực hiện lại
+    if (_pendingRequests['init'] != null) {
+      await _pendingRequests['init']!.future;
+      return;
+    }
+
+    final completer = Completer<void>();
+    _pendingRequests['init'] = completer;
+
     try {
       final querySnapshot = await _firestore
           .collection('chats')
           .where('participants', arrayContains: currentUserId)
           .orderBy('lastMessageAt', descending: true)
           .limit(20)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+            throw TimeoutException('Tải dữ liệu chat quá thời gian, vui lòng thử lại sau');
+          });
 
       for (var doc in querySnapshot.docs) {
         final chat = Chat.fromMap(doc.data(), doc.id);
@@ -44,8 +60,13 @@ class ChatService extends ChangeNotifier {
       }
       
       notifyListeners();
+      completer.complete();
     } catch (e) {
       debugPrint('Lỗi khi khởi tạo dữ liệu chat: $e');
+      completer.completeError(e);
+      throw e;
+    } finally {
+      _pendingRequests.remove('init');
     }
   }
 
@@ -127,6 +148,10 @@ class ChatService extends ChangeNotifier {
           
           notifyListeners();
           return chatList;
+        })
+        .handleError((error) {
+          debugPrint('Lỗi khi lấy danh sách chat: $error');
+          return <Chat>[];
         });
   }
 
@@ -141,14 +166,60 @@ class ChatService extends ChangeNotifier {
             throw Exception('Cuộc trò chuyện không tồn tại');
           }
           
-          final chat = Chat.fromMap(doc.data()!, doc.id);
+          final chat = Chat.fromMap(doc.data()!, chatId);
           _chats[chatId] = chat;
           return chat;
+        })
+        .handleError((error) {
+          debugPrint('Lỗi khi lấy chi tiết chat: $error');
+          throw error;
         });
   }
 
   // Lấy danh sách tin nhắn từ một cuộc trò chuyện
   Stream<List<ChatMessageDetail>> getChatMessages(String chatId) {
+    // Kiểm tra cache trước
+    if (_messages.containsKey(chatId) && _messages[chatId]!.isNotEmpty) {
+      // Trả về dữ liệu từ cache ngay lập tức
+      final cachedMessages = _messages[chatId]!;
+      
+      // Đồng thời vẫn lấy dữ liệu mới từ Firestore
+      Future.delayed(Duration.zero, () => _refreshChatMessages(chatId));
+      
+      // Thay thế concatWith bằng cách sử dụng Controller
+      StreamController<List<ChatMessageDetail>> controller = StreamController<List<ChatMessageDetail>>();
+      
+      // Trả về dữ liệu cache ngay lập tức
+      controller.add(cachedMessages);
+      
+      // Đăng ký lắng nghe dữ liệu mới và thêm vào controller
+      _getFirestoreChatMessages(chatId).listen(
+        (newMessages) {
+          if (!controller.isClosed) {
+            controller.add(newMessages);
+          }
+        },
+        onError: (error) {
+          if (!controller.isClosed) {
+            debugPrint('Lỗi khi lấy tin nhắn: $error');
+            // Không báo lỗi, giữ dữ liệu cache
+          }
+        },
+        onDone: () {
+          if (!controller.isClosed) {
+            controller.close();
+          }
+        }
+      );
+      
+      return controller.stream;
+    }
+    
+    return _getFirestoreChatMessages(chatId);
+  }
+  
+  // Tách riêng phần lấy dữ liệu từ Firestore
+  Stream<List<ChatMessageDetail>> _getFirestoreChatMessages(String chatId) {
     return _firestore
         .collection('chats')
         .doc(chatId)
@@ -164,18 +235,58 @@ class ChatService extends ChangeNotifier {
           _messages[chatId] = messageList;
           
           return messageList;
+        })
+        .handleError((error) {
+          debugPrint('Lỗi khi lấy tin nhắn: $error');
+          // Trả về danh sách rỗng thay vì ném lỗi
+          return <ChatMessageDetail>[];
         });
+  }
+  
+  // Cập nhật lại dữ liệu chat từ Firestore
+  Future<void> _refreshChatMessages(String chatId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .get()
+          .timeout(const Duration(seconds: 5));
+          
+      final messageList = snapshot.docs
+          .map((doc) => ChatMessageDetail.fromMap(doc.data(), doc.id))
+          .toList();
+          
+      _messages[chatId] = messageList;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Lỗi khi cập nhật tin nhắn: $e');
+      // Không cần throw lỗi vì đây là hàm background
+    }
   }
 
   // Đánh dấu đã đọc tin nhắn
   Future<void> markAsRead(String chatId) async {
     if (currentUserId.isEmpty) return;
+    
+    // Tránh trùng lặp yêu cầu
+    final requestKey = 'mark_read_$chatId';
+    if (_pendingRequests[requestKey] != null) {
+      await _pendingRequests[requestKey]!.future;
+      return;
+    }
+    
+    final completer = Completer<void>();
+    _pendingRequests[requestKey] = completer;
 
     try {
       // Cập nhật trạng thái đọc của cuộc trò chuyện
       await _firestore.collection('chats').doc(chatId).update({
         'read.$currentUserId': true,
         'unreadCount.$currentUserId': 0,
+      }).timeout(const Duration(seconds: 5), onTimeout: () {
+        throw TimeoutException('Đánh dấu đã đọc tin nhắn quá thời gian');
       });
 
       // Cập nhật tất cả tin nhắn chưa đọc
@@ -195,8 +306,12 @@ class ChatService extends ChangeNotifier {
       
       await batch.commit();
       notifyListeners();
+      completer.complete();
     } catch (e) {
       debugPrint('Lỗi khi đánh dấu đã đọc: $e');
+      completer.completeError(e);
+    } finally {
+      _pendingRequests.remove(requestKey);
     }
   }
 

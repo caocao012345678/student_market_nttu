@@ -23,7 +23,7 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
   late TextEditingController _searchController;
   bool _isSearching = false;
   bool _isFiltersVisible = false;
@@ -38,6 +38,10 @@ class _SearchScreenState extends State<SearchScreen> {
     'Sách giáo khoa', 'Laptop cũ', 'Điện thoại', 'Quần áo nam',
     'Quần áo nữ', 'Đồ dùng học tập', 'Tặng free', 'Đồ dùng ký túc xá'
   ];
+  
+  // Animation controller cho chuyển đổi giữa chế độ xem
+  late AnimationController _animationController;
+  late Animation<double> _animation;
 
   final List<Map<String, dynamic>> _categories = [
     {'icon': Icons.all_inbox, 'name': 'Tất cả'},
@@ -63,7 +67,18 @@ class _SearchScreenState extends State<SearchScreen> {
     
     if (_searchController.text.isNotEmpty) {
       _isSearching = true;
+      _performSearch(_searchController.text);
     }
+    
+    // Khởi tạo animation
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
     
     // Load recent searches
     _loadRecentSearches();
@@ -124,6 +139,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -132,6 +148,7 @@ class _SearchScreenState extends State<SearchScreen> {
     
     setState(() {
       _searchQuery = query;
+      _isSearching = true;
       _isLoading = true;
     });
     
@@ -141,7 +158,10 @@ class _SearchScreenState extends State<SearchScreen> {
     // Lưu vào SharedPreferences
     _saveSearchQuery(query);
     
-    // ... existing code (search logic) ...
+    // Trigger animation khi tìm kiếm (nếu chưa hiển thị)
+    if (!_isSearching) {
+      _animationController.forward();
+    }
   }
 
   void _saveSearchToFirebase(String query) {
@@ -157,52 +177,83 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  void _toggleViewMode() {
+    setState(() {
+      _isGridView = !_isGridView;
+    });
+    
+    // Chạy animation khi chuyển đổi chế độ xem
+    if (_isGridView) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.blue[900],
-        title: TextField(
-          controller: _searchController,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Tìm kiếm sản phẩm...',
-            hintStyle: const TextStyle(color: Colors.white70),
-            border: InputBorder.none,
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.white),
-                    onPressed: () {
-                      setState(() {
-                        _searchController.clear();
-                        _isSearching = false;
-                      });
-                    },
-                  )
-                : const Icon(Icons.search, color: Colors.white),
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
           ),
-          onSubmitted: (value) => _performSearch(value),
+          child: TextField(
+            controller: _searchController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              hintText: 'Tìm kiếm sản phẩm...',
+              hintStyle: const TextStyle(color: Colors.white70),
+              border: InputBorder.none,
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.white, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _isSearching = false;
+                        });
+                      },
+                    )
+                  : const Icon(Icons.search, color: Colors.white),
+            ),
+            onSubmitted: (value) => _performSearch(value),
+            textInputAction: TextInputAction.search,
+          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              _isFiltersVisible ? Icons.filter_list_off : Icons.filter_list,
+            icon: AnimatedIcon(
+              icon: AnimatedIcons.menu_close,
+              progress: _animation,
               color: Colors.white,
+              semanticLabel: 'Hiển thị bộ lọc',
             ),
             onPressed: () {
               setState(() {
                 _isFiltersVisible = !_isFiltersVisible;
               });
+              
+              if (_isFiltersVisible) {
+                _animationController.forward();
+              } else {
+                _animationController.reverse();
+              }
             },
           ),
           IconButton(
-            icon: Icon(_isGridView ? Icons.list : Icons.grid_view, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _isGridView = !_isGridView;
-              });
-            },
+            icon: AnimatedIcon(
+              icon: AnimatedIcons.list_view,
+              progress: _animation,
+              color: Colors.white,
+              semanticLabel: 'Chuyển đổi chế độ xem',
+            ),
+            onPressed: _toggleViewMode,
           ),
         ],
         bottom: _isFiltersVisible
@@ -246,6 +297,12 @@ class _SearchScreenState extends State<SearchScreen> {
                         _selectedCategory = _categories[index]['name'];
                       });
                     },
+                    selectedColor: Colors.blue[700],
+                    labelStyle: TextStyle(
+                      color: _selectedCategory == _categories[index]['name'] 
+                          ? Colors.white 
+                          : Colors.black,
+                    ),
                   ),
                 );
               },
@@ -260,7 +317,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               Text(
-                '${_priceRange.start.round()}đ - ${_priceRange.end.round()}đ',
+                '${_priceRange.start.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}đ - ${_priceRange.end.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}đ',
                 style: const TextStyle(fontSize: 12),
               ),
             ],
@@ -270,6 +327,7 @@ class _SearchScreenState extends State<SearchScreen> {
             min: 0,
             max: 10000000,
             divisions: 50,
+            activeColor: Colors.blue[700],
             labels: RangeLabels(
               '${_priceRange.start.round()}đ',
               '${_priceRange.end.round()}đ',
@@ -288,35 +346,45 @@ class _SearchScreenState extends State<SearchScreen> {
                 'Sắp xếp theo',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              DropdownButton<String>(
-                value: _sortBy,
-                items: const [
-                  DropdownMenuItem(
-                    value: 'Mới nhất',
-                    child: Text('Mới nhất'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Giá thấp đến cao',
-                    child: Text('Giá thấp đến cao'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Giá cao đến thấp',
-                    child: Text('Giá cao đến thấp'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Bán chạy',
-                    child: Text('Bán chạy'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Đánh giá cao',
-                    child: Text('Đánh giá cao'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _sortBy = value!;
-                  });
-                },
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: DropdownButton<String>(
+                  value: _sortBy,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down),
+                  isDense: true,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Mới nhất',
+                      child: Text('Mới nhất'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Giá thấp đến cao',
+                      child: Text('Giá thấp đến cao'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Giá cao đến thấp',
+                      child: Text('Giá cao đến thấp'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Bán chạy',
+                      child: Text('Bán chạy'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Đánh giá cao',
+                      child: Text('Đánh giá cao'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _sortBy = value!;
+                    });
+                  },
+                ),
               ),
             ],
           ),
@@ -327,10 +395,20 @@ class _SearchScreenState extends State<SearchScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue[900],
                 foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () {
                 // Apply filters and perform search
                 _performSearch(_searchController.text.trim());
+                
+                // Ẩn bộ lọc sau khi áp dụng
+                setState(() {
+                  _isFiltersVisible = false;
+                });
+                _animationController.reverse();
               },
               child: const Text('Áp dụng'),
             ),
@@ -351,14 +429,44 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Đang tìm kiếm "${_searchController.text.trim()}"...',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
           );
         }
 
         if (snapshot.hasError) {
           return Center(
-            child: Text('Đã xảy ra lỗi: ${snapshot.error}'),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Đã xảy ra lỗi: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => _performSearch(_searchController.text.trim()),
+                  child: const Text('Thử lại'),
+                ),
+              ],
+            ),
           );
         }
 
@@ -390,37 +498,81 @@ class _SearchScreenState extends State<SearchScreen> {
                     color: Colors.grey[500],
                   ),
                 ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.clear),
+                  label: const Text('Xóa bộ lọc'),
+                  onPressed: () {
+                    setState(() {
+                      _selectedCategory = 'Tất cả';
+                      _priceRange = const RangeValues(0, 10000000);
+                      _sortBy = 'Mới nhất';
+                    });
+                    _performSearch(_searchController.text.trim());
+                  },
+                ),
               ],
             ),
           );
         }
 
-        if (_isGridView) {
-          return GridView.builder(
-            padding: const EdgeInsets.all(12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.58,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 12,
+        // Hiển thị thông tin tìm kiếm
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.blue[50],
+              child: Row(
+                children: [
+                  Text(
+                    'Kết quả (${products.length})',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _selectedCategory != 'Tất cả' ? _selectedCategory : '',
+                    style: TextStyle(
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return ProductCardStandard(product: products[index]);
-            },
-          );
-        } else {
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return ProductCardStandard(
-                product: products[index],
-                isListView: true,
-              );
-            },
-          );
-        }
+            
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _isGridView
+                    ? GridView.builder(
+                        key: const ValueKey<String>('grid'),
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.58,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          return ProductCardStandard(product: products[index]);
+                        },
+                      )
+                    : ListView.builder(
+                        key: const ValueKey<String>('list'),
+                        padding: const EdgeInsets.all(12),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          return ProductCardStandard(
+                            product: products[index],
+                            isListView: true,
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ],
+        );
       },
     );
   }
