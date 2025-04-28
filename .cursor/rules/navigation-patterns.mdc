@@ -1,0 +1,138 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Mẫu Điều Hướng - Student Market NTTU
+
+## Cấu Trúc Điều Hướng
+
+Ứng dụng Student Market NTTU sử dụng kết hợp các phương pháp điều hướng sau:
+
+- **Navigator 2.0** - Điều hướng dựa trên router cho web và điều hướng sâu
+- **Điều hướng đẩy/pop** - Cho các luồng đơn giản trong ứng dụng
+
+## Định Nghĩa Route
+
+Các route được định nghĩa tập trung trong [lib/main.dart](mdc:lib/main.dart):
+
+```dart
+GoRouter router = GoRouter(
+  routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const HomeScreen(),
+    ),
+    GoRoute(
+      path: '/product/:id',
+      builder: (context, state) => ProductDetailScreen(
+        id: state.params['id'] ?? '',
+      ),
+    ),
+    // Các route khác...
+  ],
+);
+```
+
+## Mẫu Điều Hướng Chính
+
+### Điều Hướng Giữa Các Màn Hình
+
+```dart
+// Điều hướng đến màn hình chi tiết sản phẩm
+context.go('/product/${product.id}');
+
+// Điều hướng đến trang cá nhân
+context.go('/profile/${user.id}');
+
+// Trở về trang trước
+context.pop();
+```
+
+### Truyền Tham Số
+
+```dart
+// Truyền tham số qua route
+context.goNamed(
+  'product',
+  params: {'id': product.id},
+  queryParams: {'referral': 'homepage'},
+);
+
+// Nhận tham số trong màn hình đích
+final productId = GoRouterState.of(context).params['id'];
+final referral = GoRouterState.of(context).queryParams['referral'];
+```
+
+### Điều Hướng Có Điều Kiện
+
+```dart
+// Kiểm tra đăng nhập trước khi điều hướng
+void navigateToCheckout() {
+  if (authService.isLoggedIn) {
+    context.go('/checkout');
+  } else {
+    context.go('/login', extra: {'returnTo': '/checkout'});
+  }
+}
+```
+
+### Điều Hướng Drawer
+
+Sử dụng [lib/widgets/app_drawer.dart](mdc:lib/widgets/app_drawer.dart) để điều hướng qua các chức năng chính:
+
+```dart
+ListTile(
+  leading: Icon(Icons.home),
+  title: Text('Trang chủ'),
+  onTap: () {
+    Navigator.pop(context); // Đóng drawer
+    context.go('/');
+  },
+),
+```
+
+## Điều Hướng Sâu (Deep Linking)
+
+Hỗ trợ điều hướng sâu cho web và mobile thông qua URLs có định dạng:
+
+- `/product/{productId}` - Màn hình chi tiết sản phẩm
+- `/category/{categoryId}` - Sản phẩm theo danh mục
+- `/search?q={searchTerm}` - Kết quả tìm kiếm
+- `/profile/{userId}` - Trang cá nhân người dùng
+
+## Điều Hướng Modal và Bottom Sheet
+
+```dart
+// Hiển thị modal
+void showFilterOptions() {
+  showModalBottomSheet(
+    context: context,
+    builder: (context) => FilterOptionsSheet(),
+  );
+}
+
+// Hiển thị dialog
+void showConfirmation() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Xác nhận'),
+      content: Text('Bạn có chắc chắn muốn thực hiện?'),
+      actions: [
+        TextButton(
+          child: Text('Hủy'),
+          onPressed: () => Navigator.pop(context),
+        ),
+        TextButton(
+          child: Text('Xác nhận'),
+          onPressed: () {
+            Navigator.pop(context);
+            // Thực hiện hành động
+          },
+        ),
+      ],
+    ),
+  );
+}
+```

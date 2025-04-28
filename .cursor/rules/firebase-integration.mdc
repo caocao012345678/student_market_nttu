@@ -1,0 +1,72 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tích Hợp Firebase - Student Market NTTU
+
+## Các Dịch Vụ Firebase Được Sử Dụng
+
+- **Firestore Database**: Lưu trữ dữ liệu người dùng, sản phẩm, tin nhắn và đơn hàng
+- **Firebase Authentication**: Quản lý đăng nhập và xác thực người dùng
+- **Firebase Storage**: Lưu trữ hình ảnh sản phẩm và avatar người dùng
+- **Firebase Cloud Messaging**: Gửi thông báo đẩy (push notifications)
+- **Firebase Functions**: Xử lý logic phía server và các tác vụ tự động
+
+## Cấu Hình Firebase
+
+- [lib/firebase_options.dart](mdc:lib/firebase_options.dart) - Cấu hình Firebase cho các nền tảng
+- [lib/main.dart](mdc:lib/main.dart) - Khởi tạo Firebase trong hàm `main()`
+- [.firebaserc](mdc:.firebaserc) - Cấu hình project Firebase
+- [firebase.json](mdc:firebase.json) - Cấu hình dịch vụ Firebase
+
+## Schema Firestore
+
+### Collection `users`
+- UID (Document ID): ID người dùng từ Firebase Auth
+- displayName: Tên hiển thị
+- email: Email đăng nhập
+- phoneNumber: Số điện thoại liên hệ
+- photoURL: URL ảnh đại diện
+- createdAt: Thời gian tạo tài khoản
+- role: Vai trò (user, admin)
+
+### Collection `products`
+- id (Document ID): ID sản phẩm
+- name: Tên sản phẩm
+- description: Mô tả chi tiết
+- price: Giá bán
+- images: Danh sách URL hình ảnh
+- category: Danh mục sản phẩm
+- sellerId: ID người bán
+- status: Trạng thái (available, sold)
+- createdAt: Thời gian đăng bán
+
+### Collection `chats`
+- id (Document ID): ID cuộc trò chuyện
+- participants: Mảng ID người tham gia
+- lastMessage: Tin nhắn cuối cùng
+- updatedAt: Thời gian cập nhật cuối
+
+### Collection `orders`
+- id (Document ID): ID đơn hàng
+- buyerId: ID người mua
+- sellerId: ID người bán
+- products: Danh sách sản phẩm trong đơn
+- status: Trạng thái đơn hàng
+- totalAmount: Tổng tiền
+- createdAt: Thời gian tạo đơn
+
+## Bảo Mật Firebase
+
+- [firestore.rules](mdc:firestore.rules) - Quy tắc bảo mật Firestore
+- Mỗi người dùng chỉ có thể đọc/ghi dữ liệu của họ
+- Admin có quyền đọc/ghi toàn bộ dữ liệu
+
+## Tích Hợp Firebase Trong Services
+
+- [lib/services/auth_service.dart](mdc:lib/services/auth_service.dart) - Quản lý xác thực
+- [lib/services/product_service.dart](mdc:lib/services/product_service.dart) - Quản lý sản phẩm
+- [lib/services/chat_service.dart](mdc:lib/services/chat_service.dart) - Quản lý tin nhắn
+- [lib/services/firebase_messaging_service.dart](mdc:lib/services/firebase_messaging_service.dart) - Quản lý thông báo
+

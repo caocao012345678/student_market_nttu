@@ -1,0 +1,188 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Quản Lý Trạng Thái - Student Market NTTU
+
+## Kiến Trúc State Management
+
+Student Market NTTU sử dụng `Provider` kết hợp với `ChangeNotifier` làm giải pháp chính để quản lý trạng thái ứng dụng:
+
+- **Provider Pattern**: Cung cấp và phân phối trạng thái xuống widget tree
+- **ChangeNotifier**: Lớp cơ sở cho tất cả các service class quản lý trạng thái
+- **Consumer & context.watch()**: Lắng nghe và phản ứng với những thay đổi trạng thái
+
+## Cấu Trúc Provider
+
+Các provider được đăng ký tập trung trong [lib/main.dart](mdc:lib/main.dart):
+
+```dart
+void main() async {
+  // ...
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => UserService()),
+        ChangeNotifierProvider(create: (_) => ProductService()),
+        ChangeNotifierProvider(create: (_) => CartService()),
+        // Các provider khác...
+      ],
+      child: MyApp(),
+    ),
+  );
+}
+```
+
+## Các Services
+
+Mỗi service mở rộng từ `ChangeNotifier` và quản lý một phần trạng thái:
+
+### [lib/services/auth_service.dart](mdc:lib/services/auth_service.dart)
+
+```dart
+class AuthService extends ChangeNotifier {
+  User? _currentUser;
+  bool _isLoading = false;
+
+  User? get currentUser => _currentUser;
+  bool get isLoading => _isLoading;
+  bool get isLoggedIn => _currentUser != null;
+
+  Future<void> login(String email, String password) async {
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      // Xử lý logic đăng nhập
+      _currentUser = result.user;
+    } catch (e) {
+      // Xử lý lỗi
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  // Các phương thức khác...
+}
+```
+
+### [lib/services/product_service.dart](mdc:lib/services/product_service.dart)
+
+```dart
+class ProductService extends ChangeNotifier {
+  List<Product> _products = [];
+  bool _isLoading = false;
+  String _errorMessage = '';
+  
+  // Getters
+  List<Product> get products => _products;
+  bool get isLoading => _isLoading;
+  String get errorMessage => _errorMessage;
+  
+  // Methods
+  Future<void> fetchProducts() async {
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      // Logic tải sản phẩm từ Firestore
+      _products = result;
+      _errorMessage = '';
+    } catch (e) {
+      _errorMessage = 'Không thể tải sản phẩm';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  // Các phương thức khác...
+}
+```
+
+## Mẫu Sử Dụng State
+
+### Đọc State
+
+```dart
+// Lấy trạng thái nhưng không lắng nghe thay đổi
+final authService = Provider.of<AuthService>(context, listen: false);
+final currentUser = authService.currentUser;
+
+// Lắng nghe và tự động rebuild khi state thay đổi (Cách 1)
+Consumer<CartService>(
+  builder: (context, cartService, child) {
+    return Text('Tổng: ${cartService.totalAmount} VND');
+  },
+);
+
+// Lắng nghe và tự động rebuild khi state thay đổi (Cách 2)
+final cart = context.watch<CartService>();
+return Text('Số lượng: ${cart.itemCount}');
+```
+
+### Cập Nhật State
+
+```dart
+// Cập nhật state từ widget
+final productService = Provider.of<ProductService>(context, listen: false);
+ElevatedButton(
+  child: Text('Tải lại'),
+  onPressed: () => productService.fetchProducts(),
+)
+
+// Thêm vào giỏ hàng
+void addToCart(Product product) {
+  final cartService = Provider.of<CartService>(context, listen: false);
+  cartService.addItem(product);
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('Đã thêm sản phẩm vào giỏ hàng')),
+  );
+}
+```
+
+## State cho Phân Quyền
+
+```dart
+// Kiểm tra phân quyền trong UI
+Consumer<AuthService>(
+  builder: (context, auth, child) {
+    if (!auth.isLoggedIn) {
+      return LoginButton();
+    }
+    
+    if (auth.currentUser?.role == 'admin') {
+      return AdminPanel();
+    }
+    
+    return UserDashboard();
+  },
+)
+```
+
+## Local State vs Global State
+
+- **Local State**: Sử dụng `StatefulWidget` cho trạng thái chỉ ảnh hưởng đến một màn hình hoặc widget
+- **Global State**: Sử dụng `Provider` cho trạng thái được chia sẻ giữa nhiều màn hình hoặc widget
+
+## Tương Tác Giữa Các Service
+
+Các service có thể tương tác với nhau để đồng bộ trạng thái:
+
+```dart
+class OrderService extends ChangeNotifier {
+  final CartService _cartService;
+  
+  OrderService(this._cartService);
+  
+  Future<void> placeOrder() async {
+    // Xử lý đặt hàng
+    await _createOrder(_cartService.items);
+    _cartService.clearCart(); // Tương tác với CartService
+  }
+}
+```
+

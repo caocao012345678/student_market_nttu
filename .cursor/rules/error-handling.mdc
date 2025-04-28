@@ -1,0 +1,192 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Xử Lý Lỗi - Student Market NTTU
+
+## Nguyên Tắc Xử Lý Lỗi
+
+Ứng dụng Student Market NTTU tuân theo các nguyên tắc xử lý lỗi sau:
+
+1. **Bắt và xử lý lỗi** càng gần nguồn lỗi càng tốt
+2. **Hiển thị thông báo thân thiện** với người dùng, tránh các thông báo kỹ thuật
+3. **Ghi nhật ký lỗi** chi tiết cho mục đích phát triển
+4. **Phân loại lỗi** để xử lý phù hợp (lỗi mạng, lỗi xác thực, lỗi dữ liệu, v.v.)
+
+## Mẫu Xử Lý Lỗi
+
+### Try-Catch Blocks
+
+```dart
+Future<List<Product>> fetchProducts() async {
+  try {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('products')
+        .get();
+    
+    return snapshot.docs
+        .map((doc) => Product.fromFirestore(doc))
+        .toList();
+  } on FirebaseException catch (e) {
+    debugPrint('Lỗi Firebase: ${e.code} - ${e.message}');
+    throw XuLyLoi('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+  } catch (e) {
+    debugPrint('Lỗi không xác định: $e');
+    throw XuLyLoi('Đã có lỗi xảy ra. Vui lòng thử lại sau.');
+  }
+}
+```
+
+### Lớp XuLyLoi
+
+Ứng dụng sử dụng lớp `XuLyLoi` tùy chỉnh để quản lý lỗi:
+
+```dart
+class XuLyLoi implements Exception {
+  final String message;
+  final String? code;
+  final dynamic originalError;
+
+  XuLyLoi(this.message, {this.code, this.originalError});
+
+  @override
+  String toString() => message;
+}
+```
+
+### Xử Lý Lỗi Trong Services
+
+Các service xử lý lỗi và thông báo cho UI thông qua state:
+
+```dart
+class AuthService extends ChangeNotifier {
+  String? _errorMessage;
+  bool _isLoading = false;
+
+  String? get errorMessage => _errorMessage;
+  bool get isLoading => _isLoading;
+
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Logic đăng nhập
+      return true;
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'user-not-found':
+          _errorMessage = 'Tài khoản không tồn tại';
+          break;
+        case 'wrong-password':
+          _errorMessage = 'Mật khẩu không chính xác';
+          break;
+        default:
+          _errorMessage = 'Lỗi đăng nhập: ${e.message}';
+      }
+      return false;
+    } catch (e) {
+      _errorMessage = 'Đã có lỗi xảy ra khi đăng nhập';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+}
+```
+
+### Hiển Thị Lỗi Trong UI
+
+Hiển thị lỗi trong UI một cách nhất quán:
+
+```dart
+Consumer<AuthService>(
+  builder: (context, auth, _) {
+    if (auth.errorMessage != null) {
+      return Container(
+        padding: EdgeInsets.all(8),
+        color: Colors.red.shade100,
+        child: Text(
+          auth.errorMessage!,
+          style: TextStyle(color: Colors.red.shade900),
+        ),
+      );
+    }
+    return SizedBox.shrink();
+  },
+)
+```
+
+### Xử Lý Lỗi Form
+
+Xử lý lỗi validation trong form:
+
+```dart
+TextFormField(
+  decoration: InputDecoration(labelText: 'Email'),
+  validator: (value) {
+    if (value == null || value.isEmpty) {
+      return 'Vui lòng nhập email';
+    }
+    if (!value.contains('@')) {
+      return 'Email không hợp lệ';
+    }
+    return null;
+  },
+  onSaved: (value) => email = value!,
+)
+```
+
+## Xử Lý Lỗi Mạng
+
+```dart
+Future<void> checkNetworkAndProceed(Function() callback) async {
+  try {
+    final result = await InternetAddress.lookup('google.com');
+    if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+      // Kết nối mạng ổn định
+      callback();
+    }
+  } on SocketException catch (_) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Không có kết nối internet. Vui lòng kiểm tra lại.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+```
+
+## Xử Lý Lỗi Hình Ảnh
+
+```dart
+Image.network(
+  product.imageUrl,
+  loadingBuilder: (context, child, loadingProgress) {
+    if (loadingProgress == null) return child;
+    return CircularProgressIndicator();
+  },
+  errorBuilder: (context, error, stackTrace) {
+    debugPrint('Lỗi tải hình ảnh: $error');
+    return Image.asset('assets/images/image_placeholder.png');
+  },
+)
+```
+
+## Log Errors
+
+Sử dụng `FirebaseCrashlytics` để ghi log lỗi:
+
+```dart
+try {
+  // Thao tác có thể gây lỗi
+} catch (e, stackTrace) {
+  debugPrint('Lỗi: $e');
+  FirebaseCrashlytics.instance.recordError(e, stackTrace);
+  // Hiển thị thông báo lỗi cho người dùng
+}
+```
