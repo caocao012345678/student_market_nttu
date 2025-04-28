@@ -4,16 +4,25 @@ import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/screens/change_password_screen.dart';
 import 'package:student_market_nttu/screens/my_products_screen.dart';
 import 'package:student_market_nttu/screens/add_product_screen.dart';
+import 'package:student_market_nttu/screens/admin/admin_home_screen.dart';
+import 'package:student_market_nttu/services/auth_service.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
+import 'package:student_market_nttu/widgets/app_drawer.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
+    final authService = Provider.of<AuthService>(context);
+    final isDarkMode = themeService.isDarkMode;
+    
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cài đặt'),
+      appBar: const CommonAppBar(
+        title: 'Cài đặt',
       ),
+      drawer: const AppDrawer(),
       body: ListView(
         children: [          
           ListTile(

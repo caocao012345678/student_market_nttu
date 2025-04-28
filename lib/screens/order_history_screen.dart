@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/purchase_order.dart';
 import '../services/auth_service.dart';
+import 'package:student_market_nttu/services/order_service.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
+import 'package:student_market_nttu/widgets/app_drawer.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({Key? key}) : super(key: key);
@@ -87,16 +90,19 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lịch sử đơn hàng'),
+      appBar: CommonAppBar(
+        title: 'Lịch sử đơn hàng',
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'Mua'),
-            Tab(text: 'Bán'),
+            Tab(text: 'Đơn mua'),
+            Tab(text: 'Đơn bán'),
           ],
+          labelColor: Colors.white,
+          indicatorColor: Colors.white,
         ),
       ),
+      drawer: const AppDrawer(),
       body: TabBarView(
         controller: _tabController,
         children: [

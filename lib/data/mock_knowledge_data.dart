@@ -1,7 +1,6 @@
 // Dữ liệu mẫu cho cơ sở tri thức của chatbot
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/knowledge_base.dart';
 
 class MockKnowledgeData {
   static final List<Map<String, dynamic>> knowledgeDocuments = [

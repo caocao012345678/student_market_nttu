@@ -5,6 +5,9 @@ import '../models/product.dart';
 import '../services/user_service.dart';
 import '../services/favorites_service.dart';
 import '../widgets/product_card_standard.dart';
+import 'package:student_market_nttu/services/auth_service.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
+import 'package:student_market_nttu/widgets/app_drawer.dart';
 
 class FavoriteProductsScreen extends StatelessWidget {
   const FavoriteProductsScreen({Key? key}) : super(key: key);
@@ -24,133 +27,139 @@ class FavoriteProductsScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sản phẩm yêu thích'),
+      appBar: const CommonAppBar(
+        title: 'Sản phẩm yêu thích',
       ),
-      body: FutureBuilder<List<String>>(
-        future: favoritesService.getUserFavorites(),
-        builder: (context, favoriteIdsSnapshot) {
-          if (favoriteIdsSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
+      drawer: const AppDrawer(),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await favoritesService.getUserFavorites();
+        },
+        child: FutureBuilder<List<String>>(
+          future: favoritesService.getUserFavorites(),
+          builder: (context, favoriteIdsSnapshot) {
+            if (favoriteIdsSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
 
-          if (favoriteIdsSnapshot.hasError) {
-            return Center(
-              child: Text('Lỗi: ${favoriteIdsSnapshot.error}'),
-            );
-          }
+            if (favoriteIdsSnapshot.hasError) {
+              return Center(
+                child: Text('Lỗi: ${favoriteIdsSnapshot.error}'),
+              );
+            }
 
-          final favoriteIds = favoriteIdsSnapshot.data ?? [];
+            final favoriteIds = favoriteIdsSnapshot.data ?? [];
 
-          if (favoriteIds.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite_border,
-                    size: 80,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Bạn chưa có sản phẩm yêu thích nào',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade600,
+            if (favoriteIds.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.favorite_border,
+                      size: 80,
+                      color: Colors.grey.shade400,
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Khám phá sản phẩm ngay'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return FutureBuilder<List<Product>>(
-            future: _getFavoriteProducts(favoriteIds),
-            builder: (context, productsSnapshot) {
-              if (productsSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
-              }
-
-              if (productsSnapshot.hasError) {
-                return Center(
-                  child: Text('Lỗi: ${productsSnapshot.error}'),
-                );
-              }
-
-              final products = productsSnapshot.data ?? [];
-
-              if (products.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.favorite_border,
-                        size: 80,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Không tìm thấy sản phẩm yêu thích nào',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(8.0),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  return Dismissible(
-                    key: Key(products[index].id),
-                    direction: DismissDirection.endToStart,
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20.0),
-                      color: Colors.red,
-                      child: const Icon(
-                        Icons.delete,
-                        color: Colors.white,
+                    const SizedBox(height: 16),
+                    Text(
+                      'Bạn chưa có sản phẩm yêu thích nào',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade600,
                       ),
                     ),
-                    onDismissed: (direction) {
-                      _removeFromFavorites(context, products[index].id);
-                    },
-                    child: ProductCardStandard(
-                      product: products[index],
-                      onFavoriteToggle: () {
-                        // Refresh the screen when a favorite is toggled
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const FavoriteProductsScreen(),
-                          ),
-                        );
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
                       },
+                      child: const Text('Khám phá sản phẩm ngay'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return FutureBuilder<List<Product>>(
+              future: _getFavoriteProducts(favoriteIds),
+              builder: (context, productsSnapshot) {
+                if (productsSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                if (productsSnapshot.hasError) {
+                  return Center(
+                    child: Text('Lỗi: ${productsSnapshot.error}'),
+                  );
+                }
+
+                final products = productsSnapshot.data ?? [];
+
+                if (products.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.favorite_border,
+                          size: 80,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Không tìm thấy sản phẩm yêu thích nào',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
                     ),
                   );
-                },
-              );
-            },
-          );
-        },
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(8.0),
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    return Dismissible(
+                      key: Key(products[index].id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20.0),
+                        color: Colors.red,
+                        child: const Icon(
+                          Icons.delete,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onDismissed: (direction) {
+                        _removeFromFavorites(context, products[index].id);
+                      },
+                      child: ProductCardStandard(
+                        product: products[index],
+                        onFavoriteToggle: () {
+                          // Refresh the screen when a favorite is toggled
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const FavoriteProductsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

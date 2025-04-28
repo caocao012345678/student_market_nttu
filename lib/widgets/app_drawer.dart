@@ -11,6 +11,7 @@ import 'package:student_market_nttu/screens/my_products_screen.dart';
 import 'package:student_market_nttu/screens/order_history_screen.dart';
 import 'package:student_market_nttu/screens/favorite_products_screen.dart';
 import 'package:student_market_nttu/screens/notification_screen.dart';
+import 'package:student_market_nttu/screens/chat_list_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -110,8 +111,6 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           
-          const Divider(),
-          
           ListTile(
             leading: const Icon(Icons.notifications_outlined),
             title: const Text('Thông báo'),
@@ -120,6 +119,18 @@ class AppDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const NotificationScreen()),
+              );
+            },
+          ),
+          
+          ListTile(
+            leading: const Icon(Icons.chat_outlined),
+            title: const Text('Tin nhắn'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatListScreen()),
               );
             },
           ),

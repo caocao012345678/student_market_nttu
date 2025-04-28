@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/screens/add_product_screen.dart';
 import 'package:student_market_nttu/screens/edit_product_screen.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
+import 'package:student_market_nttu/widgets/app_drawer.dart';
 
 class UserProfilePage extends StatefulWidget {
   final String userId;
@@ -133,9 +135,9 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
     final isCurrentUser = authService.user?.uid == widget.userId;
     
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.username ?? 'Trang người dùng'),
-        actions: [
+      appBar: CommonAppBar(
+        title: widget.username ?? 'Trang người dùng',
+        additionalActions: [
           if (!isCurrentUser && authService.user != null)
             _buildFollowButton(),
         ],
@@ -151,6 +153,7 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
           ],
         ),
       ),
+      drawer: const AppDrawer(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(

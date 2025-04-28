@@ -18,6 +18,7 @@ import 'package:student_market_nttu/screens/notification_screen.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/widgets/app_drawer.dart';
 import 'package:student_market_nttu/screens/user_locations_screen.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -59,9 +60,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Cá nhân'),
-        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -88,17 +86,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Trang cá nhân'),
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () {
-              themeService.toggleTheme();
-            },
-          ),
-        ],
-      ),
       drawer: const AppDrawer(),
       body: _buildProfileContent(),
     );

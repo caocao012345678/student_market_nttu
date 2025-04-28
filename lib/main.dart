@@ -8,6 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:student_market_nttu/screens/chatbot_screen.dart';
 import 'package:student_market_nttu/screens/chatbot_help_screen.dart';
 import 'package:student_market_nttu/screens/splash_screen.dart';
+import 'package:student_market_nttu/screens/chat_list_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/services/shipper_service.dart';
@@ -20,8 +21,11 @@ import 'package:student_market_nttu/services/cart_service.dart';
 import 'package:student_market_nttu/services/payment_service.dart';
 import 'package:student_market_nttu/services/category_service.dart';
 import 'package:student_market_nttu/services/chatbot_service.dart';
+import 'package:student_market_nttu/services/chat_service.dart';
+import 'package:student_market_nttu/services/firebase_messaging_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,11 +43,29 @@ void main() async {
     initializeFirebaseWeb(options);
   }
   
+  // Đăng ký locale tiếng Việt cho timeago
+  timeago.setLocaleMessages('vi', timeago.ViMessages());
+  
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    
+    // Khởi tạo dịch vụ thông báo Firebase sau khi widget được xây dựng
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FirebaseMessagingService.initialize(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +82,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CartService()),
         ChangeNotifierProvider(create: (_) => PaymentService()),
         ChangeNotifierProvider(create: (_) => CategoryService()),
+        ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProxyProvider<ProductService, ChatbotService>(
           create: (context) => ChatbotService(Provider.of<ProductService>(context, listen: false)),
           update: (_, productService, previousChatbotService) => 
@@ -140,6 +163,7 @@ class MyApp extends StatelessWidget {
             routes: {
               ChatbotScreen.routeName: (ctx) => const ChatbotScreen(),
               ChatbotHelpScreen.routeName: (ctx) => const ChatbotHelpScreen(),
+              ChatListScreen.routeName: (ctx) => const ChatListScreen(),
             },
           );
         },

@@ -3,14 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:typed_data';
-import '../services/auth_service.dart';
 import '../services/product_service.dart';
 import '../services/category_service.dart';
 import '../services/user_service.dart';
-import '../models/product.dart';
 import '../models/category.dart';
-import '../screens/moderation_result_screen.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({Key? key}) : super(key: key);

@@ -10,6 +10,8 @@ import 'package:student_market_nttu/models/category.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
 import 'package:student_market_nttu/screens/cart_screen.dart';
 import 'package:student_market_nttu/widgets/cart_badge.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
+import 'package:student_market_nttu/widgets/app_drawer.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -154,25 +156,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sản phẩm'),
-        backgroundColor: Colors.blue[900],
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SearchScreen(),
-                ),
-              );
-            },
-          ),
-          CartBadge(),
-        ],
-      ),
+      drawer: const AppDrawer(),
       body: Column(
         children: [
           // Categories in Grid format

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:student_market_nttu/services/user_service.dart';
-import 'package:student_market_nttu/screens/admin/admin_home_screen.dart';
 import 'package:student_market_nttu/screens/profile_screen.dart';
 import 'package:student_market_nttu/screens/cart_screen.dart';
 import 'package:student_market_nttu/screens/settings_screen.dart';
+import 'package:student_market_nttu/screens/admin/admin_home_screen.dart';
+import 'package:student_market_nttu/screens/chat_list_screen.dart';
 
 class MainMenu extends StatefulWidget {
   final int initialIndex;
@@ -168,6 +169,20 @@ class _MainMenuState extends State<MainMenu> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const CartScreen(),
+                      ),
+                    );
+                  },
+                ),
+                
+                ListTile(
+                  leading: const Icon(Icons.chat_outlined),
+                  title: const Text('Tin nhắn'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ChatListScreen(),
                       ),
                     );
                   },

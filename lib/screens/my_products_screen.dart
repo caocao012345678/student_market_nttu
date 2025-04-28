@@ -11,6 +11,8 @@ import 'product_detail_screen.dart';
 import 'add_product_screen.dart';
 import 'moderation_history_screen.dart';
 import 'edit_product_screen.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
+import 'package:student_market_nttu/widgets/app_drawer.dart';
 
 class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({Key? key}) : super(key: key);
@@ -62,9 +64,9 @@ class _MyProductsScreenState extends State<MyProductsScreen> with SingleTickerPr
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sản phẩm của tôi'),
-        actions: [
+      appBar: CommonAppBar(
+        title: 'Sản phẩm của tôi',
+        additionalActions: [
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Lịch sử kiểm duyệt',
@@ -100,6 +102,7 @@ class _MyProductsScreenState extends State<MyProductsScreen> with SingleTickerPr
           isScrollable: true,
         ),
       ),
+      drawer: const AppDrawer(),
       body: Column(
         children: [
           Container(

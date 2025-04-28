@@ -15,9 +15,12 @@ import 'package:student_market_nttu/screens/search_screen.dart';
 import 'package:student_market_nttu/screens/cart_screen.dart';
 import 'package:student_market_nttu/widgets/cart_badge.dart';
 import 'package:student_market_nttu/widgets/chatbot_button.dart';
+import 'package:student_market_nttu/screens/chat_list_screen.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
 
 import '../services/user_service.dart';
 import '../services/cart_service.dart';
+import '../widgets/app_drawer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const HomeContent(),
     const ProductListScreen(),
-    Container(), // Placeholder cho màn hình tin nhắn
+    const ChatListScreen(),
     const NotificationScreen(),
     const ProfileScreen(),
   ];
@@ -54,6 +57,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: const CommonAppBar(
+        title: 'Student Market NTTU',
+      ),
+      drawer: const AppDrawer(),
+      floatingActionButton: const ChatbotButton(),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -137,45 +146,22 @@ class _HomeContentState extends State<HomeContent> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Student Market NTTU'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SearchScreen(),
-                ),
-              );
-            },
-          ),
-          const CartBadge(),
-        ],
-      ),
-      floatingActionButton: const ChatbotButton(),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          // Refresh data
-          setState(() {});
-        },
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildBannerSlider(),
-              _buildRecommendedProducts(),
-              _buildFeaturedShops(),
-              _buildDonorRecognition(),
-              _buildLatestProducts(),
-              const SizedBox(height: 16),
-            ],
-          ),
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Refresh data
+        setState(() {});
+      },
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildBannerSlider(),
+            _buildRecommendedProducts(),
+            _buildFeaturedShops(),
+            _buildDonorRecognition(),
+            _buildLatestProducts(),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );

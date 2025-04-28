@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/user_service.dart';
+import 'package:student_market_nttu/widgets/common_app_bar.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -118,8 +119,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chỉnh sửa hồ sơ'),
+      appBar: const CommonAppBar(
+        title: 'Chỉnh sửa hồ sơ',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

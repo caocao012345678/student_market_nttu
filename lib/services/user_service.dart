@@ -287,8 +287,15 @@ class UserService extends ChangeNotifier {
   }
 
   // Lấy thông tin người dùng theo ID
-  Future<DocumentSnapshot> getUserById(String userId) {
-    return _firestore.collection('users').doc(userId).get();
+  Future<UserModel?> getUserById(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (!doc.exists) return null;
+      return UserModel.fromMap(doc.data()!, userId);
+    } catch (e) {
+      debugPrint('Lỗi khi lấy thông tin người dùng: $e');
+      return null;
+    }
   }
   
   // Kiểm tra xem người dùng hiện tại có đang follow userId không
