@@ -67,7 +67,7 @@ if (pineconeApiKey) {
  */
 function createProductDescription(product) {
   return `
-    Tên sản phẩm: ${product.name}
+    Tên sản phẩm: ${product.title || product.name || 'Không có tên'}
     Giá: ${product.price} VND
     Danh mục: ${product.category || 'Không có'}
     Mô tả: ${product.description || 'Không có mô tả'}
@@ -87,16 +87,36 @@ async function getEmbedding(text) {
       throw new Error('Không có Palm API key');
     }
     
-    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/embedding-gecko-001:embedText';
+    // Thay đổi URL API: textembedding-gecko là model đúng thay vì embedding-gecko
+    // gecko-001 đã bị ngừng hỗ trợ và thay thế bằng các model mới hơn
+    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/textembedding-gecko:embedText';
     
+    console.log('Gọi API tạo embedding với URL:', API_URL);
+    console.log('Độ dài văn bản:', text.length);
+    
+    try {
     const response = await axios.post(
       `${API_URL}?key=${palmApiKey}`,
       {
         text: text,
       }
     );
+      
+      if (!response.data || !response.data.embedding || !response.data.embedding.values) {
+        console.error('Phản hồi API không có cấu trúc mong đợi:', JSON.stringify(response.data));
+        throw new Error('Phản hồi API không đúng định dạng');
+      }
     
     return response.data.embedding.values;
+    } catch (apiError) {
+      console.error('Chi tiết lỗi API:', apiError.response ? {
+        status: apiError.response.status,
+        statusText: apiError.response.statusText,
+        data: apiError.response.data
+      } : apiError.message);
+      
+      throw new Error(`Lỗi khi gọi API embedding: ${apiError.message}`);
+    }
   } catch (error) {
     console.error('Lỗi khi tạo embedding:', error);
     throw new Error('Không thể tạo embedding');
@@ -108,12 +128,18 @@ async function getEmbedding(text) {
  * @param {string} id - ID của document
  * @param {Array<number>} vector - Vector nhúng
  * @param {Object} metadata - Metadata kèm theo
+ * @param {string} namespace - Namespace trong Pinecone
  * @return {Promise<void>}
  */
-async function upsertToPinecone(id, vector, metadata) {
+async function upsertToPinecone(id, vector, metadata, namespace = '') {
   try {
     if (!index) {
       throw new Error('Pinecone client chưa được khởi tạo');
+    }
+    
+    const options = {};
+    if (namespace) {
+      options.namespace = namespace;
     }
     
     await index.upsert({
@@ -124,8 +150,9 @@ async function upsertToPinecone(id, vector, metadata) {
           metadata: metadata,
         },
       ],
+      ...options
     });
-    console.log(`Đã upsert document ${id} vào Pinecone`);
+    console.log(`Đã upsert document ${id} vào Pinecone${namespace ? ` (namespace: ${namespace})` : ''}`);
   } catch (error) {
     console.error('Lỗi khi upsert vào Pinecone:', error);
     throw new Error('Không thể upsert vào Pinecone');
@@ -148,7 +175,7 @@ exports.syncProductToPinecone = functions.firestore
     // Sản phẩm đã bị xóa
     if (!change.after.exists) {
       try {
-        await index.deleteOne(productId);
+        await index.deleteOne(productId, { namespace: 'products' });
         console.log(`Đã xóa sản phẩm ${productId} từ Pinecone`);
         return null;
       } catch (error) {
@@ -161,13 +188,17 @@ exports.syncProductToPinecone = functions.firestore
     const productData = change.after.data();
     const description = createProductDescription(productData);
     
+    // Log dữ liệu sản phẩm để debug
+    console.log(`Đang xử lý sản phẩm: ${productId}`);
+    console.log('Dữ liệu sản phẩm:', JSON.stringify(productData));
+    
     try {
       // Tạo embedding từ mô tả sản phẩm
       const embedding = await getEmbedding(description);
       
       // Chuẩn bị metadata
       const metadata = {
-        name: productData.name,
+        name: productData.title || '',
         price: productData.price,
         category: productData.category || '',
         status: productData.status || 'active',
@@ -178,8 +209,8 @@ exports.syncProductToPinecone = functions.firestore
           : new Date().toISOString(),
       };
       
-      // Upsert vào Pinecone
-      await upsertToPinecone(productId, embedding, metadata);
+      // Upsert vào Pinecone với namespace
+      await upsertToPinecone(productId, embedding, metadata, 'products');
       
       return null;
     } catch (error) {
@@ -231,6 +262,7 @@ exports.findSimilarProducts = functions.https.onCall(async (data) => {
       vector: embedding,
       topK: limit + 1, // +1 vì có thể kết quả bao gồm chính sản phẩm đó
       includeMetadata: true,
+      namespace: 'products'
     });
     
     // Lọc bỏ chính sản phẩm đó nếu có trong kết quả
@@ -298,6 +330,7 @@ exports.searchProductsByText = functions.https.onCall(async (data) => {
       vector: embedding,
       topK: limit,
       includeMetadata: true,
+      namespace: 'products',
       filter: Object.keys(pineconeFilter).length > 0 ? pineconeFilter : undefined,
     });
     
@@ -341,8 +374,8 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
   try {
     // Xóa toàn bộ index (tùy chọn)
     if (data.clearExisting === true) {
-      await index.deleteAll();
-      console.log('Đã xóa toàn bộ index');
+      await index.deleteAll({ namespace: 'products' });
+      console.log('Đã xóa toàn bộ index trong namespace products');
     }
     
     // Lấy tất cả sản phẩm từ Firestore
@@ -370,7 +403,7 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
             
             // Chuẩn bị metadata
             const metadata = {
-              name: productData.name,
+              name: productData.title || productData.name || '',
               price: productData.price,
               category: productData.category || '',
               status: productData.status || 'active',
@@ -382,7 +415,7 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
             };
             
             // Upsert vào Pinecone
-            await upsertToPinecone(productId, embedding, metadata);
+            await upsertToPinecone(productId, embedding, metadata, 'products');
             processedCount++;
             
             return { success: true, id: productId };
@@ -412,10 +445,10 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
       failedDetails: failedResults,
     };
   } catch (error) {
-    console.error('Lỗi khi rebuild Pinecone index:', error);
+    console.error('Lỗi khi đồng bộ lại index:', error);
     throw new functions.https.HttpsError(
       'internal',
-      'Đã xảy ra lỗi khi rebuild Pinecone index'
+      'Đã xảy ra lỗi khi đồng bộ lại index'
     );
   }
 }); 
