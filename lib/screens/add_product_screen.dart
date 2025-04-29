@@ -7,6 +7,9 @@ import '../services/product_service.dart';
 import '../services/category_service.dart';
 import '../services/user_service.dart';
 import '../models/category.dart';
+import '../screens/my_products_screen.dart';
+import '../services/auth_service.dart';
+import '../models/product.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({Key? key}) : super(key: key);
@@ -1007,19 +1010,46 @@ class _AddProductScreenState extends State<AddProductScreen> {
         specifications[entry.key] = entry.value;
       }
       
-      // Thêm sản phẩm với kiểm duyệt
-      final productId = await Provider.of<ProductService>(context, listen: false)
-          .addProductWithModeration(
+      // Xử lý giá nếu là đồ tặng
+      double price = 0;
+      double originalPrice = 0;
+      
+      if (_isGiftItem) {
+        price = 0;
+        originalPrice = 0;
+      } else {
+        price = double.parse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), ''));
+        originalPrice = _originalPriceController.text.isEmpty 
+          ? 0 
+          : double.parse(_originalPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''));
+      }
+      
+      // Lấy thông tin người dùng hiện tại
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userId = authService.currentUser!.uid;
+      
+      // Tạo đối tượng sản phẩm
+      final product = Product(
+        id: '', // ID sẽ được Firebase gán
         title: _titleController.text,
         description: _descriptionController.text,
-        price: double.parse(_priceController.text),
-        category: _selectedCategoryId,
+        price: price,
+        originalPrice: originalPrice,
+        category: _selectedCategoryName, // Sử dụng tên danh mục
         images: imageUrls,
+        sellerId: userId,
+        createdAt: DateTime.now(),
+        quantity: int.parse(_quantityController.text),
         condition: _condition,
         location: _locationController.text,
         tags: _tags,
         specifications: specifications,
+        status: ProductStatus.pending_review, // Sản phẩm cần được duyệt
       );
+      
+      // Thêm sản phẩm vào database
+      final createdProduct = await Provider.of<ProductService>(context, listen: false)
+          .createProduct(product);
       
       setState(() {
         _isLoading = false;
@@ -1027,10 +1057,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
       
       if (!mounted) return;
       
-      // Hiển thị thông báo thành công và rời khỏi màn hình
+      // Hiển thị thông báo thành công
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sản phẩm đã được thêm và đang chờ kiểm duyệt')          
+        const SnackBar(
+          content: Text('Sản phẩm đã được thêm và đang chờ kiểm duyệt'),
+          duration: Duration(seconds: 2),
+        )
+      );
+      
+      // Chuyển hướng đến trang sản phẩm của tôi
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const MyProductsScreen(),
         ),
       );
     } catch (e) {

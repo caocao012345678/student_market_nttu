@@ -9,16 +9,23 @@ import '../models/product.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/moderation_result.dart';
 import '../services/user_service.dart';
+import '../services/ntt_point_service.dart';
 
 class ProductService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final NTTPointService? _nttPointService;
   bool _isLoading = false;
+
+  ProductService({NTTPointService? nttPointService}) : _nttPointService = nttPointService;
 
   bool get isLoading => _isLoading;
 
+  // Hằng số cho loại sản phẩm đồ tặng
+  static const String DONATION_CATEGORY = 'Đồ tặng';
+
   // Create a new product
-  Future<void> createProduct(Product product) async {
+  Future<Product> createProduct(Product product) async {
     try {
       _isLoading = true;
       notifyListeners();
@@ -27,9 +34,22 @@ class ProductService extends ChangeNotifier {
       
       // Update the product with its ID
       await docRef.update({'id': docRef.id});
+      
+      // Xử lý NTTPoint cho sản phẩm đồ tặng
+      if (product.category == DONATION_CATEGORY && _nttPointService != null) {
+        await _nttPointService!.addPointsForDonationProduct(
+          product.sellerId, 
+          docRef.id, 
+          product.title
+        );
+      }
 
+      final createdProduct = product.copyWith(id: docRef.id);
+      
       _isLoading = false;
       notifyListeners();
+      
+      return createdProduct;
     } catch (e) {
       _isLoading = false;
       notifyListeners();
@@ -71,6 +91,47 @@ class ProductService extends ChangeNotifier {
             snapshot.docs.map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList());
   }
 
+  // Update product
+  Future<void> updateProduct(Product product) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      // Lấy sản phẩm cũ để kiểm tra thay đổi danh mục
+      final oldProduct = await getProductById(product.id);
+      
+      // Cập nhật sản phẩm
+      await _firestore.collection('products').doc(product.id).update(product.toMap());
+
+      // Xử lý NTTPoint cho sản phẩm đồ tặng
+      if (_nttPointService != null) {
+        // Nếu sản phẩm mới là đồ tặng và sản phẩm cũ không phải
+        if (product.category == DONATION_CATEGORY && oldProduct.category != DONATION_CATEGORY) {
+          await _nttPointService!.addPointsForDonationProduct(
+            product.sellerId, 
+            product.id, 
+            product.title
+          );
+        } 
+        // Nếu sản phẩm cũ là đồ tặng và sản phẩm mới không phải
+        else if (oldProduct.category == DONATION_CATEGORY && product.category != DONATION_CATEGORY) {
+          await _nttPointService!.deductPointsForDonationProduct(
+            product.sellerId, 
+            product.id, 
+            product.title
+          );
+        }
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      throw e;
+    }
+  }
+
   // Update product status
   Future<void> updateProductStatus(String productId, bool isSold) async {
     try {
@@ -106,6 +167,15 @@ class ProductService extends ChangeNotifier {
         } catch (e) {
           print('Error deleting image: $e');
         }
+      }
+      
+      // Xử lý NTTPoint nếu xóa sản phẩm đồ tặng
+      if (product.category == DONATION_CATEGORY && _nttPointService != null) {
+        await _nttPointService!.deductPointsForDonationProduct(
+          product.sellerId, 
+          productId, 
+          product.title
+        );
       }
 
       // Delete the product document
@@ -1118,7 +1188,7 @@ class ProductService extends ChangeNotifier {
   }
 
   // Update product
-  Future<void> updateProduct({
+  Future<void> updateProductWithFields({
     required String productId,
     required String title,
     required String description,

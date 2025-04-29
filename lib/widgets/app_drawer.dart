@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
+import 'package:student_market_nttu/services/ntt_point_service.dart';
 import 'package:student_market_nttu/screens/home_screen.dart';
 import 'package:student_market_nttu/screens/profile_screen.dart';
 import 'package:student_market_nttu/screens/settings_screen.dart';
@@ -12,6 +13,7 @@ import 'package:student_market_nttu/screens/order_history_screen.dart';
 import 'package:student_market_nttu/screens/favorite_products_screen.dart';
 import 'package:student_market_nttu/screens/notification_screen.dart';
 import 'package:student_market_nttu/screens/chat_list_screen.dart';
+import 'package:student_market_nttu/screens/ntt_point_history_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -22,6 +24,7 @@ class AppDrawer extends StatelessWidget {
     final currentUser = authService.currentUser;
     final themeService = Provider.of<ThemeService>(context);
     final isDarkMode = themeService.isDarkMode;
+    final pointService = Provider.of<NTTPointService>(context);
 
     return Drawer(
       child: ListView(
@@ -131,6 +134,38 @@ class AppDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ChatListScreen()),
+              );
+            },
+          ),
+          
+          ListTile(
+            leading: const Icon(Icons.monetization_on_outlined),
+            title: Row(
+              children: [
+                const Text('NTTPoint'),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${pointService.availablePoints}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NTTPointHistoryScreen()),
               );
             },
           ),

@@ -19,6 +19,7 @@ class PurchaseOrder {
   final String productTitle;
   final String productImage;
   final double price;
+  final double originalPrice; // Giá gốc trước khi áp dụng điểm
   final int quantity;
   final String status;
   final DateTime createdAt;
@@ -28,6 +29,8 @@ class PurchaseOrder {
   final String? note;
   final double? shippingFee;
   final Map<String, dynamic>? paymentDetails;
+  final int pointsUsed; // Số điểm đã sử dụng cho đơn hàng
+  final double discountAmount; // Số tiền giảm từ việc dùng điểm
 
   PurchaseOrder({
     required this.id,
@@ -39,6 +42,7 @@ class PurchaseOrder {
     required this.productTitle,
     required this.productImage,
     required this.price,
+    this.originalPrice = 0.0,
     required this.quantity,
     required this.status,
     required this.createdAt,
@@ -48,6 +52,8 @@ class PurchaseOrder {
     this.note,
     this.shippingFee,
     this.paymentDetails,
+    this.pointsUsed = 0,
+    this.discountAmount = 0.0,
   });
 
   factory PurchaseOrder.fromMap(Map<String, dynamic> map, String id) {
@@ -61,6 +67,7 @@ class PurchaseOrder {
       productTitle: map['productTitle'] ?? '',
       productImage: map['productImage'] ?? '',
       price: (map['price'] ?? 0.0).toDouble(),
+      originalPrice: (map['originalPrice'] ?? map['price'] ?? 0.0).toDouble(),
       quantity: map['quantity'] ?? 1,
       status: map['status'] ?? 'pending',
       createdAt: (map['createdAt'] as Timestamp).toDate(),
@@ -72,6 +79,8 @@ class PurchaseOrder {
       note: map['note'],
       shippingFee: (map['shippingFee'] as num?)?.toDouble(),
       paymentDetails: map['paymentDetails'],
+      pointsUsed: map['pointsUsed'] ?? 0,
+      discountAmount: (map['discountAmount'] ?? 0.0).toDouble(),
     );
   }
 
@@ -85,6 +94,7 @@ class PurchaseOrder {
       'productTitle': productTitle,
       'productImage': productImage,
       'price': price,
+      'originalPrice': originalPrice,
       'quantity': quantity,
       'status': status,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -95,6 +105,8 @@ class PurchaseOrder {
       'note': note,
       'shippingFee': shippingFee,
       'paymentDetails': paymentDetails,
+      'pointsUsed': pointsUsed,
+      'discountAmount': discountAmount,
     };
   }
 
@@ -108,6 +120,7 @@ class PurchaseOrder {
     String? productTitle,
     String? productImage,
     double? price,
+    double? originalPrice,
     int? quantity,
     String? status,
     DateTime? createdAt,
@@ -117,6 +130,8 @@ class PurchaseOrder {
     String? note,
     double? shippingFee,
     Map<String, dynamic>? paymentDetails,
+    int? pointsUsed,
+    double? discountAmount,
   }) {
     return PurchaseOrder(
       id: id ?? this.id,
@@ -128,6 +143,7 @@ class PurchaseOrder {
       productTitle: productTitle ?? this.productTitle,
       productImage: productImage ?? this.productImage,
       price: price ?? this.price,
+      originalPrice: originalPrice ?? this.originalPrice,
       quantity: quantity ?? this.quantity,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -137,6 +153,8 @@ class PurchaseOrder {
       note: note ?? this.note,
       shippingFee: shippingFee ?? this.shippingFee,
       paymentDetails: paymentDetails ?? this.paymentDetails,
+      pointsUsed: pointsUsed ?? this.pointsUsed,
+      discountAmount: discountAmount ?? this.discountAmount,
     );
   }
 } 

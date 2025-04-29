@@ -9,6 +9,7 @@ import 'package:student_market_nttu/screens/chatbot_screen.dart';
 import 'package:student_market_nttu/screens/chatbot_help_screen.dart';
 import 'package:student_market_nttu/screens/splash_screen.dart';
 import 'package:student_market_nttu/screens/chat_list_screen.dart';
+import 'package:student_market_nttu/screens/ntt_point_history_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/services/shipper_service.dart';
@@ -22,6 +23,7 @@ import 'package:student_market_nttu/services/payment_service.dart';
 import 'package:student_market_nttu/services/category_service.dart';
 import 'package:student_market_nttu/services/chatbot_service.dart';
 import 'package:student_market_nttu/services/chat_service.dart';
+import 'package:student_market_nttu/services/ntt_point_service.dart';
 import 'package:student_market_nttu/services/firebase_messaging_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
@@ -73,7 +75,13 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
-        ChangeNotifierProvider(create: (_) => ProductService()),
+        ChangeNotifierProvider(create: (_) => NTTPointService()),
+        ChangeNotifierProxyProvider<NTTPointService, ProductService>(
+          create: (context) => ProductService(
+            nttPointService: Provider.of<NTTPointService>(context, listen: false)),
+          update: (context, nttPointService, previous) => 
+            ProductService(nttPointService: nttPointService),
+        ),
         ChangeNotifierProvider(create: (_) => ReviewService()),
         ChangeNotifierProvider(create: (_) => OrderService()),
         ChangeNotifierProvider(create: (_) => ShipperService()),
@@ -164,6 +172,7 @@ class _MyAppState extends State<MyApp> {
               ChatbotScreen.routeName: (ctx) => const ChatbotScreen(),
               ChatbotHelpScreen.routeName: (ctx) => const ChatbotHelpScreen(),
               ChatListScreen.routeName: (ctx) => const ChatListScreen(),
+              NTTPointHistoryScreen.routeName: (ctx) => const NTTPointHistoryScreen(),
             },
           );
         },

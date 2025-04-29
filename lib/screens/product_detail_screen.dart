@@ -793,7 +793,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton(
-                                      onPressed: _isLoading ? null : () {},
+                                      onPressed: _isLoading ? null : _submitReview,
                                       child: _isLoading
                                           ? const SizedBox(
                                               height: 20,
