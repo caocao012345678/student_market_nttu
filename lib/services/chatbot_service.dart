@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/chat_message.dart';
 import '../models/knowledge_base.dart';
 import '../models/product.dart';
@@ -11,6 +12,7 @@ import './product_service.dart';
 
 class ChatbotService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   ProductService _productService;
   List<ChatMessage> _messages = [];
   bool _isLoading = false;
@@ -19,7 +21,13 @@ class ChatbotService extends ChangeNotifier {
   // Pinecone config
   bool _isPineconeInitialized = false;
   String _pineconeApiUrl = '';
-  String _pineconeIndexName = 'student-market';
+  String _pineconeHost = '';
+  String _pineconeIndexName = '';
+  
+  // Cloud Function API URLs
+  final String _findSimilarProductsUrl = 'https://us-central1-chosinhviennttu.cloudfunctions.net/findSimilarProducts';
+  final String _searchProductsByTextUrl = 'https://us-central1-chosinhviennttu.cloudfunctions.net/searchProductsByText';
+  final String _rebuildPineconeIndexUrl = 'https://us-central1-chosinhviennttu.cloudfunctions.net/rebuildPineconeIndex';
   
   // Constant để lưu danh mục câu hỏi
   final Map<String, List<String>> _questionCategories = {
@@ -72,9 +80,17 @@ class ChatbotService extends ChangeNotifier {
         return;
       }
       
-      _pineconeApiUrl = 'https://${_pineconeIndexName}-${_pineconeEnvironment}.svc.${_pineconeEnvironment}.pinecone.io';
+      _pineconeHost = dotenv.env['PINECONE_HOST'] ?? '';
+      _pineconeIndexName = dotenv.env['PINECONE_INDEX_NAME'] ?? 'student-market-knowledge-data';
+      
+      if (_pineconeHost.isEmpty) {
+        print('PINECONE_HOST not found in environment variables');
+        return;
+      }
+      
+      _pineconeApiUrl = 'https://$_pineconeHost';
       _isPineconeInitialized = true;
-      print('Pinecone initialized with API URL: $_pineconeApiUrl');
+      print('Pinecone initialized with API URL: $_pineconeApiUrl, Index: $_pineconeIndexName');
     } catch (e) {
       print('Error initializing Pinecone: $e');
     }
@@ -468,14 +484,35 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
     try {
       List<Product> products = [];
       
-      // Nếu Pinecone đã được khởi tạo, sử dụng tìm kiếm ngữ nghĩa
-      if (_isPineconeInitialized) {
-        final searchResults = await _findSimilarItemsInPinecone(message, topK: 5);
-        products = searchResults['products'] as List<Product>;
-      }
-      
-      // Nếu không tìm thấy kết quả từ Pinecone hoặc Pinecone chưa khởi tạo, sử dụng phương pháp tìm kiếm cũ
-      if (products.isEmpty) {
+      // Sử dụng Cloud Function để tìm kiếm sản phẩm
+      try {
+        final result = await _functions.httpsCallable('searchProductsByText').call({
+          'query': message,
+          'limit': 5,
+        });
+        
+        if (result.data != null && result.data['results'] != null) {
+          final List<dynamic> searchResults = result.data['results'];
+          products = searchResults.map((item) {
+            return Product(
+              id: item['id'] ?? '',
+              title: item['title'] ?? 'Sản phẩm',
+              description: item['description'] ?? '',
+              category: item['category'] ?? 'Khác',
+              price: double.tryParse(item['price'].toString()) ?? 0.0,
+              sellerId: item['sellerId'] ?? 'unknown',
+              createdAt: DateTime.now(),
+              images: item['imageUrl'] != null ? [item['imageUrl']] : [],
+              tags: item['tags'] != null ? List<String>.from(item['tags']) : [],
+              isSold: false,
+              status: ProductStatus.available,
+            );
+          }).toList();
+        }
+      } catch (e) {
+        print('Error using searchProductsByText: $e');
+        
+        // Fallback: Sử dụng tìm kiếm từ local
         products = await _searchProductsWithKeywords(message);
       }
       
@@ -841,14 +878,35 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
     // Thêm thông tin về sản phẩm nếu có từ khóa liên quan
     List<Product> products = [];
     
-    // Nếu Pinecone đã được khởi tạo, sử dụng tìm kiếm ngữ nghĩa
-    if (_isPineconeInitialized) {
-      final searchResults = await _findSimilarItemsInPinecone(query, topK: 2);
-      products = searchResults['products'] as List<Product>;
-    }
-    
-    // Nếu không tìm thấy kết quả từ Pinecone, sử dụng phương pháp tìm kiếm từ khóa
-    if (products.isEmpty) {
+    // Sử dụng Cloud Function để tìm kiếm sản phẩm
+    try {
+      final result = await _functions.httpsCallable('searchProductsByText').call({
+        'query': query,
+        'limit': 2,
+      });
+      
+      if (result.data != null && result.data['results'] != null) {
+        final List<dynamic> searchResults = result.data['results'];
+        products = searchResults.map((item) {
+          return Product(
+            id: item['id'] ?? '',
+            title: item['title'] ?? 'Sản phẩm',
+            description: item['description'] ?? '',
+            category: item['category'] ?? 'Khác',
+            price: double.tryParse(item['price'].toString()) ?? 0.0,
+            sellerId: item['sellerId'] ?? 'unknown',
+            createdAt: DateTime.now(),
+            images: item['imageUrl'] != null ? [item['imageUrl']] : [],
+            tags: item['tags'] != null ? List<String>.from(item['tags']) : [],
+            isSold: false,
+            status: ProductStatus.available,
+          );
+        }).toList();
+      }
+    } catch (e) {
+      print('Error using searchProductsByText for context: $e');
+      
+      // Fallback: Sử dụng tìm kiếm local
       final keywords = await _extractKeywords(query);
       if (keywords.isNotEmpty) {
         products = await _fetchProductsByKeywords(keywords, limit: 2);
@@ -1061,7 +1119,6 @@ Câu hỏi hiện tại: $query''';
               },
             },
           ],
-          'namespace': 'documents',
         }),
       );
       
@@ -1120,7 +1177,6 @@ Câu hỏi hiện tại: $query''';
               },
             },
           ],
-          'namespace': 'products',
         }),
       );
       
@@ -1157,8 +1213,8 @@ Câu hỏi hiện tại: $query''';
       List<KnowledgeDocument> documents = [];
       List<Product> products = [];
       
-      // Tìm kiếm tài liệu
-      await _searchInNamespace('documents', queryEmbedding, topK).then((matches) {
+      // Tìm kiếm tài liệu trong namespace knowledge
+      await _searchInNamespace('knowledge', queryEmbedding, topK).then((matches) {
         for (final match in matches) {
           final metadata = match['metadata'];
           if (metadata != null) {
@@ -1175,33 +1231,34 @@ Câu hỏi hiện tại: $query''';
         }
       });
       
-      // Tìm kiếm sản phẩm
-      await _searchInNamespace('products', queryEmbedding, topK).then((matches) {
-        for (final match in matches) {
-          final metadata = match['metadata'];
-          if (metadata != null) {
-            try {
-              products.add(Product(
-                id: metadata['id'] ?? '',
-                title: metadata['title'] ?? 'Sản phẩm',
-                description: metadata['description'] ?? '',
-                category: metadata['category'] ?? 'Khác',
-                price: double.tryParse(metadata['price'] ?? '0') ?? 0.0,
-                sellerId: metadata['sellerId'] ?? 'unknown',
-                createdAt: DateTime.now(),
-                images: metadata['imageUrl'] != null && metadata['imageUrl'].toString().isNotEmpty
-                    ? [metadata['imageUrl'].toString()]
-                    : [],
-                tags: [],
-                isSold: false,
-                status: ProductStatus.available,
-              ));
-            } catch (e) {
-              print('Error creating Product from metadata: $e');
-            }
-          }
+      // Tìm kiếm sản phẩm sử dụng Cloud Function
+      try {
+        final result = await _functions.httpsCallable('findSimilarProducts').call({
+          'query': query,
+          'limit': topK,
+        });
+        
+        if (result.data != null && result.data['results'] != null) {
+          final List<dynamic> searchResults = result.data['results'];
+          products = searchResults.map((item) {
+            return Product(
+              id: item['id'] ?? '',
+              title: item['title'] ?? 'Sản phẩm',
+              description: item['description'] ?? '',
+              category: item['category'] ?? 'Khác',
+              price: double.tryParse(item['price'].toString()) ?? 0.0,
+              sellerId: item['sellerId'] ?? 'unknown',
+              createdAt: DateTime.now(),
+              images: item['imageUrl'] != null ? [item['imageUrl']] : [],
+              tags: item['tags'] != null ? List<String>.from(item['tags']) : [],
+              isSold: false,
+              status: ProductStatus.available,
+            );
+          }).toList();
         }
-      });
+      } catch (e) {
+        print('Error using findSimilarProducts: $e');
+      }
       
       return {
         'documents': documents,
@@ -1218,19 +1275,36 @@ Câu hỏi hiện tại: $query''';
     try {
       final url = '$_pineconeApiUrl/query';
       
+      // Tạo payload query mà không sử dụng namespace
+      final Map<String, dynamic> payload = {
+        'vector': queryVector,
+        'topK': topK,
+        'includeMetadata': true,
+        'includeValues': false,
+      };
+      
+      // Thêm bộ lọc metadata.type để thay thế cho namespace
+      if (namespace == 'knowledge') {
+        payload['filter'] = {
+          'metadata': {
+            'type': 'document'
+          }
+        };
+      } else if (namespace == 'products') {
+        payload['filter'] = {
+          'metadata': {
+            'type': 'product'
+          }
+        };
+      }
+      
       final response = await http.post(
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Api-Key': _pineconeApiKey,
         },
-        body: jsonEncode({
-          'vector': queryVector,
-          'topK': topK,
-          'includeMetadata': true,
-          'includeValues': false,
-          'namespace': namespace,
-        }),
+        body: jsonEncode(payload),
       );
       
       if (response.statusCode == 200) {

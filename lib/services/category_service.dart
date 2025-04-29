@@ -73,29 +73,6 @@ class CategoryService extends ChangeNotifier {
 
       // Filter chỉ lấy những danh mục active
       _activeCategories = _categories.where((cat) => cat.isActive).toList();
-      
-      // Kiểm tra xem có danh mục "Đồ tặng" không
-      bool hasGiftCategory = _activeCategories.any((cat) => cat.name == 'Đồ tặng');
-      
-      // Nếu chưa có, tạo danh mục "Đồ tặng" mới
-      if (!hasGiftCategory) {
-        print("CategoryService: Thêm danh mục Đồ tặng");
-        await addGiftCategory();
-        
-        // Cập nhật lại danh sách local
-        final giftCat = await _firestore
-            .collection('categories')
-            .where('name', isEqualTo: 'Đồ tặng')
-            .limit(1)
-            .get();
-            
-        if (giftCat.docs.isNotEmpty) {
-          final giftCategory = Category.fromMap(giftCat.docs.first.data(), giftCat.docs.first.id);
-          _categories.add(giftCategory);
-          _activeCategories.add(giftCategory);
-        }
-      }
-
       _isLoading = false;
       notifyListeners();
       print("CategoryService: Tải danh mục thành công");
@@ -114,16 +91,7 @@ class CategoryService extends ChangeNotifier {
             color: Colors.blue,
             createdAt: DateTime.now(),
             description: 'Danh mục mặc định khi không thể tải danh mục',
-          ),
-          Category(
-            id: 'gift',
-            name: 'Đồ tặng',
-            iconName: 'gift',
-            icon: Icons.card_giftcard,
-            color: Colors.green,
-            createdAt: DateTime.now(),
-            description: 'Các sản phẩm được tặng miễn phí',
-          ),
+          )
         ];
         _activeCategories = List.from(_categories);
       }
@@ -172,48 +140,7 @@ class CategoryService extends ChangeNotifier {
   List<Category> getParentCategories() {
     return _categories.where((category) => 
       category.parentId.isEmpty && category.isActive).toList();
-  }
-
-  // Thêm danh mục "Đồ tặng" nếu chưa có
-  Future<void> addGiftCategory() async {
-    try {
-      // Tạo dữ liệu danh mục
-      final giftCategory = {
-        'name': 'Đồ tặng',
-        'description': 'Các sản phẩm được tặng miễn phí',
-        'icon': 'gift',
-        'iconName': 'gift',
-        'color': '#4CAF50', // Màu xanh lá
-        'isActive': true,
-        'parentId': '',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      
-      // Thêm vào Firestore
-      final docRef = await _firestore.collection('categories').add(giftCategory);
-      
-      // Thêm vào danh sách local
-      final newCategory = Category(
-        id: docRef.id,
-        name: 'Đồ tặng',
-        description: 'Các sản phẩm được tặng miễn phí',
-        icon: Icons.card_giftcard,
-        iconName: 'gift',
-        color: Colors.green,
-        isActive: true,
-        parentId: '',
-        createdAt: DateTime.now(),
-      );
-      
-      _categories.add(newCategory);
-      _activeCategories.add(newCategory);
-      
-      notifyListeners();
-    } catch (e) {
-      print('Lỗi khi thêm danh mục Đồ tặng: $e');
-    }
-  }
+  }  
 
   // Tìm kiếm danh mục theo từ khóa
   List<Category> searchCategories(String query) {
@@ -372,7 +299,7 @@ class CategoryService extends ChangeNotifier {
         {
           'name': 'Thể thao & Giải trí',
           'iconName': 'sports',
-          'color': Colors.green.value,
+          'color': Colors.deepOrange.value,
           'parentId': '',
           'description': 'Dụng cụ thể thao và giải trí',
         },
@@ -386,7 +313,7 @@ class CategoryService extends ChangeNotifier {
         {
           'name': 'Đồ tặng',
           'iconName': 'gift',
-          'color': Colors.deepOrange.value,
+          'color': Colors.green.value,
           'parentId': '',
           'description': 'Các sản phẩm được tặng miễn phí',
         },
@@ -487,5 +414,24 @@ class CategoryService extends ChangeNotifier {
       notifyListeners();
       print('Error seeding default categories: $e');
     }
+  }
+
+  // Lấy tên danh mục từ ID
+  String getCategoryName(String categoryId) {
+    if (categoryId == 'all') return 'Tất cả';
+    
+    final category = _categories.firstWhere(
+      (cat) => cat.id == categoryId,
+      orElse: () => Category(
+        id: categoryId, 
+        name: categoryId, // Sử dụng ID làm tên nếu không tìm thấy
+        iconName: 'category',
+        icon: Icons.category,
+        color: Colors.grey,
+        createdAt: DateTime.now()
+      )
+    );
+    
+    return category.name;
   }
 } 

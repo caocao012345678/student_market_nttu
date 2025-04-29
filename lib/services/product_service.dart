@@ -16,6 +16,7 @@ class ProductService extends ChangeNotifier {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final NTTPointService? _nttPointService;
   bool _isLoading = false;
+  bool _disposed = false;
 
   ProductService({NTTPointService? nttPointService}) : _nttPointService = nttPointService;
 
@@ -27,8 +28,10 @@ class ProductService extends ChangeNotifier {
   // Create a new product
   Future<Product> createProduct(Product product) async {
     try {
-      _isLoading = true;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = true;
+        notifyListeners();
+      }
 
       final docRef = await _firestore.collection('products').add(product.toMap());
       
@@ -46,13 +49,17 @@ class ProductService extends ChangeNotifier {
 
       final createdProduct = product.copyWith(id: docRef.id);
       
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
       
       return createdProduct;
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
       throw e;
     }
   }
@@ -94,8 +101,10 @@ class ProductService extends ChangeNotifier {
   // Update product
   Future<void> updateProduct(Product product) async {
     try {
-      _isLoading = true;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = true;
+        notifyListeners();
+      }
 
       // Lấy sản phẩm cũ để kiểm tra thay đổi danh mục
       final oldProduct = await getProductById(product.id);
@@ -123,11 +132,15 @@ class ProductService extends ChangeNotifier {
         }
       }
 
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
       throw e;
     }
   }
@@ -567,61 +580,79 @@ class ProductService extends ChangeNotifier {
             snapshot.docs.map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList());
   }
 
-  // Get products by category
-  Stream<List<Product>> getProductsByCategory(String categoryId, {String? sortBy}) {
-    Query query;
-    bool needsClientSideSorting = false;
-    bool priceAscending = false;
+  // Lấy sản phẩm theo danh mục
+  Stream<List<Product>> getProductsByCategory(String categoryId, {String sortBy = 'newest'}) {
+    print('Đang tìm kiếm sản phẩm theo danh mục ID: $categoryId với sortBy: $sortBy');
     
+    // Nếu danh mục là "all" thì không lọc theo danh mục
     if (categoryId == 'all') {
-      query = _firestore
-        .collection('products')
-        .where('isSold', isEqualTo: false)
-        .where('status', whereNotIn: ['pending_review', 'rejected']);
-    } else {
-      query = _firestore
-        .collection('products')
-        .where('category', isEqualTo: categoryId)
-        .where('isSold', isEqualTo: false)
-        .where('status', whereNotIn: ['pending_review', 'rejected']);
-    }
-    
-    // Check if sorting by price (will be done client-side)
-    if (sortBy == 'price_asc' || sortBy == 'price_desc') {
-      needsClientSideSorting = true;
-      priceAscending = sortBy == 'price_asc';
-      // Default ordering for fetching data
-      query = query.orderBy('createdAt', descending: true);
-    } else {
-      // Apply server-side sorting for non-price fields
-      switch (sortBy) {
-        case 'newest':
-          query = query.orderBy('createdAt', descending: true);
-          break;
-        case 'oldest':
-          query = query.orderBy('createdAt', descending: false);
-          break;
-        default:
-          query = query.orderBy('createdAt', descending: true);
+      print('Tìm kiếm tất cả danh mục');
+      
+      Query query = _firestore.collection('products')
+          .where('isSold', isEqualTo: false)
+          .where('status', whereIn: ['available', 'verified']);
+      
+      // Sắp xếp cho trường hợp "Tất cả"
+      if (sortBy == 'newest') {
+        query = query.orderBy('createdAt', descending: true);
+      } else if (sortBy == 'price_asc') {
+        query = query.orderBy('price', descending: false);
+      } else if (sortBy == 'price_desc') {
+        query = query.orderBy('price', descending: true);
       }
+      
+      return query.snapshots().map((snapshot) {
+        final products = snapshot.docs.map((doc) {
+          return Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+        }).toList();
+        
+        print('Tìm thấy ${products.length} sản phẩm từ tất cả danh mục');
+        return products;
+      });
+    } else {
+      // Lấy tất cả sản phẩm
+      return _firestore.collection('products')
+          .where('isSold', isEqualTo: false)
+          .where('status', whereIn: ['available', 'verified'])
+          .snapshots()
+          .asyncMap((snapshot) async {
+            // Tìm tên danh mục từ ID
+            String categoryName = categoryId;
+            try {
+              final categoryDoc = await _firestore.collection('categories').doc(categoryId).get();
+              if (categoryDoc.exists && categoryDoc.data() != null) {
+                String? name = categoryDoc.data()!['name'];
+                if (name != null && name.isNotEmpty) {
+                  categoryName = name;
+                  print('Tìm thấy tên danh mục: $categoryName từ ID: $categoryId');
+                }
+              }
+            } catch (e) {
+              print('Lỗi khi tìm tên danh mục: $e');
+            }
+            
+            // Lọc sản phẩm theo tên danh mục
+            final allProducts = snapshot.docs.map((doc) => 
+              Product.fromMap(doc.data() as Map<String, dynamic>, doc.id)
+            ).toList();
+            
+            final filteredProducts = allProducts.where((product) {
+              return product.category == categoryName;
+            }).toList();
+            
+            // Sắp xếp sản phẩm
+            if (sortBy == 'newest') {
+              filteredProducts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            } else if (sortBy == 'price_asc') {
+              filteredProducts.sort((a, b) => a.price.compareTo(b.price));
+            } else if (sortBy == 'price_desc') {
+              filteredProducts.sort((a, b) => b.price.compareTo(a.price));
+            }
+            
+            print('Tìm thấy ${filteredProducts.length} sản phẩm thuộc danh mục: $categoryName (ID: $categoryId)');
+            return filteredProducts;
+          });
     }
-    
-    return query
-        .snapshots()
-        .map((snapshot) {
-          List<Product> products = snapshot.docs
-              .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-              .toList();
-          
-          // Apply client-side sorting for price if needed
-          if (needsClientSideSorting) {
-            products.sort((a, b) => priceAscending 
-                ? a.price.compareTo(b.price) 
-                : b.price.compareTo(a.price));
-          }
-          
-          return products;
-        });
   }
 
   Stream<List<Product>> getRelatedProducts({
@@ -667,6 +698,11 @@ class ProductService extends ChangeNotifier {
         throw Exception('Người dùng chưa đăng nhập');
       }
 
+      if (!_disposed) {
+        _isLoading = true;
+        notifyListeners();
+      }
+
       // Tạo ID mới cho sản phẩm
       final String productId = _firestore.collection('products').doc().id;
       
@@ -698,11 +734,29 @@ class ProductService extends ChangeNotifier {
       // Lưu sản phẩm vào Firestore
       await _firestore.collection('products').doc(productId).set(newProduct.toMap());
       
+      // Xử lý NTTPoint cho sản phẩm đồ tặng
+      if (category == DONATION_CATEGORY && _nttPointService != null) {
+        await _nttPointService!.addPointsForDonationProduct(
+          user.uid, 
+          productId, 
+          title
+        );
+      }
+      
       // Yêu cầu kiểm duyệt sản phẩm (thông qua Cloud Function hoặc gọi trực tiếp)
       await _requestProductModeration(productId, newProduct);
       
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
+      
       return productId;
     } catch (e) {
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
       throw Exception('Lỗi khi thêm sản phẩm: $e');
     }
   }
@@ -1203,8 +1257,10 @@ class ProductService extends ChangeNotifier {
     Map<String, String> specifications = const {},
   }) async {
     try {
-      _isLoading = true;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = true;
+        notifyListeners();
+      }
 
       final productData = {
         'title': title,
@@ -1223,11 +1279,15 @@ class ProductService extends ChangeNotifier {
 
       await _firestore.collection('products').doc(productId).update(productData);
 
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
       throw e;
     }
   }
@@ -1264,5 +1324,12 @@ class ProductService extends ChangeNotifier {
       debugPrint('Lỗi khi tìm kiếm sản phẩm theo từ khóa: $e');
       throw e;
     }
+  }
+
+  // Thêm phương thức override dispose để đánh dấu service đã bị hủy
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 } 

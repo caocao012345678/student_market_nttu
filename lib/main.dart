@@ -25,6 +25,10 @@ import 'package:student_market_nttu/services/chatbot_service.dart';
 import 'package:student_market_nttu/services/chat_service.dart';
 import 'package:student_market_nttu/services/ntt_point_service.dart';
 import 'package:student_market_nttu/services/firebase_messaging_service.dart';
+import 'package:student_market_nttu/services/knowledge_base_service.dart';
+// import 'package:student_market_nttu/services/notification_service.dart';
+// import 'package:student_market_nttu/services/search_service.dart';
+// import 'package:student_market_nttu/services/messaging_service.dart';
 import 'package:student_market_nttu/utils/web_utils.dart' if (dart.library.html) 'package:student_market_nttu/utils/web_utils_web.dart';
 import 'firebase_options.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -91,6 +95,10 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => PaymentService()),
         ChangeNotifierProvider(create: (_) => CategoryService()),
         ChangeNotifierProvider(create: (_) => ChatService()),
+        // ChangeNotifierProvider(create: (_) => NotificationService()),
+        // ChangeNotifierProvider(create: (_) => SearchService()),
+        // ChangeNotifierProvider(create: (_) => MessagingService()),
+        ChangeNotifierProvider(create: (_) => KnowledgeBaseService()),
         ChangeNotifierProxyProvider<ProductService, ChatbotService>(
           create: (context) => ChatbotService(Provider.of<ProductService>(context, listen: false)),
           update: (_, productService, previousChatbotService) => 

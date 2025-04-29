@@ -507,7 +507,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                           CircleAvatar(
                             radius: 18,
                             backgroundImage: widget.product.sellerAvatar.isNotEmpty
-                                ? NetworkImage(widget.product.sellerAvatar)
+                                ? CachedNetworkImageProvider(widget.product.sellerAvatar) as ImageProvider
                                 : null,
                             child: widget.product.sellerAvatar.isEmpty
                                 ? const Icon(Icons.person, size: 18)
@@ -518,12 +518,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  widget.product.sellerName.isNotEmpty
-                                      ? widget.product.sellerName
-                                      : 'Người bán',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    widget.product.sellerName.isNotEmpty
+                                        ? widget.product.sellerName
+                                        : 'Người bán',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 if (widget.product.location.isNotEmpty)
@@ -556,11 +559,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                             child: const Text('Xem shop', style: TextStyle(fontSize: 12)),
                           ),
                         ],
-                      ),
-                      // Related Products Section
-                      RelatedProductsSection(
-                        category: widget.product.category,
-                        excludeProductId: widget.product.id,
                       ),
                       const SizedBox(height: 24),
                     ],

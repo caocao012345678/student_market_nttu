@@ -26,8 +26,7 @@ const pineconeApiKey = (config && config.pinecone && config.pinecone.api_key) ||
   process.env.PINECONE_API_KEY || '';
 const pineconeHost = (config && config.pinecone && config.pinecone.host) || 
   process.env.PINECONE_HOST || '';
-const pineconeIndexName = (config && config.pinecone && config.pinecone.index_name) || 
-  process.env.PINECONE_INDEX_NAME || 'student-market';
+const pineconeIndexName = process.env.PINECONE_INDEX_NAME || '';
 
 // In ra các giá trị để debug
 console.log('Gemini API Key:', geminiApiKey ? 'Đã thiết lập' : 'Chưa thiết lập');
@@ -193,11 +192,7 @@ async function upsertToPinecone(id, vector, metadata, namespace = '') {
       id: String(id),
       values: vector,
       metadata: safeMetadata
-    }];
-    
-    // Log đối tượng upsert đầy đủ - ĐẢM BẢO DÒNG NÀY XUẤT HIỆN TRONG LOG CÙNG VỚI LỖI
-    console.log('--- DEBUG: Đối tượng Upsert đầy đủ ---', JSON.stringify(upsertData, null, 2));
-    
+    }];    
     // Thực hiện upsert - API phiên bản 5.1.2 nhận trực tiếp mảng vector records
     const upsertOptions = {};
     if (namespace) {

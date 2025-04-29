@@ -272,11 +272,16 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                 if (!widget.isCompact)
                   Row(
                     children: [
+                      // Sử dụng CircleAvatar với CachedNetworkImageProvider cho avatar
                       CircleAvatar(
                         radius: 10,
                         backgroundImage: widget.product.sellerAvatar.isNotEmpty
-                            ? NetworkImage(widget.product.sellerAvatar) as ImageProvider
-                            : const AssetImage('assets/images/avatar_placeholder.png'),
+                            ? CachedNetworkImageProvider(widget.product.sellerAvatar) as ImageProvider
+                            : null,
+                        backgroundColor: Colors.grey[200],
+                        child: widget.product.sellerAvatar.isEmpty
+                            ? const Icon(Icons.store, size: 10, color: Colors.grey)
+                            : null,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -532,31 +537,44 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
   }
   
   Widget _buildProductImage() {
-    return Hero(
-      tag: 'product-${widget.product.id}',
-      child: CachedNetworkImage(
-        imageUrl: widget.product.images.isNotEmpty
-            ? widget.product.images.first
-            : 'https://via.placeholder.com/300',
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: Colors.grey[200],
-          child: const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
+    return widget.product.images.isNotEmpty
+        ? CachedNetworkImage(
+            imageUrl: widget.product.images.first,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Center(
+              child: Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey[200],
-          child: const Icon(Icons.error),
-        ),
-      ),
-    );
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey[200],
+              child: const Icon(
+                Icons.image_not_supported,
+                color: Colors.grey,
+              ),
+            ),
+            // Thêm options để cải thiện hiển thị
+            memCacheWidth: 400,
+            memCacheHeight: 400,
+            maxWidthDiskCache: 800,
+            maxHeightDiskCache: 800,
+          )
+        : Container(
+            color: Colors.grey[200],
+            child: const Icon(
+              Icons.image_not_supported,
+              color: Colors.grey,
+            ),
+          );
   }
   
   Widget _buildSoldOverlay() {
