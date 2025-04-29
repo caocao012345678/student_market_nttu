@@ -8,8 +8,9 @@ require('dotenv').config();
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const axios = require('axios');
-// const { GoogleGenerativeAI } = require('@google/generative-ai');
+// Không còn sử dụng axios nên có thể xóa import
+// const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { Pinecone } = require('@pinecone-database/pinecone');
 
 // Khởi tạo ứng dụng Firebase Admin
@@ -19,45 +20,54 @@ const db = admin.firestore();
 // Đọc cấu hình an toàn
 const config = functions.config();
 // Biến cấu hình với giá trị dự phòng
-// Hiện không cần geminiApiKey vì không sử dụng Google Generative AI
-// const geminiApiKey = (config && config.gemini && config.gemini.api_key) || 
-//   process.env.GEMINI_API_KEY || '';
+const geminiApiKey = (config && config.gemini && config.gemini.api_key) || 
+  process.env.GEMINI_API_KEY || '';
 const pineconeApiKey = (config && config.pinecone && config.pinecone.api_key) || 
   process.env.PINECONE_API_KEY || '';
-const pineconeEnv = (config && config.pinecone && config.pinecone.environment) || 
-  process.env.PINECONE_ENVIRONMENT || 'gcp-starter';
+const pineconeHost = (config && config.pinecone && config.pinecone.host) || 
+  process.env.PINECONE_HOST || '';
 const pineconeIndexName = (config && config.pinecone && config.pinecone.index_name) || 
   process.env.PINECONE_INDEX_NAME || 'student-market';
-const palmApiKey = (config && config.google && config.google.palm_api_key) || 
-  process.env.PALM_API_KEY || '';
 
 // In ra các giá trị để debug
+console.log('Gemini API Key:', geminiApiKey ? 'Đã thiết lập' : 'Chưa thiết lập');
 console.log('Pinecone API Key:', pineconeApiKey ? 'Đã thiết lập' : 'Chưa thiết lập');
-console.log('Pinecone Environment:', pineconeEnv);
+console.log('Pinecone Host:', pineconeHost);
 console.log('Pinecone Index Name:', pineconeIndexName);
 
-// Khởi tạo Google AI cho Embeddings hiện không cần thiết
-// const genAI = new GoogleGenerativeAI(geminiApiKey);
-// const embeddingModel = genAI.getGenerativeModel({ model: 'embedding-001' });
+// Khởi tạo Google AI cho Embeddings 
+let genAI = null;
+let embeddingModel = null;
+if (geminiApiKey) {
+  try {
+    genAI = new GoogleGenerativeAI(geminiApiKey);
+    embeddingModel = genAI.getGenerativeModel({ model: 'embedding-001' });
+    console.log('Google Generative AI đã được khởi tạo thành công');
+  } catch (error) {
+    console.error('Lỗi khi khởi tạo Google Generative AI:', error);
+  }
+} else {
+  console.warn('Thiếu Gemini API key, các tính năng liên quan đến embedding sẽ không hoạt động');
+}
 
 // Khởi tạo Pinecone client nếu có API key
 let pinecone;
 let index;
-if (pineconeApiKey) {
+if (pineconeApiKey && pineconeHost) {
   try {
+    // Khởi tạo theo API phiên bản 5.1.2
     pinecone = new Pinecone({
       apiKey: pineconeApiKey,
-      environment: pineconeEnv,
     });
     
     // Lấy index từ Pinecone
-    index = pinecone.index(pineconeIndexName);
+    index = pinecone.Index(pineconeIndexName);
     console.log('Pinecone client đã được khởi tạo thành công');
   } catch (error) {
     console.error('Lỗi khi khởi tạo Pinecone client:', error);
   }
 } else {
-  console.warn('Thiếu Pinecone API key, các tính năng liên quan đến Pinecone sẽ không hoạt động');
+  console.warn('Thiếu Pinecone API key hoặc Host URL, các tính năng liên quan đến Pinecone sẽ không hoạt động');
 }
 
 /**
@@ -77,44 +87,57 @@ function createProductDescription(product) {
 }
 
 /**
- * Hàm gọi API để nhúng văn bản thành vector
+ * Hàm tạo embedding sử dụng Google Generative AI SDK với mô hình embedding-001
  * @param {string} text - Văn bản cần nhúng
  * @return {Promise<Array<number>>} - Vector nhúng
  */
-async function getEmbedding(text) {
+async function createEmbedding(text) {
   try {
-    if (!palmApiKey) {
-      throw new Error('Không có Palm API key');
+    if (!embeddingModel) {
+      throw new Error('Google Generative AI embeddingModel chưa được khởi tạo');
     }
     
-    // Thay đổi URL API: textembedding-gecko là model đúng thay vì embedding-gecko
-    // gecko-001 đã bị ngừng hỗ trợ và thay thế bằng các model mới hơn
-    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/textembedding-gecko:embedText';
-    
-    console.log('Gọi API tạo embedding với URL:', API_URL);
+    console.log('Tạo embedding với GoogleGenerativeAI SDK');
     console.log('Độ dài văn bản:', text.length);
     
     try {
-    const response = await axios.post(
-      `${API_URL}?key=${palmApiKey}`,
-      {
-        text: text,
-      }
-    );
+      // Tạo embedding
+      const result = await embeddingModel.embedContent(text);
       
-      if (!response.data || !response.data.embedding || !response.data.embedding.values) {
-        console.error('Phản hồi API không có cấu trúc mong đợi:', JSON.stringify(response.data));
-        throw new Error('Phản hồi API không đúng định dạng');
+      // Kiểm tra cấu trúc phản hồi
+      console.log('Cấu trúc phản hồi embedding:', JSON.stringify(result, null, 2));
+      
+      // Đảm bảo có giá trị embedding và values
+      let embedding = [];
+      
+      if (result && result.embedding && Array.isArray(result.embedding.values)) {
+        embedding = result.embedding.values;
+      } else if (result && result.embedding && typeof result.embedding === 'object') {
+        // Trường hợp embedding không có thuộc tính values nhưng là một đối tượng
+        console.log('Cấu trúc embedding khác mong đợi, kiểm tra thuộc tính');
+        // Thử lấy trường đầu tiên chứa dữ liệu mảng
+        for (const key in result.embedding) {
+          if (Array.isArray(result.embedding[key])) {
+            embedding = result.embedding[key];
+            console.log(`Đã tìm thấy mảng giá trị trong thuộc tính ${key}`);
+            break;
+          }
+        }
+      } else if (result && Array.isArray(result)) {
+        // Trường hợp kết quả trực tiếp là một mảng
+        embedding = result;
       }
-    
-    return response.data.embedding.values;
+      
+      // Kiểm tra kết quả cuối cùng
+      if (!Array.isArray(embedding) || embedding.length === 0) {
+        console.error('Không thể lấy vector embedding từ phản hồi:', result);
+        throw new Error('Phản hồi từ API không chứa vector embedding hợp lệ');
+      }
+      
+      console.log(`Đã nhận được vector embedding với ${embedding.length} phần tử`);
+      return embedding;
     } catch (apiError) {
-      console.error('Chi tiết lỗi API:', apiError.response ? {
-        status: apiError.response.status,
-        statusText: apiError.response.statusText,
-        data: apiError.response.data
-      } : apiError.message);
-      
+      console.error('Chi tiết lỗi API:', apiError);
       throw new Error(`Lỗi khi gọi API embedding: ${apiError.message}`);
     }
   } catch (error) {
@@ -137,25 +160,76 @@ async function upsertToPinecone(id, vector, metadata, namespace = '') {
       throw new Error('Pinecone client chưa được khởi tạo');
     }
     
-    const options = {};
-    if (namespace) {
-      options.namespace = namespace;
+    // Kiểm tra vector phải là mảng
+    if (!Array.isArray(vector)) {
+      console.error('Vector không phải là một mảng. Kiểu dữ liệu:', typeof vector);
+      throw new Error('Vector phải là một mảng số');
+    }
+
+    // Kiểm tra vector phải chứa các số
+    if (vector.length === 0 || vector.some(val => typeof val !== 'number')) {
+      console.error('Vector chứa giá trị không hợp lệ. Độ dài:', vector.length);
+      throw new Error('Vector phải chứa các giá trị số');
     }
     
-    await index.upsert({
-      vectors: [
-        {
-          id: id,
-          values: vector,
-          metadata: metadata,
-        },
-      ],
-      ...options
-    });
-    console.log(`Đã upsert document ${id} vào Pinecone${namespace ? ` (namespace: ${namespace})` : ''}`);
+    // Đảm bảo metadata là object và không chứa giá trị không hợp lệ
+    const safeMetadata = {};
+    if (metadata) {
+      // Chỉ lấy các trường cần thiết và đảm bảo kiểu dữ liệu đúng
+      if (metadata.name !== undefined) safeMetadata.name = String(metadata.name || '');
+      if (metadata.price !== undefined) safeMetadata.price = Number(metadata.price || 0);
+      if (metadata.category !== undefined) safeMetadata.category = String(metadata.category || '');
+      if (metadata.status !== undefined) safeMetadata.status = String(metadata.status || 'active');
+      if (metadata.sellerId !== undefined) safeMetadata.sellerId = String(metadata.sellerId || '');
+      if (metadata.sellerName !== undefined) safeMetadata.sellerName = String(metadata.sellerName || '');
+      if (metadata.createdAt !== undefined) safeMetadata.createdAt = String(metadata.createdAt || '');
+    }
+    
+    console.log(`Đang upsert document ${id} với vector ${vector.length} phần tử`);
+    console.log('SafeMetadata:', JSON.stringify(safeMetadata));
+    
+    // Cấu trúc upsert cho phiên bản SDK 5.1.2
+    const upsertData = [{
+      id: String(id),
+      values: vector,
+      metadata: safeMetadata
+    }];
+    
+    // Log đối tượng upsert đầy đủ - ĐẢM BẢO DÒNG NÀY XUẤT HIỆN TRONG LOG CÙNG VỚI LỖI
+    console.log('--- DEBUG: Đối tượng Upsert đầy đủ ---', JSON.stringify(upsertData, null, 2));
+    
+    // Thực hiện upsert - API phiên bản 5.1.2 nhận trực tiếp mảng vector records
+    const upsertOptions = {};
+    if (namespace) {
+      upsertOptions.namespace = namespace;
+    }
+    
+    await index.upsert(upsertData, upsertOptions);
+    
+    console.log(`Đã upsert document ${id} vào Pinecone ${namespace ? `(namespace: ${namespace})` : ''}`);
   } catch (error) {
     console.error('Lỗi khi upsert vào Pinecone:', error);
-    throw new Error('Không thể upsert vào Pinecone');
+    
+    if (error.name === 'PineconeArgumentError') {
+      console.error('Chi tiết lỗi PineconeArgumentError:', error.message);
+      // Không log toàn bộ vector - chỉ log thông tin cần thiết
+      console.error('Thông tin về vector:', {
+        vectorType: typeof vector,
+        isArray: Array.isArray(vector),
+        vectorLength: vector ? vector.length : 'null',
+        sampleValues: vector && vector.length > 0 ? vector.slice(0, 3) : []
+      });
+    }
+    
+    // Hiển thị thông tin SDK version
+    try {
+      const pineconeVersion = require('@pinecone-database/pinecone/package.json').version;
+      console.log('Phiên bản SDK Pinecone:', pineconeVersion);
+    } catch (err) {
+      console.log('Không thể xác định phiên bản SDK Pinecone');
+    }
+    
+    throw new Error(`Không thể upsert vào Pinecone: ${error.message}`);
   }
 }
 
@@ -170,12 +244,19 @@ exports.syncProductToPinecone = functions.firestore
       return null;
     }
     
+    if (!embeddingModel) {
+      console.error('Google Generative AI embeddingModel chưa được khởi tạo');
+      return null;
+    }
+    
     const productId = context.params.productId;
+    const namespace = 'products'; // Namespace mặc định
     
     // Sản phẩm đã bị xóa
     if (!change.after.exists) {
       try {
-        await index.deleteOne(productId, { namespace: 'products' });
+        // API phiên bản 5.1.2 - Xóa vector
+        await index.deleteOne(productId, { namespace });
         console.log(`Đã xóa sản phẩm ${productId} từ Pinecone`);
         return null;
       } catch (error) {
@@ -194,23 +275,55 @@ exports.syncProductToPinecone = functions.firestore
     
     try {
       // Tạo embedding từ mô tả sản phẩm
-      const embedding = await getEmbedding(description);
+      const embedding = await createEmbedding(description);
       
-      // Chuẩn bị metadata
+      // Chuẩn bị metadata đảm bảo kiểu dữ liệu và không có giá trị null/undefined
       const metadata = {
-        name: productData.title || '',
-        price: productData.price,
-        category: productData.category || '',
-        status: productData.status || 'active',
-        sellerId: productData.sellerId,
-        sellerName: productData.sellerName || '',
-        createdAt: productData.createdAt 
-          ? productData.createdAt.toDate().toISOString() 
-          : new Date().toISOString(),
+        name: productData.title ? String(productData.title) : '',
+        price: productData.price ? Number(productData.price) : 0,
+        category: productData.category ? String(productData.category) : '',
+        status: productData.status ? String(productData.status) : 'active',
+        sellerId: productData.sellerId ? String(productData.sellerId) : '',
+        sellerName: productData.sellerName ? String(productData.sellerName) : '',
       };
       
+      // Xử lý timestamp một cách an toàn
+      if (productData.createdAt) {
+        try {
+          // Nếu là Firebase Timestamp, chuyển về ISO string
+          if (typeof productData.createdAt.toDate === 'function') {
+            metadata.createdAt = productData.createdAt.toDate().toISOString();
+          } 
+          // Nếu là Date object
+          else if (productData.createdAt instanceof Date) {
+            metadata.createdAt = productData.createdAt.toISOString();
+          }
+          // Nếu là timestamp dạng object với _seconds và _nanoseconds 
+          else if (productData.createdAt._seconds) {
+            const date = new Date(productData.createdAt._seconds * 1000);
+            metadata.createdAt = date.toISOString();
+          }
+          // Nếu là chuỗi
+          else if (typeof productData.createdAt === 'string') {
+            metadata.createdAt = productData.createdAt;
+          }
+          // Mặc định
+          else {
+            metadata.createdAt = new Date().toISOString();
+          }
+        } catch (timeError) {
+          console.error('Lỗi xử lý timestamp:', timeError);
+          metadata.createdAt = new Date().toISOString();
+        }
+      } else {
+        metadata.createdAt = new Date().toISOString();
+      }
+      
+      // Log metadata để debug
+      console.log('Metadata đã chuẩn bị:', JSON.stringify(metadata));
+      
       // Upsert vào Pinecone với namespace
-      await upsertToPinecone(productId, embedding, metadata, 'products');
+      await upsertToPinecone(productId, embedding, metadata, namespace);
       
       return null;
     } catch (error) {
@@ -227,6 +340,13 @@ exports.findSimilarProducts = functions.https.onCall(async (data) => {
     throw new functions.https.HttpsError(
       'failed-precondition',
       'Pinecone client chưa được khởi tạo'
+    );
+  }
+  
+  if (!embeddingModel) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Google Generative AI embeddingModel chưa được khởi tạo'
     );
   }
   
@@ -255,7 +375,7 @@ exports.findSimilarProducts = functions.https.onCall(async (data) => {
     const description = createProductDescription(productData);
     
     // Tạo embedding từ mô tả sản phẩm
-    const embedding = await getEmbedding(description);
+    const embedding = await createEmbedding(description);
     
     // Tìm kiếm các sản phẩm tương tự trong Pinecone
     const queryResult = await index.query({
@@ -296,6 +416,13 @@ exports.searchProductsByText = functions.https.onCall(async (data) => {
     );
   }
   
+  if (!embeddingModel) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Google Generative AI embeddingModel chưa được khởi tạo'
+    );
+  }
+  
   const { query, limit = 10, filter = {} } = data;
   
   if (!query || query.trim() === '') {
@@ -307,7 +434,7 @@ exports.searchProductsByText = functions.https.onCall(async (data) => {
   
   try {
     // Tạo embedding từ truy vấn tìm kiếm
-    const embedding = await getEmbedding(query);
+    const embedding = await createEmbedding(query);
     
     // Xây dựng filter nếu có
     const pineconeFilter = {};
@@ -363,6 +490,13 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
     );
   }
   
+  if (!embeddingModel) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Google Generative AI embeddingModel chưa được khởi tạo'
+    );
+  }
+  
   // Kiểm tra quyền admin
   if (!context.auth || !context.auth.token.admin) {
     throw new functions.https.HttpsError(
@@ -399,7 +533,7 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
           
           try {
             // Tạo embedding
-            const embedding = await getEmbedding(description);
+            const embedding = await createEmbedding(description);
             
             // Chuẩn bị metadata
             const metadata = {
