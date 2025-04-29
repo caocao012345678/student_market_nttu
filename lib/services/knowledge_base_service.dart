@@ -21,6 +21,7 @@ class KnowledgeBaseService extends ChangeNotifier {
   
   List<KnowledgeDocument> get documents => _documents;
   bool get isLoading => _isLoading;
+  bool get isPineconeInitialized => _isPineconeInitialized;
   
   // API URL và key từ environment variable
   String get _geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
@@ -47,7 +48,12 @@ class KnowledgeBaseService extends ChangeNotifier {
         return;
       }
       
-      _pineconeApiUrl = 'https://$_pineconeHost';
+      // Xử lý URL để tránh lặp lại https://
+      if (_pineconeHost.startsWith('https://')) {
+        _pineconeApiUrl = _pineconeHost;
+      } else {
+        _pineconeApiUrl = 'https://$_pineconeHost';
+      }
       _isPineconeInitialized = true;
       print('KnowledgeBaseService: Pinecone initialized with API URL: $_pineconeApiUrl, Index: $_pineconeIndexName');
     } catch (e) {

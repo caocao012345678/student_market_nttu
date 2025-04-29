@@ -343,11 +343,29 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildCreditInfo(
-                      'NTT Point',
-                      '${_userProfile?.nttPoint ?? 0}',
-                      Icons.monetization_on,
-                      Colors.amber,
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(widget.userId)
+                        .snapshots(),
+                      builder: (context, snapshot) {
+                        int nttPoint = 0;
+                        if (snapshot.hasData && snapshot.data != null) {
+                          try {
+                            nttPoint = snapshot.data!.get('nttPoint') ?? 0;
+                          } catch (e) {
+                            nttPoint = _userProfile?.nttPoint ?? 0;
+                          }
+                        } else {
+                          nttPoint = _userProfile?.nttPoint ?? 0;
+                        }
+                        return _buildCreditInfo(
+                          'NTT Point',
+                          '$nttPoint',
+                          Icons.monetization_on,
+                          Colors.amber,
+                        );
+                      },
                     ),
                     _buildCreditInfo(
                       'NTT Credit',

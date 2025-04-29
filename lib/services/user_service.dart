@@ -12,6 +12,9 @@ class UserService extends ChangeNotifier {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   UserModel? _currentUser;
   bool _isLoading = false;
+  
+  // Thêm Map để lưu cache thông tin người dùng khác
+  final Map<String, UserModel> _userCache = {};
 
   UserService() {
     _initUserData();
@@ -288,14 +291,38 @@ class UserService extends ChangeNotifier {
 
   // Lấy thông tin người dùng theo ID
   Future<UserModel?> getUserById(String userId) async {
+    if (userId.isEmpty) return null;
+    
     try {
+      // Kiểm tra xem có phải người dùng hiện tại không
+      if (_currentUser != null && _currentUser!.id == userId) {
+        return _currentUser;
+      }
+      
+      // Kiểm tra trong cache
+      if (_userCache.containsKey(userId)) {
+        return _userCache[userId];
+      }
+      
       final doc = await _firestore.collection('users').doc(userId).get();
-      if (!doc.exists) return null;
-      return UserModel.fromMap(doc.data()!, userId);
+      
+      if (doc.exists) {
+        // Tạo model người dùng từ dữ liệu Firestore
+        final userModel = UserModel.fromMap(doc.data()!, userId);
+        
+        // Lưu vào cache
+        _userCache[userId] = userModel;
+        
+        // Thông báo cho UI cập nhật
+        notifyListeners();
+        
+        return userModel;
+      }
     } catch (e) {
-      debugPrint('Lỗi khi lấy thông tin người dùng: $e');
-      return null;
+      print('Error getting user by ID: $e');
     }
+    
+    return null;
   }
   
   // Kiểm tra xem người dùng hiện tại có đang follow userId không
@@ -871,5 +898,20 @@ class UserService extends ChangeNotifier {
       print('Error loading user data: $e');
       _currentUser = null;
     }
+  }
+
+  // Thêm phương thức mới để lấy thông tin người dùng từ cache
+  UserModel? getUserFromCache(String userId) {
+    // Kiểm tra nếu userId trùng với người dùng hiện tại
+    if (_currentUser != null && _currentUser!.id == userId) {
+      return _currentUser;
+    }
+    
+    // Kiểm tra trong cache người dùng khác
+    if (_userCache.containsKey(userId)) {
+      return _userCache[userId];
+    }
+    
+    return null;
   }
 } 

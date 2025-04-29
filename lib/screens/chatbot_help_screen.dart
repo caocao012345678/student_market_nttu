@@ -273,6 +273,109 @@ class _ChatbotHelpScreenState extends State<ChatbotHelpScreen> {
     }
   }
 
+  // Thêm dữ liệu mẫu (mock data) vào knowledge base
+  Future<void> _importMockData() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    // Kiểm tra quyền
+    if (authService.currentUser == null || !authService.isUserAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn không có quyền thực hiện thao tác này.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Xác nhận
+    final shouldImport = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận import dữ liệu mẫu'),
+        content: const Text('Hành động này sẽ thêm các tài liệu mẫu vào cơ sở tri thức và đồng bộ với Pinecone. Tiếp tục?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    ) ?? false;
+    
+    if (shouldImport) {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      try {
+        final knowledgeService = Provider.of<KnowledgeBaseService>(context, listen: false);
+        final firestore = FirebaseFirestore.instance;
+        int successCount = 0;
+        
+        // Xử lý từng tài liệu mẫu
+        for (final docData in MockKnowledgeData.knowledgeDocuments) {
+          // Kiểm tra xem tài liệu đã tồn tại chưa (dựa vào tiêu đề)
+          final existingDocs = await firestore
+              .collection('knowledge_documents')
+              .where('title', isEqualTo: docData['title'])
+              .get();
+          
+          // Nếu tài liệu chưa tồn tại, thêm vào
+          if (existingDocs.docs.isEmpty) {
+            // Tạo tài liệu
+            final doc = KnowledgeDocument(
+              id: '',
+              title: docData['title'],
+              content: docData['content'],
+              category: docData['category'],
+              keywords: List<String>.from(docData['keywords'] ?? []),
+              createdAt: (docData['createdAt'] as Timestamp).toDate(),
+              updatedAt: (docData['updatedAt'] as Timestamp).toDate(),
+              order: docData['order'] ?? 0,
+            );
+            
+            // Lưu tài liệu
+            final success = await knowledgeService.createDocument(doc);
+            if (success) successCount++;
+          }
+        }
+        
+        // Thông báo kết quả
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã thêm $successCount tài liệu mẫu vào cơ sở tri thức.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Tải lại danh sách
+        await _loadDocuments();
+        
+        // Nếu Pinecone được khởi tạo, xây dựng lại index
+        if (knowledgeService.isPineconeInitialized) {
+          await knowledgeService.rebuildPineconeIndex();
+        }
+        
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Lắng nghe thay đổi từ KnowledgeBaseService
@@ -289,6 +392,11 @@ class _ChatbotHelpScreenState extends State<ChatbotHelpScreen> {
       appBar: AppBar(
         title: const Text('Trung tâm trợ giúp'),
         actions: isAdmin ? [
+          IconButton(
+            icon: const Icon(Icons.dataset),
+            onPressed: _isLoading ? null : _importMockData,
+            tooltip: 'Import dữ liệu mẫu',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _rebuildPineconeIndex,

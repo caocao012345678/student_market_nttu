@@ -9,6 +9,7 @@ import 'package:student_market_nttu/services/product_service.dart';
 import 'package:student_market_nttu/services/favorites_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:student_market_nttu/widgets/product_card_standard.dart';
+import '../services/user_service.dart';
 
 /// @deprecated Use ProductCardStandard instead
 /// This widget is kept for backward compatibility

@@ -73,26 +73,35 @@ class ChatbotService extends ChangeNotifier {
   }
   
   // Khởi tạo Pinecone
-  Future<void> _initPinecone() async {
+  Future<bool> _initPinecone() async {
     try {
       if (_pineconeApiKey.isEmpty) {
         print('PINECONE_API_KEY not found in environment variables');
-        return;
+        return false;
       }
       
+      // Khởi tạo các giá trị
       _pineconeHost = dotenv.env['PINECONE_HOST'] ?? '';
-      _pineconeIndexName = dotenv.env['PINECONE_INDEX_NAME'] ?? 'student-market-knowledge-data';
+      _pineconeIndexName = dotenv.env['PINECONE_INDEX_NAME'] ?? 'student-market-knowledge-base';
       
       if (_pineconeHost.isEmpty) {
         print('PINECONE_HOST not found in environment variables');
-        return;
+        return false;
       }
       
-      _pineconeApiUrl = 'https://$_pineconeHost';
+      // Xử lý URL để tránh lặp lại https://
+      if (_pineconeHost.startsWith('https://')) {
+        _pineconeApiUrl = _pineconeHost;
+      } else {
+        _pineconeApiUrl = 'https://$_pineconeHost';
+      }
+      
       _isPineconeInitialized = true;
       print('Pinecone initialized with API URL: $_pineconeApiUrl, Index: $_pineconeIndexName');
+      return true;
     } catch (e) {
       print('Error initializing Pinecone: $e');
+      return false;
     }
   }
   

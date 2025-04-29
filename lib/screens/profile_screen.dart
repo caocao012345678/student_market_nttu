@@ -19,6 +19,7 @@ import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/widgets/app_drawer.dart';
 import 'package:student_market_nttu/screens/user_locations_screen.dart';
 import 'package:student_market_nttu/widgets/common_app_bar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -217,12 +218,26 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStatCard(
-                context, 
-                'NTT Point', 
-                '${userModel?.nttPoint ?? 0}',
-                Icons.monetization_on,
-                Colors.amber
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user?.uid)
+                  .snapshots(),
+                builder: (context, snapshot) {
+                  int nttPoint = 0;
+                  if (snapshot.hasData && snapshot.data != null) {
+                    nttPoint = snapshot.data!.get('nttPoint') ?? 0;
+                  } else {
+                    nttPoint = userModel?.nttPoint ?? 0;
+                  }
+                  return _buildStatCard(
+                    context, 
+                    'NTT Point', 
+                    '$nttPoint',
+                    Icons.monetization_on,
+                    Colors.amber
+                  );
+                },
               ),
               _buildStatCard(
                 context, 
