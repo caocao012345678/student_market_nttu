@@ -8,6 +8,7 @@ import '../screens/product_detail_screen.dart';
 import '../screens/chatbot_help_screen.dart';
 import '../services/auth_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:intl/intl.dart';
 
 class ChatbotScreen extends StatefulWidget {
   static const routeName = '/chatbot';
@@ -487,18 +488,41 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           const SizedBox(height: 8),
           // Danh sách sản phẩm trượt ngang
           SizedBox(
-            height: 200,
+            height: 300,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: products.length,
               itemBuilder: (context, index) {
                 final product = products[index];
+                final String productId = product['productId'] ?? '';
+                final String productName = product['productName'] ?? 'Sản phẩm';
+                final String productImage = product['productImage'] ?? '';
+                final double productPrice = (product['productPrice'] is double) 
+                  ? product['productPrice'] 
+                  : double.tryParse(product['productPrice'].toString()) ?? 0.0;
+                final String productDescription = product['productDescription'] ?? '';
+                final String productCategory = product['productCategory'] ?? '';
+                final String productCondition = product['productCondition'] ?? '';
+                
+                // Format giá tiền theo định dạng VND
+                final formatCurrency = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0);
+                final formattedPrice = formatCurrency.format(productPrice);
+                
                 return Container(
-                  width: 160,
-                  margin: const EdgeInsets.only(right: 8),
+                  width: 180,
+                  margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.withOpacity(0.3)),
                     borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                   child: InkWell(
                     onTap: () {
@@ -507,7 +531,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => FutureBuilder<Product>(
-                            future: Provider.of<ProductService>(context, listen: false).getProductById(product['productId']),
+                            future: Provider.of<ProductService>(context, listen: false).getProductById(productId),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState == ConnectionState.waiting) {
                                 return const Scaffold(
@@ -530,6 +554,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         ),
                       );
                     },
+                    borderRadius: BorderRadius.circular(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -539,58 +564,77 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                             topLeft: Radius.circular(12),
                             topRight: Radius.circular(12),
                           ),
-                          child: SizedBox(
-                            height: 100,
-                            width: double.infinity,
-                            child: product['productImage'] != null && product['productImage'].isNotEmpty
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: productImage.isNotEmpty
                                 ? Image.network(
-                                    product['productImage'],
+                                    productImage,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Icon(
-                                      Icons.image_not_supported,
-                                      size: 50,
-                                      color: Colors.grey[400],
-                                    ),
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[200],
+                                        child: const Center(
+                                          child: Icon(Icons.image_not_supported, color: Colors.grey),
+                                        ),
+                                      );
+                                    },
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        color: Colors.grey[200],
+                                        child: const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                      );
+                                    },
                                   )
-                                : Icon(
-                                    Icons.image_not_supported,
-                                    size: 50,
-                                    color: Colors.grey[400],
+                                : Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Icon(Icons.image, color: Colors.grey),
+                                    ),
                                   ),
                           ),
                         ),
                         // Thông tin sản phẩm
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product['productName'] ?? 'Sản phẩm',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Tên sản phẩm
+                                Text(
+                                  productName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${product['productPrice'] != null ? (product['productPrice'] as num).toStringAsFixed(0) : '0'} VNĐ',
-                                style: TextStyle(
-                                  color: Colors.red[700],
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
+                                const SizedBox(height: 4),
+                                // Giá sản phẩm
+                                Text(
+                                  formattedPrice,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                product['productDescription'] ?? '',
-                                style: const TextStyle(fontSize: 10),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                                // Tình trạng sản phẩm
+                                if (productCondition.isNotEmpty) 
+                                  Text(
+                                    productCondition,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],

@@ -476,67 +476,6 @@ Lưu ý: Việc cập nhật thông tin sản phẩm thường xuyên và chính
       'updatedAt': Timestamp.now(),
       'order': 3,
     },
-    {
-      'title': 'Đăng bán sản phẩm dưới dạng "Preorder"',
-      'content': '''
-Hướng dẫn đăng bán sản phẩm dưới dạng "Đặt trước" (Preorder) trên Student Market NTTU:
-
-1. Khái niệm Preorder:
-   - Preorder là hình thức cho phép người mua đặt hàng trước khi sản phẩm có sẵn
-   - Phù hợp cho các sản phẩm mới, hàng độc quyền, hoặc sản phẩm bạn sẽ nhập về sau
-   - Người mua sẽ đặt cọc trước một phần hoặc toàn bộ tiền hàng
-
-2. Điều kiện đăng bán Preorder:
-   - Tài khoản của bạn phải được xác thực đầy đủ
-   - Có điểm uy tín NTT Credit từ 120 điểm trở lên
-   - Đã hoàn thành ít nhất 10 giao dịch thành công
-   - Tỷ lệ đánh giá tích cực từ 90% trở lên
-
-3. Cách đăng bán sản phẩm Preorder:
-   - Đăng nhập và chọn "Đăng sản phẩm mới"
-   - Điền thông tin sản phẩm như thông thường
-   - Trong mục "Tình trạng sản phẩm", chọn "Đặt trước (Preorder)"
-   - Thiết lập các thông tin bổ sung:
-     + Ngày dự kiến có hàng
-     + Số tiền đặt cọc (tối thiểu 20%, tối đa 100%)
-     + Chính sách hủy đặt cọc
-     + Thời gian mở đặt hàng
-   - Tải lên hình ảnh chính thức của sản phẩm (có thể sử dụng ảnh chính thức từ nhà sản xuất)
-   - Mô tả chi tiết nguồn gốc sản phẩm, thời gian và phương thức giao hàng
-   - Nhấn "Đăng sản phẩm" để hoàn tất
-
-4. Quản lý đơn đặt hàng Preorder:
-   - Xem danh sách người đặt trước trong mục "Đơn hàng Preorder"
-   - Cập nhật trạng thái khi có thay đổi:
-     + Đã đặt hàng với nhà cung cấp
-     + Đang vận chuyển về kho
-     + Sẵn sàng giao hàng
-   - Thông báo cho người mua qua tin nhắn hệ thống khi có cập nhật
-   - Xử lý các yêu cầu hủy đặt hàng và hoàn tiền (nếu có)
-
-5. Mẹo để preorder thành công:
-   - Cung cấp thông tin chi tiết và chính xác về sản phẩm
-   - Đặt ngày giao hàng dự kiến xa hơn thực tế một chút để tránh trễ hẹn
-   - Cập nhật thường xuyên về tiến độ sản phẩm
-   - Có chính sách đặt cọc và hủy đơn rõ ràng
-   - Ưu tiên người đặt trước theo thứ tự thời gian
-   - Cung cấp ưu đãi đặc biệt cho người đặt trước (quà tặng, giảm giá...)
-
-6. Quy định về Preorder:
-   - Thời gian giao hàng không quá 30 ngày kể từ ngày đăng
-   - Phải cập nhật trạng thái đơn hàng ít nhất 1 lần/tuần
-   - Hoàn trả 100% tiền cọc nếu sản phẩm không đáp ứng mô tả
-   - Hoàn trả ít nhất 80% tiền cọc nếu người mua hủy đơn có lý do
-   - Không được thay đổi giá sau khi đã nhận đặt cọc
-
-Lưu ý: Tính năng Preorder hiện chỉ áp dụng cho sản phẩm mới. Việc giao hàng đúng hẹn sẽ giúp tăng điểm uy tín đáng kể cho người bán.
-''',
-      'keywords': ['preorder', 'đặt trước', 'đặt hàng trước', 'đặt cọc', 'sản phẩm mới', 'hàng sắp về'],
-      'category': 'product',
-      'createdAt': Timestamp.now(),
-      'updatedAt': Timestamp.now(),
-      'order': 4,
-    },
 
     // DANH MỤC: PAYMENT - THANH TOÁN
     {
@@ -572,15 +511,6 @@ Student Market NTTU hỗ trợ các phương thức thanh toán sau:
    - Sinh viên đã xác thực nhận thêm 20% giá trị quy đổi
    - Ưu điểm: Tiết kiệm, đặc quyền cho người dùng thân thiết
    - Nhược điểm: Cần tích lũy điểm qua các giao dịch trước
-
-5. Thanh toán trả góp
-   - Áp dụng cho sản phẩm trên 1 triệu đồng
-   - Trả góp 0% lãi suất trong 3 tháng cho sinh viên điểm tín dụng từ 80
-   - Trả góp 0% lãi suất 6 tháng cho sinh viên điểm tín dụng từ 120
-   - Hợp tác với các đối tác tài chính: FE Credit, Home Credit
-   - Yêu cầu xác minh danh tính và thông tin sinh viên
-   - Ưu điểm: Giảm áp lực tài chính ngắn hạn
-   - Nhược điểm: Cần đủ điều kiện về điểm tín dụng
 
 Quy trình thanh toán an toàn:
 1. Tiền được giữ trong tài khoản đảm bảo của Student Market NTTU
@@ -629,12 +559,11 @@ NTT Credit là hệ thống điểm uy tín và ưu đãi dành cho người dù
      + Nhận đánh giá 1 sao (-3 điểm)
 
 3. Đặc quyền theo điểm uy tín (NTT Credit):
-   - 80-99 điểm: Được mua trả góp 3 tháng không lãi suất
+   - 80-99 điểm: Mức tiêu chuẩn cho giao dịch
    - 100-119 điểm: Mức cơ bản, đủ điều kiện bán hàng
-   - 120-139 điểm: Được phép mua trả góp 3 tháng, bán sản phẩm giá trị cao
-   - 140-159 điểm: Được phép mua trả góp 6 tháng, giảm 50% phí đăng bán
+   - 120-159 điểm: Ưu tiên hiển thị sản phẩm trong tìm kiếm
    - 160-179 điểm: Được giao dịch không cần đặt cọc
-   - 180-199 điểm: Được ưu tiên hiển thị trong tìm kiếm
+   - 180-199 điểm: Được ưu tiên hỗ trợ khi có tranh chấp
    - 200+ điểm: Được mời vào chương trình Người bán ưu tú
 
 4. Cấp độ thành viên:
@@ -642,7 +571,6 @@ NTT Credit là hệ thống điểm uy tín và ưu đãi dành cho người dù
    - Silver: NTT Credit từ 120-159 điểm
    - Gold: NTT Credit từ 160-199 điểm
    - Platinum: NTT Credit từ 200+ điểm
-   - VIP: Người dùng đóng phí thành viên hàng tháng
    - Campus Ambassador: Đại diện chính thức của Student Market tại trường
 
 5. Kiểm tra và nâng cao điểm:
@@ -1243,12 +1171,6 @@ Student Market NTTU hỗ trợ các phương thức giao hàng sau:
    - Thời gian giao hàng: 3-7 ngày
    - Phí giao hàng: Theo bảng giá vận chuyển
    - Phù hợp cho các mặt hàng giá trị thấp và trung bình
-
-5. Giao hàng nhanh (Express Shipping)
-   - Đối tác: Giao Hàng Tiết Kiệm, Giao Hàng Nhanh
-   - Thời gian giao hàng: 1-3 ngày
-   - Phí giao hàng: Cao hơn giao hàng tiêu chuẩn 30-50%
-   - Phù hợp cho hàng cần giao nhanh chóng
 
 Quy trình giao nhận hàng:
 1. Người bán chuẩn bị hàng và đóng gói cẩn thận

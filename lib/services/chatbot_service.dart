@@ -510,9 +510,13 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
               category: item['category'] ?? 'Khác',
               price: double.tryParse(item['price'].toString()) ?? 0.0,
               sellerId: item['sellerId'] ?? 'unknown',
+              sellerName: item['sellerName'] ?? 'Người bán',
               createdAt: DateTime.now(),
-              images: item['imageUrl'] != null ? [item['imageUrl']] : [],
+              images: item['imageUrl'] != null ? [item['imageUrl']] : 
+                      item['thumbnailUrl'] != null ? [item['thumbnailUrl']] : [],
               tags: item['tags'] != null ? List<String>.from(item['tags']) : [],
+              condition: item['condition'] ?? 'Chưa xác định',
+              location: item['location'] ?? '',
               isSold: false,
               status: ProductStatus.available,
             );
@@ -522,6 +526,10 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
         print('Error using searchProductsByText: $e');
         
         // Fallback: Sử dụng tìm kiếm từ local
+        products = await _searchProductsWithKeywords(message);
+      }
+      
+      if (products.isEmpty) {
         products = await _searchProductsWithKeywords(message);
       }
       
@@ -542,38 +550,6 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
     }
   }
   
-  // Phương thức tìm kiếm sản phẩm bằng từ khóa (phương pháp cũ)
-  Future<List<Product>> _searchProductsWithKeywords(String message) async {
-    // Tìm kiếm các từ khóa sản phẩm từ câu hỏi
-    final keywords = await _extractKeywords(message);
-    
-    // Lấy danh sách sản phẩm từ Firestore dựa trên từ khóa
-    List<Product> products = [];
-    for (final keyword in keywords) {
-      final productSnapshot = await _firestore
-        .collection('products')
-        .where('isSold', isEqualTo: false)
-        .where('status', whereNotIn: ['pending_review', 'rejected'])
-        .get();
-      
-      final potentialProducts = productSnapshot.docs
-        .map((doc) => Product.fromMap(doc.data(), doc.id))
-        .where((product) {
-          final productData = '${product.title.toLowerCase()} ${product.description.toLowerCase()} ${product.category.toLowerCase()} ${product.tags.join(' ').toLowerCase()}';
-          return productData.contains(keyword.toLowerCase());
-        })
-        .toList();
-      
-      products.addAll(potentialProducts);
-    }
-    
-    // Loại bỏ các sản phẩm trùng lặp
-    final uniqueProductIds = <String>{};
-    products = products.where((product) => uniqueProductIds.add(product.id)).toList();
-    
-    return products;
-  }
-  
   // Thêm phương thức mới để hiển thị danh sách sản phẩm theo dạng trượt ngang
   void _addBotProductListMessage(String content, List<Product> products) {
     final botMessage = ChatMessage(
@@ -589,6 +565,11 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
           'productImage': product.images.isNotEmpty ? product.images[0] : '',
           'productPrice': product.price,
           'productDescription': product.description,
+          'productCategory': product.category,
+          'productCondition': product.condition,
+          'productLocation': product.location,
+          'productSellerName': product.sellerName,
+          'productTags': product.tags,
         }).toList(),
       },
     );
@@ -1182,7 +1163,20 @@ Câu hỏi hiện tại: $query''';
                 'description': product.description,
                 'category': product.category,
                 'price': product.price.toString(),
+                'originalPrice': product.originalPrice.toString(),
                 'imageUrl': product.images.isNotEmpty ? product.images[0] : '',
+                'thumbnailUrl': product.images.isNotEmpty ? product.images[0] : '',
+                'tags': product.tags,
+                'condition': product.condition,
+                'location': product.location,
+                'specifications': _mapToStringMap(product.specifications),
+                'sellerId': product.sellerId,
+                'sellerName': product.sellerName,
+                'isSold': product.isSold,
+                'status': product.status.toString().split('.').last,
+                'viewCount': product.viewCount,
+                'favoriteCount': product.favoriteCount,
+                'createdAt': product.createdAt.toIso8601String(),
               },
             },
           ],
@@ -1200,6 +1194,15 @@ Câu hỏi hiện tại: $query''';
       print('Error storing product in Pinecone: $e');
       return false;
     }
+  }
+  
+  // Phương thức hỗ trợ chuyển đổi map sang dạng chuỗi
+  Map<String, String> _mapToStringMap(Map<String, dynamic> map) {
+    final result = <String, String>{};
+    map.forEach((key, value) {
+      result[key] = value.toString();
+    });
+    return result;
   }
   
   // Tìm kiếm tài liệu và sản phẩm tương tự trong Pinecone
@@ -1327,5 +1330,37 @@ Câu hỏi hiện tại: $query''';
       print('Error searching in namespace $namespace: $e');
       return [];
     }
+  }
+
+  // Phương thức tìm kiếm sản phẩm bằng từ khóa (phương pháp cũ)
+  Future<List<Product>> _searchProductsWithKeywords(String message) async {
+    // Tìm kiếm các từ khóa sản phẩm từ câu hỏi
+    final keywords = await _extractKeywords(message);
+    
+    // Lấy danh sách sản phẩm từ Firestore dựa trên từ khóa
+    List<Product> products = [];
+    for (final keyword in keywords) {
+      final productSnapshot = await _firestore
+        .collection('products')
+        .where('isSold', isEqualTo: false)
+        .where('status', whereNotIn: ['pending_review', 'rejected'])
+        .get();
+      
+      final potentialProducts = productSnapshot.docs
+        .map((doc) => Product.fromMap(doc.data(), doc.id))
+        .where((product) {
+          final productData = '${product.title.toLowerCase()} ${product.description.toLowerCase()} ${product.category.toLowerCase()} ${product.tags.join(' ').toLowerCase()}';
+          return productData.contains(keyword.toLowerCase());
+        })
+        .toList();
+      
+      products.addAll(potentialProducts);
+    }
+    
+    // Loại bỏ các sản phẩm trùng lặp
+    final uniqueProductIds = <String>{};
+    products = products.where((product) => uniqueProductIds.add(product.id)).toList();
+    
+    return products;
   }
 } 

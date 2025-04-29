@@ -1,0 +1,39 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Kiến Trúc Chatbot
+
+Hệ thống chatbot trong Student Market NTTU tích hợp AI để hỗ trợ người dùng tìm kiếm sản phẩm và trả lời các câu hỏi thường gặp.
+
+## Thành phần chính
+
+### Frontend
+- [lib/screens/chatbot_screen.dart](mdc:lib/screens/chatbot_screen.dart): Giao diện người dùng của chatbot
+- [lib/widgets/chatbot_button.dart](mdc:lib/widgets/chatbot_button.dart): Button hiển thị để truy cập chatbot
+
+### Service & Models
+- [lib/services/chatbot_service.dart](mdc:lib/services/chatbot_service.dart): Xử lý logic của chatbot, bao gồm phân loại tin nhắn và tạo phản hồi
+- [lib/models/chat_message.dart](mdc:lib/models/chat_message.dart): Model cho tin nhắn chat
+- [lib/models/knowledge_base.dart](mdc:lib/models/knowledge_base.dart): Model cho cơ sở kiến thức của chatbot
+
+### Cloud Functions
+- [functions/index.js](mdc:functions/index.js): Cloud Functions cho xử lý tìm kiếm và phân tích dữ liệu:
+  - `searchProductsByText`: Tìm kiếm sản phẩm bằng vector embeddings
+  - `findSimilarProducts`: Tìm sản phẩm tương tự
+
+## Luồng xử lý tin nhắn
+
+1. Người dùng gửi tin nhắn qua `ChatbotScreen`
+2. `ChatbotService.addUserMessage()` thêm tin nhắn vào danh sách
+3. `ChatbotService._processMessage()` phân loại tin nhắn dựa vào AI
+4. Dựa trên phân loại (tìm kiếm sản phẩm, câu hỏi, v.v.), gọi các handler tương ứng
+5. Handler gọi Cloud Function hoặc xử lý trực tiếp và thêm tin nhắn phản hồi từ chatbot
+
+## Công nghệ AI
+
+- **Vector Embeddings**: Sử dụng Google Generative AI để tạo vector embeddings cho văn bản
+- **Pinecone**: Vector database để lưu trữ và tìm kiếm ngữ nghĩa
+- **Phân loại tin nhắn**: Sử dụng Gemini API để phân loại loại tin nhắn
+- **RAG (Retrieval-Augmented Generation)**: Kết hợp tìm kiếm và tạo phản hồi dựa trên cơ sở kiến thức

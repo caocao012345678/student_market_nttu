@@ -3,9 +3,26 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Cấu Trúc Dự Án Student Market NTTU
+# Student Market NTTU - Cấu Trúc Dự Án
 
-Dự án Student Market NTTU là một ứng dụng thị trường trực tuyến được xây dựng bằng Flutter, Firebase và tích hợp AI thông qua Gemini API.
+Dự án Student Market NTTU là một ứng dụng thị trường dành cho sinh viên được xây dựng bằng Flutter và Firebase.
+
+## Cấu Trúc Thư Mục Chính
+
+- [lib/main.dart](mdc:lib/main.dart): Điểm khởi đầu của ứng dụng, cấu hình Firebase và providers
+- [lib/models/](mdc:lib/models): Chứa các model dữ liệu của ứng dụng
+- [lib/screens/](mdc:lib/screens): Các màn hình chính của ứng dụng
+- [lib/services/](mdc:lib/services): Services xử lý logic nghiệp vụ và tương tác với backend
+- [lib/widgets/](mdc:lib/widgets): Các widget tái sử dụng
+- [lib/utils/](mdc:lib/utils): Tiện ích và hàm helper
+- [functions/](mdc:functions): Cloud Functions cho Firebase
+
+## Cloud Functions
+
+- [functions/index.js](mdc:functions/index.js): Chứa các Firebase Cloud Functions, bao gồm:
+  - Đồng bộ dữ liệu sản phẩm với Pinecone
+  - Tìm kiếm sản phẩm bằng Vector Embeddings
+  - Xây dựng lại chỉ mục Pinecone
 
 ## Thư Mục Chính
 

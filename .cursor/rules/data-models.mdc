@@ -1,0 +1,94 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Mô Hình Dữ Liệu
+
+Hệ thống Student Market NTTU sử dụng các model dữ liệu chủ yếu để đại diện cho các thực thể trong ứng dụng.
+
+## Models Chính
+
+### Product
+
+[lib/models/product.dart](mdc:lib/models/product.dart): Đại diện cho sản phẩm trong thị trường.
+
+```dart
+class Product {
+  final String id;
+  final String title;
+  final String description;
+  final String category;
+  final double price;
+  final String sellerId;
+  final DateTime createdAt;
+  final List<String> images;
+  final List<String> tags;
+  final bool isSold;
+  final ProductStatus status;
+  // ...
+}
+```
+
+### Chat Message
+
+[lib/models/chat_message.dart](mdc:lib/models/chat_message.dart): Đại diện cho tin nhắn trong chatbot.
+
+```dart
+enum MessageType {
+  text,
+  image,
+  file,
+  product,
+  productList,
+  help,
+  location,
+}
+
+class ChatMessage {
+  final String id;
+  final String content;
+  final bool isUser;
+  final DateTime timestamp;
+  final MessageType type;
+  final Map<String, dynamic>? metadata;
+  // ...
+}
+```
+
+### Knowledge Base
+
+[lib/models/knowledge_base.dart](mdc:lib/models/knowledge_base.dart): Cấu trúc dữ liệu cho cơ sở tri thức của chatbot.
+
+```dart
+class KnowledgeDocument {
+  final String id;
+  final String title;
+  final String content;
+  final List<String> keywords;
+  final String category;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final int order;
+  // ...
+}
+```
+
+## Pinecone Metadata
+
+Trong Pinecone, các sản phẩm được lưu trữ với metadata như sau:
+
+```javascript
+{
+  name: "Tên sản phẩm",
+  price: 100000,
+  category: "Sách",
+  status: "available",
+  sellerId: "user123",
+  sellerName: "Người Bán",
+  createdAt: "2025-04-29T00:00:00.000Z",
+  type: "product"
+}
+```
+
+Trường `type: "product"` được sử dụng để phân biệt loại dữ liệu trong vector database.

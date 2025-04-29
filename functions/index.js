@@ -103,9 +103,6 @@ async function createEmbedding(text) {
       // Tạo embedding
       const result = await embeddingModel.embedContent(text);
       
-      // Kiểm tra cấu trúc phản hồi
-      console.log('Cấu trúc phản hồi embedding:', JSON.stringify(result, null, 2));
-      
       // Đảm bảo có giá trị embedding và values
       let embedding = [];
       
@@ -150,10 +147,9 @@ async function createEmbedding(text) {
  * @param {string} id - ID của document
  * @param {Array<number>} vector - Vector nhúng
  * @param {Object} metadata - Metadata kèm theo
- * @param {string} namespace - Namespace trong Pinecone
  * @return {Promise<void>}
  */
-async function upsertToPinecone(id, vector, metadata, namespace = '') {
+async function upsertToPinecone(id, vector, metadata) {
   try {
     if (!index) {
       throw new Error('Pinecone client chưa được khởi tạo');
@@ -182,6 +178,8 @@ async function upsertToPinecone(id, vector, metadata, namespace = '') {
       if (metadata.sellerId !== undefined) safeMetadata.sellerId = String(metadata.sellerId || '');
       if (metadata.sellerName !== undefined) safeMetadata.sellerName = String(metadata.sellerName || '');
       if (metadata.createdAt !== undefined) safeMetadata.createdAt = String(metadata.createdAt || '');
+      // Thêm trường type để phân biệt dữ liệu
+      safeMetadata.type = 'product'; // Thay thế cho namespace
     }
     
     console.log(`Đang upsert document ${id} với vector ${vector.length} phần tử`);
@@ -193,15 +191,10 @@ async function upsertToPinecone(id, vector, metadata, namespace = '') {
       values: vector,
       metadata: safeMetadata
     }];    
-    // Thực hiện upsert - API phiên bản 5.1.2 nhận trực tiếp mảng vector records
-    const upsertOptions = {};
-    if (namespace) {
-      upsertOptions.namespace = namespace;
-    }
     
-    await index.upsert(upsertData, upsertOptions);
+    await index.upsert(upsertData);
     
-    console.log(`Đã upsert document ${id} vào Pinecone ${namespace ? `(namespace: ${namespace})` : ''}`);
+    console.log(`Đã upsert document ${id} vào Pinecone`);
   } catch (error) {
     console.error('Lỗi khi upsert vào Pinecone:', error);
     
@@ -245,13 +238,12 @@ exports.syncProductToPinecone = functions.firestore
     }
     
     const productId = context.params.productId;
-    const namespace = 'products'; // Namespace mặc định
     
     // Sản phẩm đã bị xóa
     if (!change.after.exists) {
       try {
         // API phiên bản 5.1.2 - Xóa vector
-        await index.deleteOne(productId, { namespace });
+        await index.deleteOne(productId);
         console.log(`Đã xóa sản phẩm ${productId} từ Pinecone`);
         return null;
       } catch (error) {
@@ -318,7 +310,7 @@ exports.syncProductToPinecone = functions.firestore
       console.log('Metadata đã chuẩn bị:', JSON.stringify(metadata));
       
       // Upsert vào Pinecone với namespace
-      await upsertToPinecone(productId, embedding, metadata, namespace);
+      await upsertToPinecone(productId, embedding, metadata);
       
       return null;
     } catch (error) {
@@ -377,7 +369,7 @@ exports.findSimilarProducts = functions.https.onCall(async (data) => {
       vector: embedding,
       topK: limit + 1, // +1 vì có thể kết quả bao gồm chính sản phẩm đó
       includeMetadata: true,
-      namespace: 'products'
+      // Bỏ filter để tìm kiếm tất cả (bao gồm cả dữ liệu cũ)
     });
     
     // Lọc bỏ chính sản phẩm đó nếu có trong kết quả
@@ -418,7 +410,7 @@ exports.searchProductsByText = functions.https.onCall(async (data) => {
     );
   }
   
-  const { query, limit = 10, filter = {} } = data;
+  const { query, limit = 10, filter = {}, scoreThreshold = 0.8 } = data;
   
   if (!query || query.trim() === '') {
     throw new functions.https.HttpsError(
@@ -445,23 +437,25 @@ exports.searchProductsByText = functions.https.onCall(async (data) => {
     }
     
     // Chỉ tìm kiếm sản phẩm đang bán
-    pineconeFilter.status = filter.status || 'active';
+    pineconeFilter.status = filter.status || 'available';
     
     // Thực hiện tìm kiếm vector trong Pinecone
     const queryResult = await index.query({
       vector: embedding,
       topK: limit,
       includeMetadata: true,
-      namespace: 'products',
-      filter: Object.keys(pineconeFilter).length > 0 ? pineconeFilter : undefined,
+      // Chỉ áp dụng filter cơ bản nếu có
+      filter: Object.keys(pineconeFilter).length > 0 ? pineconeFilter : undefined
     });
     
-    // Chuyển đổi kết quả
-    const searchResults = queryResult.matches.map((match) => ({
-      id: match.id,
-      score: match.score,
-      ...match.metadata,
-    }));
+    // Chuyển đổi kết quả và lọc theo ngưỡng điểm
+    const searchResults = queryResult.matches
+      .filter(match => match.score >= scoreThreshold)
+      .map((match) => ({
+        id: match.id,
+        score: match.score,
+        ...match.metadata,
+      }));
     
     return { results: searchResults };
   } catch (error) {
@@ -503,8 +497,8 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
   try {
     // Xóa toàn bộ index (tùy chọn)
     if (data.clearExisting === true) {
-      await index.deleteAll({ namespace: 'products' });
-      console.log('Đã xóa toàn bộ index trong namespace products');
+      await index.deleteAll({ filter: { type: { $eq: 'product' } } });  // Thay thế namespace
+      console.log('Đã xóa toàn bộ index của sản phẩm');
     }
     
     // Lấy tất cả sản phẩm từ Firestore
@@ -544,7 +538,7 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
             };
             
             // Upsert vào Pinecone
-            await upsertToPinecone(productId, embedding, metadata, 'products');
+            await upsertToPinecone(productId, embedding, metadata);
             processedCount++;
             
             return { success: true, id: productId };

@@ -1,0 +1,55 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Tích Hợp Firebase và Pinecone
+
+Dự án Student Market NTTU sử dụng Firebase làm backend chính và tích hợp Pinecone để tìm kiếm vector.
+
+## Firebase
+
+Các dịch vụ Firebase được sử dụng:
+
+- **Firestore**: Lưu trữ dữ liệu chính của ứng dụng
+- **Authentication**: Xác thực người dùng
+- **Storage**: Lưu trữ hình ảnh sản phẩm
+- **Cloud Functions**: Xử lý logic phía server và tích hợp với Pinecone
+
+## Pinecone
+
+Pinecone là vector database được sử dụng để tìm kiếm ngữ nghĩa trong ứng dụng.
+
+### Cấu trúc
+
+- **Index**: Chứa vector embeddings của sản phẩm
+- **Metadata**: Chứa thông tin bổ sung về sản phẩm để hiển thị kết quả
+
+### Quy trình đồng bộ
+
+1. Khi một sản phẩm được tạo/cập nhật trong Firestore, Cloud Function `syncProductToPinecone` được kích hoạt
+2. Tạo vector embedding cho mô tả sản phẩm sử dụng Google Generative AI
+3. Lưu trữ vector và metadata vào Pinecone
+
+```javascript
+// Quy trình đồng bộ sản phẩm
+exports.syncProductToPinecone = functions.firestore
+  .document('products/{productId}')
+  .onWrite(async (change, context) => {
+    // Tạo embedding và lưu vào Pinecone
+    const embedding = await createEmbedding(description);
+    await upsertToPinecone(productId, embedding, metadata);
+  });
+```
+
+### Quản lý trạng thái Pinecone
+
+- **Quan trọng**: Pinecone SDK phiên bản mới (5.1.2+) không còn sử dụng tham số `namespace`
+- Thay vào đó, sử dụng trường `type: "product"` trong metadata để phân loại dữ liệu
+- Sử dụng `filter: { type: { $eq: 'product' } }` thay cho namespace trong các truy vấn
+
+## Cloud Functions Tìm Kiếm
+
+- `searchProductsByText`: Tìm kiếm sản phẩm dựa trên văn bản người dùng
+- `findSimilarProducts`: Tìm các sản phẩm tương tự với một sản phẩm đã cho
+- `rebuildPineconeIndex`: Đồng bộ lại toàn bộ sản phẩm với Pinecone (chỉ admin)

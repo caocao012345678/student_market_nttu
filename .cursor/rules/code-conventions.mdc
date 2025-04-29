@@ -1,0 +1,70 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Quy Ước Coding - Student Market NTTU
+
+## Ngôn Ngữ & Định Dạng
+
+- **Ngôn ngữ**: Sử dụng tiếng Việt cho comments và documentation
+- **Indentation**: 2 spaces
+- **Line length**: Tối đa 100 ký tự
+- **Format**: Sử dụng `dart format` để đảm bảo nhất quán
+
+## Quy Ước Đặt Tên
+
+- **Classes & Widgets**: Sử dụng PascalCase (ví dụ: `ProductCard`, `HomeScreen`)
+- **Biến & Functions**: Sử dụng camelCase (ví dụ: `getUserData`, `productList`)
+- **Hằng số**: Sử dụng SCREAMING_SNAKE_CASE (ví dụ: `MAX_RETRY_COUNT`)
+- **Thuộc tính private**: Sử dụng underscore prefix `_` (ví dụ: `_currentUser`)
+
+## Imports
+
+Sắp xếp imports theo thứ tự:
+1. Dart packages
+2. Flutter packages
+3. Third-party packages
+4. Relative imports (project files)
+
+Ví dụ:
+```dart
+// Dart/Flutter packages
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// Firebase packages
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// Project imports
+import '../services/user_service.dart';
+```
+
+## State Management
+
+- Sử dụng `Provider` pattern làm giải pháp quản lý state chính
+- Các service được thiết kế để extend `ChangeNotifier`
+- Đăng ký providers trong [lib/main.dart](mdc:lib/main.dart)
+
+## Error Handling
+
+- Sử dụng try-catch blocks cho các thao tác Firebase và ngoại lệ có thể xảy ra
+- Trả về thông báo lỗi thân thiện với người dùng cuối
+- Ghi log lỗi chi tiết cho phát triển
+
+Ví dụ:
+```dart
+try {
+  // Thực hiện thao tác có thể gây lỗi
+} catch (e) {
+  debugPrint('Lỗi: $e');
+  throw Exception('Không thể thực hiện thao tác. Vui lòng thử lại sau.');
+}
+```
+
+## JavaScript (Cloud Functions)
+
+- Sử dụng ES6+ syntax
+- Async/await cho xử lý bất đồng bộ
+- Function comments với JSDoc format
+- Try-catch blocks cho error handling

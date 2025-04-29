@@ -1,0 +1,63 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Troubleshooting Guide - Student Market NTTU
+
+Hướng dẫn xử lý các vấn đề thường gặp trong dự án Student Market NTTU.
+
+## 1. Vấn đề với Pinecone
+
+### Lỗi "Object contained invalid properties: namespace"
+
+```
+PineconeArgumentError: Object contained invalid properties: namespace. 
+Valid properties include id, vector, sparseVector, includeValues, includeMetadata, filter, topK.
+```
+
+**Nguyên nhân**: Phiên bản mới của Pinecone SDK (5.1.2+) không còn hỗ trợ tham số `namespace`.
+
+**Giải pháp**: 
+- Thay thế `namespace` bằng `filter` với dạng: `filter: { type: { $eq: 'product' } }`
+- Đảm bảo metadata có thêm trường `type: "product"` khi lưu vào Pinecone
+- Nên chạy lại hàm `rebuildPineconeIndex` để cập nhật tất cả dữ liệu trong Pinecone
+
+### Lỗi tìm kiếm không trả về kết quả
+
+**Nguyên nhân**:
+- Giá trị `status` không đúng (sử dụng "active" thay vì "available")
+- Dữ liệu vector embeddings chưa được cập nhật
+
+**Giải pháp**:
+- Kiểm tra giá trị `status` trong điều kiện tìm kiếm (phải là "available")
+- Thêm fallback tìm kiếm thông qua Firestore trực tiếp
+- Chạy lại hàm `rebuildPineconeIndex` để cập nhật dữ liệu
+
+## 2. Vấn đề với Gemini API
+
+### Lỗi trích xuất từ khóa
+
+```
+Exception extracting keywords: type '(dynamic) => dynamic' is not a subtype of type '(dynamic) => bool' of 'test'
+```
+
+**Nguyên nhân**: Lỗi type casting trong hàm xử lý tìm kiếm từ khóa.
+
+**Giải pháp**:
+- Sử dụng `some()` thay vì `filter()` hoặc `where()` cho kiểm tra các giá trị
+- Sửa lại các phương thức callback để đảm bảo đúng kiểu dữ liệu trả về
+
+## 3. Vấn đề với Firestore
+
+### Không lấy được dữ liệu từ Firestore
+
+**Nguyên nhân**:
+- Thiếu quyền truy cập
+- Đường dẫn collection không đúng
+- Điều kiện query quá nghiêm ngặt
+
+**Giải pháp**:
+- Kiểm tra Firestore Security Rules
+- Mở rộng điều kiện truy vấn (bớt các điều kiện where)
+- Thêm logs để debug
