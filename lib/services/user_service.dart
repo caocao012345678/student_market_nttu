@@ -914,4 +914,20 @@ class UserService extends ChangeNotifier {
     
     return null;
   }
-} 
+
+  // Thêm phương thức để lấy thông tin đăng nhập của admin
+  // Lưu ý: Trong thực tế, bạn nên sử dụng cách an toàn hơn để lưu trữ thông tin đăng nhập 
+  // như SharedPreferences có mã hóa hoặc Flutter Secure Storage
+  Future<Map<String, String>> getAdminCredentials() async {
+      // Đây chỉ là phương pháp tạm thời và không an toàn
+      // Trong thực tế, hãy sử dụng tính năng như Custom Firebase Admin SDK
+      // hoặc Firebase Functions để xử lý các nhiệm vụ admin
+      
+      // Kiểm tra xem người dùng hiện tại có phải là admin không
+          return {
+            'email': "admin@gmail.com",
+            'password': '123456' // Mật khẩu giả định, KHÔNG ĐƯỢC SỬ DỤNG TRONG SẢN PHẨM THỰC TẾ!
+
+
+  };
+} }

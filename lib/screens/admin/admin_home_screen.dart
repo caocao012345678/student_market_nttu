@@ -6,6 +6,7 @@ import 'package:student_market_nttu/screens/admin/moderation_stats_screen.dart';
 import 'package:student_market_nttu/screens/admin/user_management_screen.dart';
 import 'package:student_market_nttu/screens/home_screen.dart';
 import 'package:student_market_nttu/screens/login_screen.dart';
+import 'package:student_market_nttu/screens/admin/bulk_register_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -260,6 +261,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       );
                     },
                     subtitle: 'Cấu hình và tùy chỉnh hệ thống',
+                  ),
+                ),
+                SizedBox(
+                  width: (MediaQuery.of(context).size.width - 48) / 2,
+                  child: _buildMenuCard(
+                    title: 'Đăng ký hàng loạt',
+                    icon: Icons.group_add,
+                    color: Colors.deepOrange,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BulkRegisterScreen(),
+                        ),
+                      );
+                    },
+                    subtitle: 'Tạo nhiều tài khoản sinh viên',
                   ),
                 ),
               ],

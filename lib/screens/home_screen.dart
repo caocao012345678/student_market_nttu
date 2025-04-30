@@ -184,18 +184,57 @@ class _HomeContentState extends State<HomeContent> {
               },
               itemCount: _bannerImages.length,
               itemBuilder: (context, index) {
-                return CachedNetworkImage(
-                  imageUrl: _bannerImages[index],
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: CircularProgressIndicator(),
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.blue[800]!,
+                        Colors.blue[400]!,
+                      ],
                     ),
                   ),
-                  errorWidget: (context, url, error) => Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.error),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Nếu cần hiển thị ảnh banner thật sau này, có thể thêm code tại đây
+                      Center(
+                        child: Icon(
+                          index == 0 
+                            ? Icons.shopping_cart 
+                            : index == 1 
+                              ? Icons.book 
+                              : Icons.school,
+                          size: 48,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 30,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16, 
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            index == 0 
+                              ? 'Chợ sinh viên NTTU' 
+                              : index == 1 
+                                ? 'Sách và đồ dùng học tập'
+                                : 'Trao đổi đồ miễn phí',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -214,8 +253,8 @@ class _HomeContentState extends State<HomeContent> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _currentBannerIndex == entry.key
-                          ? Colors.blue[900]
-                          : Colors.grey.withOpacity(0.5),
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.5),
                     ),
                   );
                 }).toList(),
@@ -326,34 +365,51 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildFeaturedShops() {
-    // This would be replaced with actual data from a service
+   
+    // Dữ liệu mẫu cho Shop nổi bật
     final List<Map<String, dynamic>> featuredShops = [
       {
-        'name': 'Shop NTTU Books',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop1.jpg?alt=media',
+        'id': '1',
+        'name': 'Shop Công Nghệ NTTU',
+        'icon': Icons.computer,
+        'iconColor': Colors.blue,
         'rating': 4.8,
-        'productCount': 56,
+        'productCount': 126,
       },
       {
-        'name': 'Điện tử sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop2.jpg?alt=media',
-        'rating': 4.5,
-        'productCount': 42,
-      },
-      {
-        'name': 'Second Hand NTTU',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop3.jpg?alt=media',
+        'id': '2',
+        'name': 'Sách Cũ Sinh Viên',
+        'icon': Icons.book,
+        'iconColor': Colors.amber,
         'rating': 4.6,
-        'productCount': 78,
+        'productCount': 89,
       },
       {
-        'name': 'Thời trang sinh viên',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fshop4.jpg?alt=media',
+        'id': '3',
+        'name': 'Thời Trang NTTU',
+        'icon': Icons.shopping_bag,
+        'iconColor': Colors.pink,
+        'rating': 4.5,
+        'productCount': 154,
+      },
+      {
+        'id': '4',
+        'name': 'Đồ Cũ Ký Túc',
+        'icon': Icons.home,
+        'iconColor': Colors.green,
+        'rating': 4.3,
+        'productCount': 72,
+      },
+      {
+        'id': '5',
+        'name': 'Trang Sức Handmade',
+        'icon': Icons.diamond,
+        'iconColor': Colors.purple,
         'rating': 4.7,
         'productCount': 63,
       },
     ];
-
+    
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       shape: RoundedRectangleBorder(
@@ -404,8 +460,11 @@ class _HomeContentState extends State<HomeContent> {
                       children: [
                         CircleAvatar(
                           radius: 36,
-                          backgroundImage: CachedNetworkImageProvider(
-                            shop['avatar'],
+                          backgroundColor: shop['iconColor'],
+                          child: Icon(
+                            shop['icon'],
+                            color: Colors.white,
+                            size: 24,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -452,23 +511,48 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  Widget _buildDonorRecognition() {
-    // This would be replaced with actual data from a service
+  Widget _buildDonorRecognition() {   
+    // Dữ liệu mẫu người tặng đồ
     final List<Map<String, dynamic>> topDonors = [
       {
-        'name': 'Nguyễn Văn A',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor1.jpg?alt=media',
+        'id': '1',
+        'name': 'Nguyễn Văn An',
+        'icon': Icons.person,
+        'iconColor': Colors.blue,
+        'donationCount': 24,
+        'faculty': 'Công nghệ thông tin',
+      },
+      {
+        'id': '2',
+        'name': 'Trần Thị Bình',
+        'icon': Icons.person,
+        'iconColor': Colors.pink,
+        'donationCount': 19,
+        'faculty': 'Quản trị kinh doanh',
+      },
+      {
+        'id': '3',
+        'name': 'Lê Hoàng Dũng',
+        'icon': Icons.person,
+        'iconColor': Colors.green,
+        'donationCount': 17,
+        'faculty': 'Kỹ thuật điện tử',
+      },
+      {
+        'id': '4',
+        'name': 'Phạm Minh Châu',
+        'icon': Icons.person,
+        'iconColor': Colors.orange,
         'donationCount': 15,
+        'faculty': 'Marketing',
       },
       {
-        'name': 'Trần Thị B',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor2.jpg?alt=media',
+        'id': '5',
+        'name': 'Võ Hoài Nam',
+        'icon': Icons.person,
+        'iconColor': Colors.purple,
         'donationCount': 12,
-      },
-      {
-        'name': 'Lê Văn C',
-        'avatar': 'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/avatars%2Fdonor3.jpg?alt=media',
-        'donationCount': 10,
+        'faculty': 'Kiến trúc',
       },
     ];
 
@@ -506,7 +590,108 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ),
               ],
-            ),            
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 160,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: topDonors.length,
+                itemBuilder: (context, index) {
+                  final donor = topDonors[index];
+                  return Container(
+                    width: 120,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: 36,
+                              backgroundColor: donor['iconColor'],
+                              child: Icon(
+                                donor['icon'],
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            if (index < 3)
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: index == 0 
+                                      ? Colors.amber 
+                                      : index == 1 
+                                        ? Colors.grey[400] 
+                                        : Colors.brown[300],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          donor['name'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          donor['faculty'],
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Tặng ${donor['donationCount']} món',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.blue[800],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

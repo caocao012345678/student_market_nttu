@@ -163,32 +163,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ],
                       ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Icon(
-                            Icons.school,
-                            size: 50,
-                            color: Theme.of(context).colorScheme.primary,
+                      child: Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.contain, 
                           ),
-                          Positioned(
-                            bottom: 20,
-                            right: 20,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              child: const Icon(
-                                Icons.shopping_cart,
-                                size: 18,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -276,7 +258,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _emailController,
                             decoration: InputDecoration(
                               labelText: 'Email',
-                              hintText: 'Nhập địa chỉ email của bạn',
+                              hintText: 'Nhập Email sinh viên @nttu.edu.vn',
                               prefixIcon: const Icon(Icons.email),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -289,10 +271,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               if (value == null || value.isEmpty) {
                                 return 'Vui lòng nhập email';
                               }
-                              // Simple email validation
-                              if (!value.contains('@') || !value.contains('.')) {
-                                return 'Email không hợp lệ';
+                              
+                              // Kiểm tra định dạng email NTTU (10 chữ số + @nttu.edu.vn)
+                              RegExp nttuEmailRegex = RegExp(r'^\d{10}@nttu\.edu\.vn$');
+                              if (!nttuEmailRegex.hasMatch(value)) {
+                                return 'Email phải có định dạng xxxxxxxxxx@nttu.edu.vn\n(x là 10 số)';
                               }
+                              
                               return null;
                             },
                           ),

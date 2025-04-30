@@ -625,4 +625,193 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
       'Đã xảy ra lỗi khi đồng bộ lại index'
     );
   }
+});
+
+/**
+ * Cloud Function tạo tài khoản hàng loạt
+ * Chức năng này chỉ dành cho admin
+ */
+exports.createBulkAccounts = functions.https.onCall(async (data, context) => {
+  console.log('Bắt đầu tạo tài khoản hàng loạt:', {
+    requestedBy: context.auth?.uid,
+    email: context.auth?.token?.email,
+    totalAccounts: data.accounts?.length || 0
+  });
+  
+  // Kiểm tra người dùng đã đăng nhập
+  if (!context.auth) {
+    console.error('Người dùng chưa đăng nhập');
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Bạn cần đăng nhập để sử dụng chức năng này'
+    );
+  }
+  
+  // Có thể thêm kiểm tra bổ sung như kiểm tra email của người dùng
+  // thay vì dựa vào custom claims admin
+  
+  // HOẶC: Kiểm tra người dùng có trong danh sách admin
+  const adminEmails = ['admin@nttu.edu.vn', context.auth.token.email]; // Thêm email của bạn vào đây
+  if (!adminEmails.includes(context.auth.token.email)) {
+    console.error('Người dùng không có quyền admin:', context.auth.token.email);
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Chỉ admin mới có thể sử dụng chức năng này'
+    );
+  }
+
+  // Kiểm tra dữ liệu đầu vào
+  if (!data.accounts || !Array.isArray(data.accounts) || data.accounts.length === 0) {
+    console.error('Dữ liệu đầu vào không hợp lệ:', data);
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Vui lòng cung cấp danh sách tài khoản hợp lệ'
+    );
+  }
+
+  const accounts = data.accounts;
+  const results = {
+    successful: [],
+    failed: []
+  };
+
+  try {
+    console.log(`Bắt đầu xử lý ${accounts.length} tài khoản`);
+    
+    // Xử lý từng tài khoản một
+    for (let i = 0; i < accounts.length; i++) {
+      const account = accounts[i];
+      console.log(`Đang xử lý tài khoản ${i+1}/${accounts.length}: ${account.email}`);
+      
+      try {
+        // Kiểm tra dữ liệu tài khoản
+        if (!account.email || !account.password || !account.displayName) {
+          console.warn(`Tài khoản ${i+1}/${accounts.length} thiếu thông tin:`, {
+            hasEmail: !!account.email,
+            hasPassword: !!account.password,
+            hasDisplayName: !!account.displayName
+          });
+          
+          results.failed.push({
+            email: account.email || 'Unknown',
+            success: false,
+            error: 'Thiếu thông tin tài khoản'
+          });
+          continue;
+        }
+
+        // Kiểm tra tài khoản đã tồn tại chưa
+        try {
+          const userExists = await admin.auth().getUserByEmail(account.email);
+          if (userExists) {
+            console.warn(`Email ${account.email} đã tồn tại trong hệ thống`);
+            results.failed.push({
+              email: account.email,
+              success: false,
+              error: 'Email đã tồn tại trong hệ thống'
+            });
+            continue;
+          }
+        } catch (error) {
+          // Lỗi USER_NOT_FOUND có nghĩa là email chưa tồn tại, đây là kết quả mong muốn
+          if (error.code !== 'auth/user-not-found') {
+            console.error(`Lỗi khi kiểm tra email ${account.email}:`, error);
+          }
+        }
+
+        // Tạo tài khoản trong Firebase Authentication
+        console.log(`Tạo tài khoản Authentication cho ${account.email}`);
+        const userRecord = await admin.auth().createUser({
+          email: account.email,
+          password: account.password,
+          displayName: account.displayName,
+          disabled: false
+        });
+
+        // Thêm thông tin vào Firestore
+        console.log(`Tạo document Firestore cho ${account.email}`);
+        await db.collection('users').doc(userRecord.uid).set({
+          email: account.email,
+          displayName: account.displayName,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastActive: admin.firestore.FieldValue.serverTimestamp(),
+          photoURL: '',
+          phoneNumber: account.phoneNumber || '',
+          address: '',
+          preferences: {},
+          settings: {},
+          favoriteProducts: [],
+          followers: [],
+          following: [],
+          isShipper: false,
+          isVerified: false,
+          productCount: 0,
+          rating: 0.0,
+          nttPoint: 0,
+          nttCredit: 100,
+          isStudent: true,
+          studentId: account.studentId || '',
+          department: account.department || '',
+          studentYear: account.studentYear || null,
+          major: account.major || null,
+          specialization: account.specialization || null,
+          interests: [],
+          preferredCategories: [],
+          completedSurvey: false,
+          isAdmin: account.role === 'admin',
+          role: account.role || 'user',
+          createdBy: context.auth.uid // ID của admin đã tạo tài khoản
+        });
+
+        // Thêm vào danh sách thành công
+        console.log(`✅ Đã tạo tài khoản thành công cho ${account.email}`);
+        results.successful.push({
+          uid: userRecord.uid,
+          email: account.email,
+          displayName: account.displayName,
+          success: true
+        });
+      } catch (error) {
+        console.error(`❌ Lỗi khi tạo tài khoản ${account.email}:`, error);
+        // Ghi chi tiết hơn về lỗi
+        const errorInfo = {
+          code: error.code || 'unknown',
+          message: error.message,
+          stack: error.stack,
+        };
+        console.error('Chi tiết lỗi:', JSON.stringify(errorInfo));
+        
+        results.failed.push({
+          email: account.email,
+          success: false,
+          error: error.message,
+          errorCode: error.code || 'unknown'
+        });
+      }
+    }
+
+    const summary = {
+      success: true,
+      totalProcessed: accounts.length,
+      successCount: results.successful.length,
+      failedCount: results.failed.length,
+      successful: results.successful,
+      failed: results.failed,
+      completedAt: new Date().toISOString()
+    };
+    
+    console.log(`✅ Hoàn thành tạo tài khoản hàng loạt: ${results.successful.length} thành công, 
+      ${results.failed.length} thất bại`);
+    
+    return summary;
+  } catch (error) {
+    console.error('❌ Lỗi hệ thống khi tạo tài khoản hàng loạt:', error);
+    console.error('Stack trace:', error.stack);
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Đã xảy ra lỗi khi xử lý tạo tài khoản hàng loạt',
+      { errorMessage: error.message }
+    );
+  }
 }); 

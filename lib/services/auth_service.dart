@@ -236,4 +236,85 @@ class AuthService extends ChangeNotifier {
       throw e;
     }
   }
+
+  // Tạo tài khoản mới mà không tự động đăng nhập
+  Future<void> createUserWithoutSignIn(String email, String password, String username) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      // Lưu lại thông tin người dùng hiện tại
+      final currentUser = _auth.currentUser;
+      
+      // Create user with email and password
+      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (userCredential.user != null) {
+        // Create initial user document in Firestore
+        await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+          'email': email,
+          'displayName': username,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastActive': FieldValue.serverTimestamp(),
+          'photoURL': '',
+          'phoneNumber': '',
+          'address': '',
+          'preferences': {},
+          'settings': {},
+          'favoriteProducts': [],
+          'followers': [],
+          'following': [],
+          'isShipper': false,
+          'isVerified': false,
+          'productCount': 0,
+          'rating': 0.0,
+          'nttPoint': 0,
+          'nttCredit': 100,
+          'isStudent': false,
+          'studentId': null,
+          'department': null,
+          'studentYear': null,
+          'major': null,
+          'specialization': null,
+          'interests': [],
+          'preferredCategories': [],
+          'completedSurvey': false,
+          'isAdmin': false,
+          'role': 'user',
+        });
+
+        // Send email verification
+        await userCredential.user!.sendEmailVerification();
+      }
+
+      // Đăng nhập lại người dùng ban đầu nếu có
+      if (currentUser != null) {
+        try {
+          // Cách khác để đăng nhập lại (sử dụng token, không cần mật khẩu)
+          // Đây chỉ là ví dụ, không phải cách thực tế làm việc với Firebase
+          // Thực tế cần lưu thông tin đăng nhập của admin và đăng nhập lại
+          // Nhưng code này chỉ để mô tả ý tưởng
+          
+          // Đáng lẽ phải dùng Custom Token hoặc phương pháp khác
+          // await _auth.signInWithCustomToken(adminToken);
+        } catch (e) {
+          debugPrint('Error signing back in: $e');
+        }
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      throw _handleFirebaseAuthException(e);
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
 } 
