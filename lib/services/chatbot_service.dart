@@ -43,17 +43,9 @@ class ChatbotService extends ChangeNotifier {
     'help': [
       'hướng dẫn', 'cách', 'làm sao', 'làm thế nào', 'giúp', 'help'
     ],
-    'account': [
-      'tài khoản', 'đăng ký', 'đăng nhập', 'password', 'mật khẩu', 'thông tin cá nhân', 'profile'
-    ],
-    'order': [
-      'đơn hàng', 'đặt hàng', 'thanh toán', 'giao hàng', 'vận chuyển', 'order'
-    ],
-    'review': [
-      'đánh giá', 'review', 'phản hồi', 'sao', 'nhận xét'
-    ],
-    'chat': [
-      'tin nhắn', 'nhắn tin', 'liên hệ', 'chat', 'trò chuyện'
+    'talk_to_user': [
+      'tâm sự', 'chuyện trò', 'trò chuyện', 'tâm tình', 'nói chuyện', 'chia sẻ', 'buồn', 'vui',
+      'cảm thấy', 'nghĩ gì', 'cảm xúc', 'suy nghĩ', 'lo lắng', 'áp lực', 'căng thẳng', 'stress'
     ]
   };
   
@@ -139,9 +131,29 @@ class ChatbotService extends ChangeNotifier {
     notifyListeners();
     
     try {
-      // Sử dụng AI để phân loại câu hỏi thay vì kiểm tra pattern đơn giản
+      // Sử dụng AI để phân loại câu hỏi
       final messageCategory = await _classifyMessage(message);
       
+      // Trích xuất từ khóa chính dựa trên loại tin nhắn
+      List<String> keywords = [];
+      
+      switch (messageCategory) {
+        case 'product_search':
+          keywords = await _extractProductKeywords(message);
+          print('Extracted product keywords: $keywords');
+          break;
+        case 'help':
+          keywords = await _extractHelpKeywords(message);
+          print('Extracted help keywords: $keywords');
+          break;
+        default:
+          // Cho các loại tin nhắn khác, sử dụng trích xuất từ khóa chung
+          keywords = await _extractMainKeywords(message);
+          print('Extracted general keywords: $keywords');
+          break;
+      }
+      
+      // Xử lý tin nhắn theo danh mục
       switch (messageCategory) {
         case 'greeting':
           _addBotTextMessage(_getRandomGreetingResponse());
@@ -150,26 +162,17 @@ class ChatbotService extends ChangeNotifier {
           _addBotTextMessage(_getRandomFarewellResponse());
           break;
         case 'product_search':
-          await _handleProductSearch(message);
+          await _handleProductSearch(message, keywords);
           break;
         case 'help':
-          await _handleHelpRequest(message);
+          await _handleHelpRequest(message, keywords);
           break;
-        case 'account':
-          await _handleAccountQuestion(message);
-          break;
-        case 'order':
-          await _handleOrderQuestion(message);
-          break;
-        case 'review':
-          await _handleReviewQuestion(message);
-          break;
-        case 'chat':
-          await _handleChatQuestion(message);
+        case 'talk_to_user':
+          await _handleTalkToUser(message);
           break;
         default:
           // Nếu không xác định được loại tin nhắn, sử dụng RAG để tạo phản hồi
-          await _generateRAGResponse(message);
+          await _generateRAGResponse(message, keywords);
       }
     } catch (e) {
       print('Error processing message: $e');
@@ -177,6 +180,211 @@ class ChatbotService extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+  
+  // Trích xuất từ khóa chung 
+  Future<List<String>> _extractMainKeywords(String message) async {
+    try {
+      final url = _getGeminiApiUrl();
+      
+      final prompt = '''Trích xuất TỐI ĐA 5 từ khóa CHÍNH từ câu hỏi sau đây của người dùng.
+Chỉ trả về danh sách từ khóa, mỗi từ khóa một dòng, không có số thứ tự, không có dấu gạch đầu dòng.
+Từ khóa nên là các danh từ hoặc cụm từ ngắn, có ý nghĩa và liên quan trực tiếp đến nội dung câu hỏi.
+KHÔNG bao gồm các từ chung chung như "cách", "làm sao", "hướng dẫn" trừ khi chúng là phần quan trọng của câu hỏi.
+Ví dụ, nếu câu hỏi là "Làm sao để đăng ký tài khoản?", từ khóa nên là "đăng ký tài khoản", không phải "làm sao".
+Từ khóa có thể bằng tiếng Việt hoặc tiếng Anh tùy thuộc vào ngôn ngữ trong câu hỏi.
+Sắp xếp từ khóa theo thứ tự quan trọng giảm dần.
+
+Câu hỏi: $message''';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+        },
+        encoding: Encoding.getByName('utf-8'),
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': prompt
+                }
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.1,
+            'maxOutputTokens': 100,
+          }
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final String resultText = data['candidates'][0]['content']['parts'][0]['text'].trim();
+        
+        // Tách các từ khóa (mỗi từ khóa một dòng)
+        final keywords = resultText
+            .split('\n')
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty)
+            .take(5) // Giới hạn tối đa 5 từ khóa
+            .toList();
+        
+        return keywords;
+      } else {
+        print('Error extracting main keywords: ${utf8.decode(response.bodyBytes)}');
+        // Trong trường hợp lỗi, sử dụng phương thức trích xuất từ khóa cũ
+        return _extractKeywords(message);
+      }
+    } catch (e) {
+      print('Exception extracting main keywords: $e');
+      // Trong trường hợp lỗi, sử dụng phương thức trích xuất từ khóa cũ
+      return _extractKeywords(message);
+    }
+  }
+  
+  // Phương thức mới: Trích xuất từ khóa liên quan đến sản phẩm
+  Future<List<String>> _extractProductKeywords(String message) async {
+    try {
+      final url = _getGeminiApiUrl();
+      
+      final prompt = '''Trích xuất TỐI ĐA 5 từ khóa CHÍNH liên quan đến SẢN PHẨM từ câu hỏi của người dùng.
+Chỉ trả về danh sách từ khóa, mỗi từ khóa một dòng, không có số thứ tự, không có dấu gạch đầu dòng.
+Tập trung vào các từ khóa liên quan đến:
+- Tên sản phẩm hoặc loại sản phẩm
+- Đặc điểm, thuộc tính của sản phẩm (màu sắc, kích thước, tính năng)
+- Thương hiệu hoặc nhà sản xuất
+- Giá cả hoặc phạm vi giá
+- Mục đích sử dụng sản phẩm
+- Danh mục sản phẩm
+
+KHÔNG bao gồm các từ chung chung như "tìm", "mua", "sản phẩm", "có bán không" trừ khi chúng là phần quan trọng.
+Từ khóa có thể bằng tiếng Việt hoặc tiếng Anh tùy thuộc vào ngôn ngữ trong câu hỏi.
+Sắp xếp từ khóa theo thứ tự quan trọng giảm dần.
+
+Câu hỏi: $message''';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+        },
+        encoding: Encoding.getByName('utf-8'),
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': prompt
+                }
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.1,
+            'maxOutputTokens': 100,
+          }
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final String resultText = data['candidates'][0]['content']['parts'][0]['text'].trim();
+        
+        // Tách các từ khóa (mỗi từ khóa một dòng)
+        final keywords = resultText
+            .split('\n')
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty)
+            .take(5) // Giới hạn tối đa 5 từ khóa
+            .toList();
+        
+        return keywords;
+      } else {
+        print('Error extracting product keywords: ${utf8.decode(response.bodyBytes)}');
+        // Trong trường hợp lỗi, sử dụng phương thức trích xuất từ khóa chung
+        return _extractMainKeywords(message);
+      }
+    } catch (e) {
+      print('Exception extracting product keywords: $e');
+      // Trong trường hợp lỗi, sử dụng phương thức trích xuất từ khóa chung
+      return _extractMainKeywords(message);
+    }
+  }
+  
+  // Phương thức mới: Trích xuất từ khóa liên quan đến trợ giúp ứng dụng
+  Future<List<String>> _extractHelpKeywords(String message) async {
+    try {
+      final url = _getGeminiApiUrl();
+      
+      final prompt = '''Trích xuất TỐI ĐA 5 từ khóa CHÍNH liên quan đến TÍNH NĂNG ỨNG DỤNG từ câu hỏi của người dùng (KHÔNG nhất thiết phải đủ 5). Không được tạo có từ khóa không liên quan mật thiết với câu hỏi người dùng
+Chỉ trả về danh sách từ khóa, mỗi từ khóa một dòng, không có số thứ tự, không có dấu gạch đầu dòng.
+Tập trung vào các từ khóa liên quan đến:
+- Tính năng hoặc chức năng cụ thể của ứng dụng
+- Giao diện người dùng
+- Cài đặt hoặc cấu hình
+- Đăng ký, đăng nhập, tài khoản 
+- Quy trình thực hiện việc gì đó (mua hàng, bán hàng, thanh toán)
+- Vấn đề người dùng gặp phải
+- Hướng dẫn sử dụng ứng dụng
+
+KHÔNG bao gồm các từ chung chung như "cách", "làm sao", "hướng dẫn" trừ khi chúng là phần quan trọng.
+Từ khóa có thể bằng tiếng Việt hoặc tiếng Anh tùy thuộc vào ngôn ngữ trong câu hỏi.
+Sắp xếp từ khóa theo thứ tự quan trọng giảm dần.
+
+Câu hỏi: $message''';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+        },
+        encoding: Encoding.getByName('utf-8'),
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': prompt
+                }
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.1,
+            'maxOutputTokens': 100,
+          }
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final String resultText = data['candidates'][0]['content']['parts'][0]['text'].trim();
+        
+        // Tách các từ khóa (mỗi từ khóa một dòng)
+        final keywords = resultText
+            .split('\n')
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty)
+            .take(5) // Giới hạn tối đa 5 từ khóa
+            .toList();
+        
+        return keywords;
+      } else {
+        print('Error extracting help keywords: ${utf8.decode(response.bodyBytes)}');
+        // Trong trường hợp lỗi, sử dụng phương thức trích xuất từ khóa chung
+        return _extractMainKeywords(message);
+      }
+    } catch (e) {
+      print('Exception extracting help keywords: $e');
+      // Trong trường hợp lỗi, sử dụng phương thức trích xuất từ khóa chung
+      return _extractMainKeywords(message);
     }
   }
   
@@ -202,10 +410,7 @@ class ChatbotService extends ChangeNotifier {
         'farewell': 'Lời tạm biệt, kết thúc cuộc trò chuyện',
         'product_search': 'Tìm kiếm hoặc hỏi về giá của sản phẩm cụ thể',
         'help': 'Yêu cầu hỗ trợ chung, hướng dẫn sử dụng các tính năng của ứng dụng (ví dụ: cách bán hàng, cách tạo tài khoản, nút tìm kiếm ở đâu, v.v.',
-        'account': 'Thông tin tài khoản, đăng ký, đăng nhập, mật khẩu',
-        'order': 'Đơn hàng, đặt hàng, thanh toán, giao hàng',
-        'review': 'Đánh giá, nhận xét về sản phẩm hoặc dịch vụ',
-        'chat': 'Tính năng tin nhắn, trò chuyện với người bán hoặc người dùng khác',
+        'talk_to_user': 'Trò chuyện, tâm sự, chia sẻ cảm xúc, suy nghĩ với người dùng, giúp đỡ về mặt tinh thần',
         'unknown': 'Không thuộc các danh mục trên' // Vẫn giữ cái này trong map gốc nếu cần xử lý sau
       };
       
@@ -490,15 +695,20 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
   }
   
   // Xử lý tìm kiếm sản phẩm
-  Future<void> _handleProductSearch(String message) async {
+  Future<void> _handleProductSearch(String message, [List<String>? keywords]) async {
     try {
       List<Product> products = [];
+      
+      // Sử dụng từ khóa nếu có
+      final searchQuery = keywords != null && keywords.isNotEmpty
+          ? '${message} ${keywords.join(' ')}'
+          : message;
       
       // Sử dụng Cloud Function để tìm kiếm sản phẩm
       try {
         final result = await _functions.httpsCallable('searchProductsByText').call({
-          'query': message,
-          'limit': 3,
+          'query': searchQuery,
+          'limit': 5,
         });
         
         if (result.data != null && result.data['results'] != null) {
@@ -527,7 +737,7 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
         print('Error using searchProductsByText: $e');
         
         // Fallback: Sử dụng tìm kiếm từ local
-        products = await _searchProductsWithKeywords(message);
+        products = await _searchProductsWithKeywords(searchQuery);
       }
       
       if (products.isEmpty) {
@@ -535,11 +745,16 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
         return;
       }
       
-      // Lấy 5 sản phẩm phù hợp nhất
-      final limitedProducts = products.take(3).toList();
+      // Đánh giá sản phẩm với AI để xác định mức độ phù hợp
+      final relevantProducts = await _evaluateProductRelevance(message, products, keywords);
+      
+      if (relevantProducts.isEmpty) {
+        _addBotTextMessage('Xin lỗi, tôi không tìm thấy sản phẩm nào thực sự phù hợp với yêu cầu của bạn.');
+        return;
+      }
       
       // Tạo tin nhắn hiển thị danh sách sản phẩm theo dạng trượt ngang
-      _addBotProductListMessage('Đây là các sản phẩm phù hợp với yêu cầu của bạn:', limitedProducts);
+      _addBotProductListMessage('Đây là các sản phẩm phù hợp với yêu cầu của bạn:', relevantProducts);
       
     } catch (e) {
       print('Error in product search: $e');
@@ -576,21 +791,48 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
   }
   
   // Xử lý yêu cầu trợ giúp
-  Future<void> _handleHelpRequest(String message) async {
+  Future<void> _handleHelpRequest(String message, [List<String>? keywords]) async {
     try {
       // Tìm kiếm tài liệu trợ giúp từ Firestore
-      final helpDocuments = await _searchHelpDocuments(message);
+      final helpDocuments = await _searchHelpDocuments(message, keywords);
       
       if (helpDocuments.isEmpty) {
         _addBotTextMessage('Xin lỗi, tôi không tìm thấy thông tin hướng dẫn phù hợp. Bạn có thể mô tả chi tiết hơn?');
         return;
       }
       
-      // Sử dụng tài liệu tìm được để tạo câu trả lời
-      final document = helpDocuments.first;
-      final response = await _generateHelpResponse(message, document);
+      // Đánh giá mức độ phù hợp của tất cả tài liệu và lưu lại kết quả
+      List<Map<String, dynamic>> relevanceScores = [];
       
-      _addBotHelpMessage(response, document);
+      // Lấy tối đa 5 tài liệu đầu tiên để đánh giá
+      final documentsToEvaluate = helpDocuments.take(5).toList();
+      
+      for (final document in documentsToEvaluate) {
+        final relevanceScore = await _evaluateHelpRelevance(message, document, keywords);
+        relevanceScores.add({
+          'document': document,
+          'score': relevanceScore,
+        });
+      }
+      
+      // Lọc ra những tài liệu có điểm cao (từ 6 trở lên)
+      final relevantDocuments = relevanceScores
+          .where((item) => (item['score'] as double) >= 0.0)
+          .toList();
+      
+      if (relevantDocuments.isEmpty) {
+        _addBotTextMessage('Xin lỗi, hiện tại tôi không có thông tin phù hợp để trả lời câu hỏi của bạn.');
+        return;
+      }
+      
+      // Sắp xếp theo điểm từ cao đến thấp
+      relevantDocuments.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
+      
+      // Sử dụng tài liệu có điểm cao nhất để tạo câu trả lời
+      final bestDocument = relevantDocuments.first['document'] as KnowledgeDocument;
+      final response = await _generateHelpResponse(message, bestDocument, keywords);
+      
+      _addBotHelpMessage(response, bestDocument);
       
     } catch (e) {
       print('Error in help request: $e');
@@ -657,19 +899,24 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
   }
   
   // Tìm kiếm tài liệu trợ giúp từ Firestore và Pinecone
-  Future<List<KnowledgeDocument>> _searchHelpDocuments(String query) async {
+  Future<List<KnowledgeDocument>> _searchHelpDocuments(String query, [List<String>? keywords]) async {
     try {
       List<KnowledgeDocument> documents = [];
       
+      // Sử dụng từ khóa nếu có
+      final searchQuery = keywords != null && keywords.isNotEmpty
+          ? '${query} ${keywords.join(' ')}'
+          : query;
+      
       // Nếu Pinecone đã được khởi tạo, sử dụng tìm kiếm ngữ nghĩa
       if (_isPineconeInitialized) {
-        final searchResults = await _findSimilarItemsInPinecone(query, topK: 3);
+        final searchResults = await _findSimilarItemsInPinecone(searchQuery, topK: 3);
         documents = searchResults['documents'] as List<KnowledgeDocument>;
       }
       
       // Nếu không tìm thấy kết quả từ Pinecone hoặc Pinecone chưa khởi tạo, sử dụng tìm kiếm từ Firestore
       if (documents.isEmpty) {
-        documents = await _searchHelpDocumentsFromFirestore(query);
+        documents = await _searchHelpDocumentsFromFirestore(searchQuery);
       }
       
       // Nếu vẫn không tìm thấy kết quả, sử dụng mock data
@@ -742,10 +989,95 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
     ];
   }
   
-  // Tạo câu trả lời cho yêu cầu trợ giúp sử dụng Gemini
-  Future<String> _generateHelpResponse(String query, KnowledgeDocument document) async {
+  // Đánh giá mức độ phù hợp của tài liệu trợ giúp sử dụng AI
+  Future<double> _evaluateHelpRelevance(String query, KnowledgeDocument document, [List<String>? keywords]) async {
     try {
       final url = _getGeminiApiUrl();
+      
+      // Tạo phần từ khóa nếu có
+      final keywordsText = keywords != null && keywords.isNotEmpty
+          ? '\nTừ khóa chính: ${keywords.join(', ')}'
+          : '';
+      
+      final prompt = '''Đánh giá mức độ phù hợp của tài liệu trợ giúp với câu hỏi của người dùng.
+Câu hỏi: "$query"$keywordsText
+
+Tài liệu:
+Tiêu đề: ${document.title}
+Nội dung: ${document.content}
+Danh mục: ${document.category}
+
+Xác định mức độ phù hợp của tài liệu với câu hỏi của người dùng trên thang điểm từ 0 đến 10.
+Trả về duy nhất một số từ 0-10, không có giải thích.
+Trong đó:
+0-3: Hoàn toàn không liên quan
+4-6: Có liên quan một phần
+7-10: Rất phù hợp hoặc trả lời trực tiếp câu hỏi''';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+        },
+        encoding: Encoding.getByName('utf-8'),
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': prompt
+                }
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.1,
+            'maxOutputTokens': 10,
+          }
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final String result = data['candidates'][0]['content']['parts'][0]['text'].trim();
+        
+        // Trích xuất giá trị số từ kết quả
+        final match = RegExp(r'\d+\.?\d*').firstMatch(result);
+        if (match != null) {
+          final score = double.tryParse(match.group(0) ?? '0') ?? 0;
+          // Giới hạn điểm từ 0-10
+          return score > 10 ? 10 : (score < 0 ? 0 : score);
+        }
+        
+        // Fallback cho các trường hợp không trích xuất được số
+        if (result.toLowerCase().contains('phù hợp') || 
+            result.toLowerCase().contains('liên quan')) {
+          return 7.0;
+        }
+        
+        return 0.0;
+      } else {
+        print('Error evaluating help relevance: ${utf8.decode(response.bodyBytes)}');
+        // Trong trường hợp lỗi, mặc định là điểm trung bình
+        return 5.0;
+      }
+    } catch (e) {
+      print('Exception evaluating help relevance: $e');
+      // Trong trường hợp lỗi, mặc định là điểm trung bình
+      return 5.0;
+    }
+  }
+
+  // Tạo câu trả lời cho yêu cầu trợ giúp sử dụng Gemini
+  Future<String> _generateHelpResponse(String query, KnowledgeDocument document, [List<String>? keywords]) async {
+    try {
+      final url = _getGeminiApiUrl();
+      
+      // Tạo phần từ khóa nếu có
+      final keywordsText = keywords != null && keywords.isNotEmpty
+          ? '\nTừ khóa chính: ${keywords.join(', ')}'
+          : '';
       
       final response = await http.post(
         Uri.parse(url),
@@ -762,12 +1094,13 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
                   'text': '''Sử dụng thông tin từ tài liệu để trả lời câu hỏi của người dùng một cách lịch sự và hữu ích, bằng tiếng Việt.
 Trả lời trực tiếp không bao gồm tựa đề, giới thiệu, hoặc kết luận. Không thêm "Trả lời:" hoặc bất kỳ tiêu đề nào vào phản hồi.
 Chỉ cung cấp nội dung trả lời mạch lạc, rõ ràng, không thừa thãi.
+Tập trung vào các từ khóa chính nếu được cung cấp.
 
 Tài liệu: ${document.title}
 
 ${document.content}
 
-Câu hỏi: $query'''
+Câu hỏi: $query$keywordsText'''
                 }
               ]
             }
@@ -788,7 +1121,7 @@ Câu hỏi: $query'''
           RegExp(r'^Trả lời:?\s*', caseSensitive: false),
           RegExp(r'^Dựa\s+(?:trên|vào)\s+(?:tài liệu|thông tin)[^:]*:?\s*', caseSensitive: false),
           RegExp(r'^Theo\s+(?:tài liệu|thông tin)[^:]*:?\s*', caseSensitive: false),
-          RegExp(r'^${document.title}:?\s*', caseSensitive: false),
+          RegExp(r'^Phản hồi:?\s*', caseSensitive: false),
         ];
         
         for (final pattern in patterns) {
@@ -807,10 +1140,10 @@ Câu hỏi: $query'''
   }
   
   // Tạo câu trả lời bằng kỹ thuật RAG sử dụng Gemini
-  Future<void> _generateRAGResponse(String query) async {
+  Future<void> _generateRAGResponse(String query, [List<String>? keywords]) async {
     try {
       // Sử dụng phương thức mới có tích hợp ngữ cảnh cuộc trò chuyện
-      await _generateRAGResponseWithContext(query);
+      await _generateRAGResponseWithContext(query, keywords);
     } catch (e) {
       print('Exception generating RAG response: $e');
       _addBotTextMessage('Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.');
@@ -818,12 +1151,12 @@ Câu hỏi: $query'''
   }
   
   // Thêm tính năng ghi nhớ ngữ cảnh cuộc trò chuyện
-  Future<void> _generateRAGResponseWithContext(String query) async {
+  Future<void> _generateRAGResponseWithContext(String query, [List<String>? keywords]) async {
     try {
       // Các bước được refactor thành các phương thức nhỏ với mục đích rõ ràng
       final conversationContext = _buildConversationContext();
-      final helpContext = await _buildHelpContext(query);
-      final productContext = await _buildProductContext(query);
+      final helpContext = await _buildHelpContext(query, keywords);
+      final productContext = await _buildProductContext(query, keywords);
       
       // Tổng hợp tất cả ngữ cảnh
       final completeContext = StringBuffer();
@@ -832,7 +1165,7 @@ Câu hỏi: $query'''
       completeContext.writeln(productContext);
       
       // Tạo và gửi câu trả lời
-      await _generateAndSendResponse(query, completeContext.toString());
+      await _generateAndSendResponse(query, completeContext.toString(), keywords);
     } catch (e) {
       print('Exception generating contextualized response: $e');
       _addBotTextMessage('Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.');
@@ -863,12 +1196,17 @@ Câu hỏi: $query'''
   }
   
   // Xây dựng ngữ cảnh từ tài liệu trợ giúp
-  Future<String> _buildHelpContext(String query) async {
+  Future<String> _buildHelpContext(String query, [List<String>? keywords]) async {
     final StringBuffer helpContext = StringBuffer();
     helpContext.writeln('Tài liệu liên quan:');
     
+    // Sử dụng từ khóa nếu có
+    final searchQuery = keywords != null && keywords.isNotEmpty
+        ? '${query} ${keywords.join(' ')}'
+        : query;
+    
     // Tìm kiếm tài liệu liên quan
-    final helpDocuments = await _searchHelpDocuments(query);
+    final helpDocuments = await _searchHelpDocuments(searchQuery);
     
     // Thêm tài liệu trợ giúp nếu có
     if (helpDocuments.isNotEmpty) {
@@ -884,9 +1222,14 @@ Câu hỏi: $query'''
   }
   
   // Xây dựng ngữ cảnh từ sản phẩm
-  Future<String> _buildProductContext(String query) async {
+  Future<String> _buildProductContext(String query, [List<String>? keywords]) async {
     final StringBuffer productContext = StringBuffer();
     productContext.writeln('Sản phẩm liên quan:');
+    
+    // Sử dụng từ khóa nếu có
+    final searchQuery = keywords != null && keywords.isNotEmpty
+        ? '${query} ${keywords.join(' ')}'
+        : query;
     
     // Thêm thông tin về sản phẩm nếu có từ khóa liên quan
     List<Product> products = [];
@@ -894,7 +1237,7 @@ Câu hỏi: $query'''
     // Sử dụng Cloud Function để tìm kiếm sản phẩm
     try {
       final result = await _functions.httpsCallable('searchProductsByText').call({
-        'query': query,
+        'query': searchQuery,
         'limit': 2,
       });
       
@@ -920,9 +1263,9 @@ Câu hỏi: $query'''
       print('Error using searchProductsByText for context: $e');
       
       // Fallback: Sử dụng tìm kiếm local
-      final keywords = await _extractKeywords(query);
-      if (keywords.isNotEmpty) {
-        products = await _fetchProductsByKeywords(keywords, limit: 2);
+      final keywordsForSearch = keywords ?? await _extractKeywords(query);
+      if (keywordsForSearch.isNotEmpty) {
+        products = await _fetchProductsByKeywords(keywordsForSearch, limit: 2);
       }
     }
     
@@ -973,8 +1316,13 @@ Câu hỏi: $query'''
   }
   
   // Tạo và gửi câu trả lời dựa trên ngữ cảnh
-  Future<void> _generateAndSendResponse(String query, String context) async {
+  Future<void> _generateAndSendResponse(String query, String context, [List<String>? keywords]) async {
     try {
+      // Tạo phần từ khóa nếu có
+      final keywordsText = keywords != null && keywords.isNotEmpty
+          ? '\nTừ khóa chính: ${keywords.join(', ')}'
+          : '';
+      
       // Tạo câu trả lời từ Gemini
       final url = _getGeminiApiUrl();
       
@@ -985,11 +1333,12 @@ Trả lời trực tiếp không bao gồm tựa đề, giới thiệu, hoặc k
 Nếu được hỏi về sản phẩm, hãy cung cấp thông tin về giá, mô tả, và cách mua hàng.
 Nếu được hỏi về cách sử dụng ứng dụng, hãy cung cấp hướng dẫn rõ ràng.
 Nếu không có đủ thông tin, hãy nói rằng bạn không biết hoặc đề xuất người dùng đặt câu hỏi rõ ràng hơn.
+Tập trung trả lời dựa trên các từ khóa chính được cung cấp.
 
 Ngữ cảnh:
 $context
 
-Câu hỏi hiện tại: $query''';
+Câu hỏi hiện tại: $query$keywordsText''';
       
       final response = await http.post(
         Uri.parse(url),
@@ -1405,5 +1754,162 @@ Câu hỏi hiện tại: $query''';
     products = products.where((product) => uniqueProductIds.add(product.id)).toList();
     
     return products;
+  }
+
+  // Đánh giá mức độ phù hợp của sản phẩm sử dụng AI
+  Future<List<Product>> _evaluateProductRelevance(String query, List<Product> products, [List<String>? keywords]) async {
+    try {
+      if (products.isEmpty) return [];
+      
+      final url = _getGeminiApiUrl();
+      
+      // Chuẩn bị danh sách sản phẩm để đánh giá
+      final StringBuffer productListText = StringBuffer();
+      for (int i = 0; i < products.length; i++) {
+        final product = products[i];
+        productListText.writeln('Sản phẩm ${i + 1}:');
+        productListText.writeln('- Tên: ${product.title}');
+        productListText.writeln('- Danh mục: ${product.category}');
+        productListText.writeln('- Giá: ${product.price.toStringAsFixed(0)} VND');
+        productListText.writeln('- Mô tả: ${product.description}');
+        productListText.writeln('- Tình trạng: ${product.condition}');
+        if (product.tags.isNotEmpty) {
+          productListText.writeln('- Tags: ${product.tags.join(', ')}');
+        }
+        productListText.writeln('');
+      }
+      
+      // Tạo phần từ khóa nếu có
+      final keywordsText = keywords != null && keywords.isNotEmpty
+          ? '\nTừ khóa chính: ${keywords.join(', ')}'
+          : '';
+      
+      final prompt = '''Đánh giá mức độ phù hợp của các sản phẩm dưới đây đối với yêu cầu của người dùng.
+Yêu cầu: "$query"$keywordsText
+
+Danh sách sản phẩm:
+$productListText
+
+Hãy đánh giá mức độ phù hợp của mỗi sản phẩm với yêu cầu của người dùng, tập trung vào các từ khóa chính.
+Trả về danh sách số thứ tự của các sản phẩm phù hợp, cách nhau bởi dấu phẩy.
+Không đưa vào danh sách những sản phẩm không phù hợp với yêu cầu.
+Chỉ trả về danh sách số (ví dụ: 1,3,5), không thêm giải thích.''';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+        },
+        encoding: Encoding.getByName('utf-8'),
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': prompt
+                }
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.1,
+            'maxOutputTokens': 50,
+          }
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final String resultText = data['candidates'][0]['content']['parts'][0]['text'].trim();
+        
+        // Xử lý kết quả trả về để lấy danh sách số
+        final List<int> relevantIndices = [];
+        // Tìm tất cả số trong chuỗi kết quả 
+        final matches = RegExp(r'\d+').allMatches(resultText);
+        for (final match in matches) {
+          final index = int.tryParse(match.group(0) ?? '');
+          if (index != null && index >= 1 && index <= products.length) {
+            relevantIndices.add(index - 1); // Chuyển từ 1-based index sang 0-based index
+          }
+        }
+        
+        // Nếu không có sản phẩm nào được xác định là phù hợp, trả về danh sách rỗng
+        if (relevantIndices.isEmpty) return [];
+        
+        // Lấy các sản phẩm phù hợp
+        return relevantIndices.map((index) => products[index]).toList();
+      } else {
+        print('Error evaluating product relevance: ${utf8.decode(response.bodyBytes)}');
+        // Trong trường hợp lỗi, trả về toàn bộ danh sách sản phẩm gốc
+        return products;
+      }
+    } catch (e) {
+      print('Exception evaluating product relevance: $e');
+      // Trong trường hợp lỗi, trả về toàn bộ danh sách sản phẩm gốc
+      return products;
+    }
+  }
+  
+
+  // Phương thức mới để xử lý tâm sự với người dùng
+  Future<void> _handleTalkToUser(String message) async {
+    try {
+      final url = _getGeminiApiUrl();
+      
+      final prompt = '''Bạn là trợ lý ảo của Student Market NTTU, một sàn thương mại điện tử cho sinh viên.
+Người dùng đang muốn trò chuyện, tâm sự hoặc chia sẻ cảm xúc với bạn.
+Hãy phản hồi một cách thấu hiểu, thân thiện và hỗ trợ tinh thần họ.
+Trả lời trực tiếp bằng tiếng Việt, không thêm "Trả lời:" hay bất kỳ tiêu đề nào.
+
+Tin nhắn của người dùng: "$message"''';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+        },
+        encoding: Encoding.getByName('utf-8'),
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': prompt
+                }
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.8,
+            'maxOutputTokens': 500,
+          }
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        String botResponse = data['candidates'][0]['content']['parts'][0]['text'];
+        
+        // Loại bỏ tiêu đề thường gặp từ phản hồi của AI
+        final patterns = [
+          RegExp(r'^Trả lời:?\s*', caseSensitive: false),
+          RegExp(r'^Phản hồi:?\s*', caseSensitive: false),
+        ];
+        
+        for (final pattern in patterns) {
+          botResponse = botResponse.replaceFirst(pattern, '');
+        }
+        
+        _addBotTextMessage(botResponse.trim());
+      } else {
+        print('Error generating talk response: ${response.statusCode} - ${response.body}');
+        _addBotTextMessage('Xin lỗi, tôi không thể trò chuyện lúc này. Bạn có thể chia sẻ sau được không?');
+      }
+    } catch (e) {
+      print('Error handling talk to user: $e');
+      _addBotTextMessage('Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.');
+    }
   }
 } 
