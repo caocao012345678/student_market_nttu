@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:convert' show jsonEncode, jsonDecode, utf8, Encoding;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -197,17 +197,16 @@ class ChatbotService extends ChangeNotifier {
     try {
       final url = _getGeminiApiUrl();
       
-      // Chuẩn bị danh sách category với mô tả
       final Map<String, String> categoryDescriptions = {
         'greeting': 'Lời chào hỏi, bắt đầu cuộc trò chuyện',
         'farewell': 'Lời tạm biệt, kết thúc cuộc trò chuyện',
-        'product_search': 'Tìm kiếm, mua bán sản phẩm hoặc hỏi về giá cả',
-        'help': 'Yêu cầu hỗ trợ, hướng dẫn sử dụng ứng dụng',
+        'product_search': 'Tìm kiếm hoặc hỏi về giá của sản phẩm cụ thể',
+        'help': 'Yêu cầu hỗ trợ chung, hướng dẫn sử dụng các tính năng của ứng dụng (ví dụ: cách bán hàng, cách tạo tài khoản, nút tìm kiếm ở đâu, v.v.',
         'account': 'Thông tin tài khoản, đăng ký, đăng nhập, mật khẩu',
         'order': 'Đơn hàng, đặt hàng, thanh toán, giao hàng',
         'review': 'Đánh giá, nhận xét về sản phẩm hoặc dịch vụ',
-        'chat': 'Tin nhắn, trò chuyện với người bán hoặc người dùng khác',
-        'unknown': 'Không thuộc các danh mục trên'
+        'chat': 'Tính năng tin nhắn, trò chuyện với người bán hoặc người dùng khác',
+        'unknown': 'Không thuộc các danh mục trên' // Vẫn giữ cái này trong map gốc nếu cần xử lý sau
       };
       
       // Tạo prompt cấu trúc rõ ràng
@@ -230,8 +229,10 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode({
           'contents': [
             {
@@ -250,7 +251,7 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       );
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
         String category = data['candidates'][0]['content']['parts'][0]['text'].trim().toLowerCase();
         
         // Xử lý kết quả cẩn thận hơn
@@ -295,7 +296,7 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
           return bestMatch;
         }
       } else {
-        print('Error calling Gemini API: ${response.body}');
+        print('Error calling Gemini API: ${utf8.decode(response.bodyBytes)}');
         return _classifyWithPattern(message.toLowerCase());
       }
     } catch (e) {
@@ -497,7 +498,7 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       try {
         final result = await _functions.httpsCallable('searchProductsByText').call({
           'query': message,
-          'limit': 5,
+          'limit': 3,
         });
         
         if (result.data != null && result.data['results'] != null) {
@@ -530,16 +531,12 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       }
       
       if (products.isEmpty) {
-        products = await _searchProductsWithKeywords(message);
-      }
-      
-      if (products.isEmpty) {
         _addBotTextMessage('Xin lỗi, tôi không tìm thấy sản phẩm nào phù hợp với yêu cầu của bạn.');
         return;
       }
       
       // Lấy 5 sản phẩm phù hợp nhất
-      final limitedProducts = products.take(5).toList();
+      final limitedProducts = products.take(3).toList();
       
       // Tạo tin nhắn hiển thị danh sách sản phẩm theo dạng trượt ngang
       _addBotProductListMessage('Đây là các sản phẩm phù hợp với yêu cầu của bạn:', limitedProducts);
@@ -609,8 +606,10 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode({
           'contents': [
             {
@@ -629,7 +628,7 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       );
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
         final content = data['candidates'][0]['content']['parts'][0]['text'];
         
         // Phân tách các từ khóa bằng dấu phẩy
@@ -640,7 +639,7 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
             
         return keywords;
       } else {
-        print('Error extracting keywords: ${response.body}');
+        print('Error extracting keywords: ${utf8.decode(response.bodyBytes)}');
         
         // Fallback: Tách từ trong câu và lọc các từ có ít nhất 3 ký tự
         return text.split(' ')
@@ -751,14 +750,24 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode({
           'contents': [
             {
               'parts': [
                 {
-                  'text': 'Sử dụng thông tin từ tài liệu để trả lời câu hỏi của người dùng một cách lịch sự và hữu ích, bằng tiếng Việt.\n\nTài liệu: ${document.title}\n\n${document.content}\n\nCâu hỏi: $query'
+                  'text': '''Sử dụng thông tin từ tài liệu để trả lời câu hỏi của người dùng một cách lịch sự và hữu ích, bằng tiếng Việt.
+Trả lời trực tiếp không bao gồm tựa đề, giới thiệu, hoặc kết luận. Không thêm "Trả lời:" hoặc bất kỳ tiêu đề nào vào phản hồi.
+Chỉ cung cấp nội dung trả lời mạch lạc, rõ ràng, không thừa thãi.
+
+Tài liệu: ${document.title}
+
+${document.content}
+
+Câu hỏi: $query'''
                 }
               ]
             }
@@ -771,8 +780,22 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       );
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['candidates'][0]['content']['parts'][0]['text'];
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        String text = data['candidates'][0]['content']['parts'][0]['text'];
+        
+        // Loại bỏ tiêu đề thường gặp từ phản hồi của AI
+        final patterns = [
+          RegExp(r'^Trả lời:?\s*', caseSensitive: false),
+          RegExp(r'^Dựa\s+(?:trên|vào)\s+(?:tài liệu|thông tin)[^:]*:?\s*', caseSensitive: false),
+          RegExp(r'^Theo\s+(?:tài liệu|thông tin)[^:]*:?\s*', caseSensitive: false),
+          RegExp(r'^${document.title}:?\s*', caseSensitive: false),
+        ];
+        
+        for (final pattern in patterns) {
+          text = text.replaceFirst(pattern, '');
+        }
+        
+        return text.trim();
       } else {
         print('Error generating help response: ${response.body}');
         return document.content;
@@ -958,6 +981,7 @@ Kết quả: Chỉ trả về tên danh mục (không có dấu ngoặc, không 
       final prompt = '''Bạn là trợ lý ảo của Student Market NTTU, một sàn thương mại điện tử cho sinh viên.
 Sử dụng thông tin từ ngữ cảnh và lịch sử cuộc trò chuyện để trả lời câu hỏi của người dùng một cách lịch sự và hữu ích bằng tiếng Việt.
 Trả lời nên mạch lạc, đầy đủ và phù hợp với cuộc hội thoại đang diễn ra.
+Trả lời trực tiếp không bao gồm tựa đề, giới thiệu, hoặc kết luận. Không thêm "Trả lời:" hoặc bất kỳ tiêu đề nào vào phản hồi.
 Nếu được hỏi về sản phẩm, hãy cung cấp thông tin về giá, mô tả, và cách mua hàng.
 Nếu được hỏi về cách sử dụng ứng dụng, hãy cung cấp hướng dẫn rõ ràng.
 Nếu không có đủ thông tin, hãy nói rằng bạn không biết hoặc đề xuất người dùng đặt câu hỏi rõ ràng hơn.
@@ -970,8 +994,10 @@ Câu hỏi hiện tại: $query''';
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode({
           'contents': [
             {
@@ -990,9 +1016,22 @@ Câu hỏi hiện tại: $query''';
       );
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final botResponse = data['candidates'][0]['content']['parts'][0]['text'];
-        _addBotTextMessage(botResponse);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        String botResponse = data['candidates'][0]['content']['parts'][0]['text'];
+        
+        // Loại bỏ tiêu đề thường gặp từ phản hồi của AI
+        final patterns = [
+          RegExp(r'^Trả lời:?\s*', caseSensitive: false),
+          RegExp(r'^Dựa\s+(?:trên|vào)\s+(?:tài liệu|thông tin)[^:]*:?\s*', caseSensitive: false),
+          RegExp(r'^Theo\s+(?:tài liệu|thông tin)[^:]*:?\s*', caseSensitive: false),
+          RegExp(r'^Phản hồi:?\s*', caseSensitive: false),
+        ];
+        
+        for (final pattern in patterns) {
+          botResponse = botResponse.replaceFirst(pattern, '');
+        }
+        
+        _addBotTextMessage(botResponse.trim());
       } else {
         print('Error generating response: ${response.statusCode} - ${response.body}');
         _addBotTextMessage('Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.');
@@ -1040,8 +1079,10 @@ Câu hỏi hiện tại: $query''';
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode({
           'model': 'embedding-001',
           'content': {
@@ -1055,11 +1096,11 @@ Câu hỏi hiện tại: $query''';
       );
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
         final embedding = data['embedding']['values'] as List;
         return embedding.map((value) => value as double).toList();
       } else {
-        print('Error creating embedding: ${response.statusCode} - ${response.body}');
+        print('Error creating embedding: ${response.statusCode} - ${utf8.decode(response.bodyBytes)}');
         // Trả về vector rỗng trong trường hợp lỗi
         return [];
       }
@@ -1092,9 +1133,11 @@ Câu hỏi hiện tại: $query''';
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
           'Api-Key': _pineconeApiKey,
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode({
           'vectors': [
             {
@@ -1116,7 +1159,7 @@ Câu hỏi hiện tại: $query''';
         print('Document stored in Pinecone: ${document.id}');
         return true;
       } else {
-        print('Error storing document in Pinecone: ${response.statusCode} - ${response.body}');
+        print('Error storing document in Pinecone: ${response.statusCode} - ${utf8.decode(response.bodyBytes)}');
         return false;
       }
     } catch (e) {
@@ -1148,9 +1191,11 @@ Câu hỏi hiện tại: $query''';
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
           'Api-Key': _pineconeApiKey,
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode({
           'vectors': [
             {
@@ -1187,7 +1232,7 @@ Câu hỏi hiện tại: $query''';
         print('Product stored in Pinecone: ${product.id}');
         return true;
       } else {
-        print('Error storing product in Pinecone: ${response.statusCode} - ${response.body}');
+        print('Error storing product in Pinecone: ${response.statusCode} - ${utf8.decode(response.bodyBytes)}');
         return false;
       }
     } catch (e) {
@@ -1250,8 +1295,8 @@ Câu hỏi hiện tại: $query''';
           'limit': topK,
         });
         
-        if (result.data != null && result.data['results'] != null) {
-          final List<dynamic> searchResults = result.data['results'];
+        if (result.data != null && result.data['products'] != null) {
+          final List<dynamic> searchResults = result.data['products'];
           products = searchResults.map((item) {
             return Product(
               id: item['id'] ?? '',
@@ -1295,35 +1340,33 @@ Câu hỏi hiện tại: $query''';
         'includeValues': false,
       };
       
-      // Thêm bộ lọc metadata.type để thay thế cho namespace
+      // Thêm bộ lọc type để thay thế cho namespace, không sử dụng metadata làm khóa ngoài
       if (namespace == 'knowledge') {
         payload['filter'] = {
-          'metadata': {
-            'type': 'document'
-          }
+          'type': 'document'
         };
       } else if (namespace == 'products') {
         payload['filter'] = {
-          'metadata': {
-            'type': 'product'
-          }
+          'type': 'product'
         };
       }
       
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
           'Api-Key': _pineconeApiKey,
         },
+        encoding: Encoding.getByName('utf-8'),
         body: jsonEncode(payload),
       );
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
         return List<Map<String, dynamic>>.from(data['matches'] ?? []);
       } else {
-        print('Error querying Pinecone: ${response.statusCode} - ${response.body}');
+        print('Error querying Pinecone: ${response.statusCode} - ${utf8.decode(response.bodyBytes)}');
         return [];
       }
     } catch (e) {

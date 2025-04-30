@@ -75,6 +75,11 @@ if (pineconeApiKey && pineconeHost) {
  * @return {string} - Văn bản mô tả sản phẩm
  */
 function createProductDescription(product) {
+  // Tạo mảng tags từ trường tags nếu có
+  const tags = Array.isArray(product.tags) && product.tags.length > 0 
+    ? product.tags.join(', ') 
+    : 'Không có thẻ';
+  
   return `
     Tên sản phẩm: ${product.title || product.name || 'Không có tên'}
     Giá: ${product.price} VND
@@ -82,6 +87,8 @@ function createProductDescription(product) {
     Mô tả: ${product.description || 'Không có mô tả'}
     Trạng thái: ${product.status || 'Đang bán'}
     Người bán: ${product.sellerName || 'Không có thông tin'}
+    Thẻ: ${tags}
+    ${product.isSold ? 'Sản phẩm đã bán' : 'Sản phẩm còn hàng'}
   `;
 }
 
@@ -172,12 +179,29 @@ async function upsertToPinecone(id, vector, metadata) {
     if (metadata) {
       // Chỉ lấy các trường cần thiết và đảm bảo kiểu dữ liệu đúng
       if (metadata.name !== undefined) safeMetadata.name = String(metadata.name || '');
+      if (metadata.title !== undefined) safeMetadata.title = String(metadata.title || '');
       if (metadata.price !== undefined) safeMetadata.price = Number(metadata.price || 0);
       if (metadata.category !== undefined) safeMetadata.category = String(metadata.category || '');
       if (metadata.status !== undefined) safeMetadata.status = String(metadata.status || 'active');
+      if (metadata.description !== undefined) safeMetadata.description = String(metadata.description || '');
       if (metadata.sellerId !== undefined) safeMetadata.sellerId = String(metadata.sellerId || '');
       if (metadata.sellerName !== undefined) safeMetadata.sellerName = String(metadata.sellerName || '');
       if (metadata.createdAt !== undefined) safeMetadata.createdAt = String(metadata.createdAt || '');
+      
+      // Thêm trường mới
+      if (metadata.images && Array.isArray(metadata.images) && metadata.images.length > 0) {
+        safeMetadata.imageUrl = String(metadata.images[0] || '');
+      }
+      
+      if (metadata.tags && Array.isArray(metadata.tags)) {
+        safeMetadata.tags = metadata.tags.map(tag => String(tag || '')).filter(tag => tag !== '');
+      }
+      
+      // Đảm bảo trường isSold được phản ánh qua status
+      if (metadata.isSold === true) {
+        safeMetadata.status = 'sold';
+      }
+      
       // Thêm trường type để phân biệt dữ liệu
       safeMetadata.type = 'product'; // Thay thế cho namespace
     }
@@ -267,11 +291,16 @@ exports.syncProductToPinecone = functions.firestore
       // Chuẩn bị metadata đảm bảo kiểu dữ liệu và không có giá trị null/undefined
       const metadata = {
         name: productData.title ? String(productData.title) : '',
+        title: productData.title ? String(productData.title) : '',
         price: productData.price ? Number(productData.price) : 0,
         category: productData.category ? String(productData.category) : '',
         status: productData.status ? String(productData.status) : 'active',
+        description: productData.description ? String(productData.description) : '',
         sellerId: productData.sellerId ? String(productData.sellerId) : '',
         sellerName: productData.sellerName ? String(productData.sellerName) : '',
+        images: Array.isArray(productData.images) ? productData.images : [],
+        tags: Array.isArray(productData.tags) ? productData.tags : [],
+        isSold: productData.isSold === true || productData.status === 'sold',
       };
       
       // Xử lý timestamp một cách an toàn
@@ -337,47 +366,64 @@ exports.findSimilarProducts = functions.https.onCall(async (data) => {
     );
   }
   
-  // Kiểm tra xác thực
-  if (!data || !data.productId) {
+  // Kiểm tra tham số đầu vào
+  if (!data) {
     throw new functions.https.HttpsError(
       'invalid-argument',
-      'Cần có ID sản phẩm để tìm kiếm'
+      'Dữ liệu đầu vào không được cung cấp'
     );
   }
   
-  const { productId, limit = 5 } = data;
+  // Hỗ trợ cả hai chế độ tìm kiếm: theo productId hoặc theo query text
+  if (!data.productId && !data.query) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Cần có ID sản phẩm hoặc từ khóa tìm kiếm'
+    );
+  }
+  
+  const { productId, query, limit = 5 } = data;
   
   try {
-    // Lấy thông tin sản phẩm từ Firestore
-    const productDoc = await db.collection('products').doc(productId).get();
+    let embedding;
     
-    if (!productDoc.exists) {
-      throw new functions.https.HttpsError(
-        'not-found',
-        'Không tìm thấy sản phẩm'
-      );
+    if (productId) {
+      // Tìm theo sản phẩm
+      const productDoc = await db.collection('products').doc(productId).get();
+      
+      if (!productDoc.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          'Không tìm thấy sản phẩm'
+        );
+      }
+      
+      const productData = productDoc.data();
+      const description = createProductDescription(productData);
+      
+      // Tạo embedding từ mô tả sản phẩm
+      embedding = await createEmbedding(description);
+    } else {
+      // Tìm theo từ khóa
+      embedding = await createEmbedding(query);
     }
-    
-    const productData = productDoc.data();
-    const description = createProductDescription(productData);
-    
-    // Tạo embedding từ mô tả sản phẩm
-    const embedding = await createEmbedding(description);
     
     // Tìm kiếm các sản phẩm tương tự trong Pinecone
     const queryResult = await index.query({
       vector: embedding,
       topK: limit + 1, // +1 vì có thể kết quả bao gồm chính sản phẩm đó
       includeMetadata: true,
-      // Bỏ filter để tìm kiếm tất cả (bao gồm cả dữ liệu cũ)
+      filter: {
+        type: 'product'
+      }
     });
     
     // Lọc bỏ chính sản phẩm đó nếu có trong kết quả
     const similarProducts = queryResult.matches
-      .filter((match) => match.id !== productId)
+      .filter((match) => match.id !== (productId ? `prod_${productId}` : null))
       .slice(0, limit)
       .map((match) => ({
-        id: match.id,
+        id: match.id.startsWith('prod_') ? match.id.substring(5) : match.id,
         score: match.score,
         ...match.metadata,
       }));
@@ -524,14 +570,19 @@ exports.rebuildPineconeIndex = functions.https.onCall(async (data, context) => {
             // Tạo embedding
             const embedding = await createEmbedding(description);
             
-            // Chuẩn bị metadata
+            // Chuẩn bị metadata đầy đủ
             const metadata = {
               name: productData.title || productData.name || '',
+              title: productData.title || '',
               price: productData.price,
               category: productData.category || '',
               status: productData.status || 'active',
+              description: productData.description || '',
               sellerId: productData.sellerId,
               sellerName: productData.sellerName || '',
+              images: Array.isArray(productData.images) ? productData.images : [],
+              tags: Array.isArray(productData.tags) ? productData.tags : [],
+              isSold: productData.isSold === true || productData.status === 'sold',
               createdAt: productData.createdAt 
                 ? productData.createdAt.toDate().toISOString() 
                 : new Date().toISOString(),

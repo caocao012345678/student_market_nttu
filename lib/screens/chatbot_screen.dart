@@ -431,6 +431,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   // Widget hiển thị tin nhắn trợ giúp
   Widget _buildHelpMessage(ChatMessage message, Color bubbleColor, Color textColor) {
+    // Lấy tiêu đề từ metadata nếu có
+    String? documentTitle = message.metadata?['documentTitle'] as String?;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -445,11 +448,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Tiêu đề trợ giúp
-          if (message.metadata != null && message.metadata!.containsKey('documentTitle'))
+          if (documentTitle != null && documentTitle.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8.0),
               child: Text(
-                message.metadata!['documentTitle'] as String,
+                documentTitle,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -457,11 +460,33 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               ),
             ),
           
-          // Nội dung trợ giúp
-          Text(message.content),
+          // Nội dung trợ giúp (kiểm tra không bắt đầu với tiêu đề)
+          Text(_cleanupHelpContent(message.content, documentTitle)),
         ],
       ),
     );
+  }
+  
+  // Làm sạch nội dung trợ giúp để tránh hiển thị tiêu đề trùng lặp
+  String _cleanupHelpContent(String content, String? documentTitle) {
+    if (documentTitle == null || documentTitle.isEmpty) return content;
+    
+    // Kiểm tra nếu nội dung bắt đầu với tiêu đề
+    if (content.startsWith(documentTitle)) {
+      // Cắt bỏ tiêu đề và các ký tự đặc biệt liền kề
+      final withoutTitle = content.substring(documentTitle.length).trim();
+      // Loại bỏ các ký tự đặc biệt như dấu ":" ở đầu
+      return withoutTitle.replaceFirst(RegExp(r'^[:\s]+'), '');
+    }
+    
+    // Xử lý trường hợp tiêu đề Cách/Đăng bán sản phẩm
+    if (documentTitle.contains("bán sản phẩm") && 
+        content.toLowerCase().startsWith(documentTitle.toLowerCase())) {
+      final withoutTitle = content.substring(documentTitle.length).trim();
+      return withoutTitle.replaceFirst(RegExp(r'^[:\s]+'), '');
+    }
+    
+    return content;
   }
 
   // Thêm phương thức hiển thị danh sách sản phẩm theo dạng trượt ngang

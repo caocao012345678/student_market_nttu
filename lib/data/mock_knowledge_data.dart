@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MockKnowledgeData {
   static final List<Map<String, dynamic>> knowledgeDocuments = [
-    // DANH MỤC: AI_FEATURES - TÍNH NĂNG TRÍ TUỆ NHÂN TẠO
+    // DANH MỤC: HELP - TRỢ GIÚP CHUNG
     {
       'title': 'Tính năng chatbot trợ lý ảo',
       'content': '''
@@ -32,7 +32,7 @@ Student Market NTTU tích hợp trợ lý ảo thông minh để hỗ trợ ngư
 Lưu ý: Trợ lý ảo đang được phát triển liên tục. Nếu bạn gặp vấn đề hoặc có góp ý, vui lòng gửi phản hồi qua mục "Cài đặt" > "Góp ý phát triển".
 ''',
       'keywords': ['chatbot', 'trợ lý ảo', 'AI', 'trí tuệ nhân tạo', 'hỏi đáp tự động', 'hỗ trợ'],
-      'category': 'ai_features',
+      'category': 'help',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 1,
@@ -63,7 +63,7 @@ Student Market NTTU sử dụng công nghệ RAG (Retrieval Augmented Generation
 Lưu ý: Công nghệ RAG đang được cải thiện liên tục. Chất lượng kết quả sẽ ngày càng tốt hơn theo thời gian khi cơ sở tri thức được mở rộng.
 ''',
       'keywords': ['RAG', 'retrieval augmented generation', 'tìm kiếm thông minh', 'truy xuất tăng cường', 'AI', 'cơ sở tri thức'],
-      'category': 'ai_features',
+      'category': 'help',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 2,
@@ -99,8 +99,8 @@ Tính năng gợi ý sản phẩm thông minh trên Student Market NTTU:
 
 Lưu ý: Hệ thống gợi ý hoạt động hiệu quả hơn khi bạn tương tác nhiều với ứng dụng và cập nhật sở thích thường xuyên.
 ''',
-      'keywords': ['gợi ý', 'đề xuất', 'sản phẩm gợi ý', 'AI', 'cá nhân hóa', 'recommendation'],
-      'category': 'ai_features',
+      'keywords': ['gợi ý', 'đề xuất', 'sản phẩm gợi ý', 'AI', 'cá nhân hóa', 'recommendation', 'product_search'],
+      'category': 'product_search',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 3,
@@ -337,8 +337,8 @@ Lưu ý:
 - Đảm bảo mô tả trung thực để tránh khiếu nại và đánh giá tiêu cực
 - Sản phẩm được đăng tải sẽ hiển thị công khai trong 30 ngày và tự động gia hạn trừ khi hết hàng
 ''',
-      'keywords': ['đăng bán', 'đăng sản phẩm', 'bán hàng', 'tạo sản phẩm', 'đăng tin', 'đăng bài', 'bán đồ'],
-      'category': 'product',
+      'keywords': ['đăng bán', 'đăng sản phẩm', 'bán hàng', 'tạo sản phẩm', 'đăng tin', 'đăng bài', 'bán đồ', 'help'],
+      'category': 'help',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 1,
@@ -407,8 +407,8 @@ Quy trình kiểm duyệt:
 
 Lưu ý: Student Market NTTU đánh giá cao sự trung thực và minh bạch. Việc tuân thủ quy định giúp nâng cao trải nghiệm mua bán và xây dựng cộng đồng lành mạnh.
 ''',
-      'keywords': ['quy định', 'điều kiện', 'cấm', 'chính sách', 'kiểm duyệt', 'không được phép', 'quy tắc', 'hướng dẫn'],
-      'category': 'product',
+      'keywords': ['quy định', 'điều kiện', 'cấm', 'chính sách', 'kiểm duyệt', 'không được phép', 'quy tắc', 'hướng dẫn', 'help'],
+      'category': 'help',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 2,
@@ -470,8 +470,8 @@ Hướng dẫn quản lý và chỉnh sửa sản phẩm đã đăng trên Stude
 
 Lưu ý: Việc cập nhật thông tin sản phẩm thường xuyên và chính xác sẽ giúp tăng cơ hội bán hàng và cải thiện độ uy tín của người bán.
 ''',
-      'keywords': ['quản lý sản phẩm', 'chỉnh sửa sản phẩm', 'cập nhật sản phẩm', 'sửa thông tin', 'ẩn sản phẩm', 'xóa sản phẩm'],
-      'category': 'product',
+      'keywords': ['quản lý sản phẩm', 'chỉnh sửa sản phẩm', 'cập nhật sản phẩm', 'sửa thông tin', 'ẩn sản phẩm', 'xóa sản phẩm', 'help'],
+      'category': 'help',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 3,
@@ -527,8 +527,8 @@ Bảo mật thanh toán:
 
 Lưu ý: Báo cáo ngay nếu bạn gặp vấn đề với thanh toán qua mục "Hỗ trợ" > "Báo cáo vấn đề thanh toán".
 ''',
-      'keywords': ['thanh toán', 'payment', 'phương thức thanh toán', 'COD', 'chuyển khoản', 'ví điện tử', 'trả góp'],
-      'category': 'payment',
+      'keywords': ['thanh toán', 'payment', 'phương thức thanh toán', 'COD', 'chuyển khoản', 'ví điện tử', 'trả góp', 'order'],
+      'category': 'order',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 1,
@@ -582,8 +582,8 @@ NTT Credit là hệ thống điểm uy tín và ưu đãi dành cho người dù
 
 Lưu ý: Điểm uy tín dưới 60 sẽ bị hạn chế quyền bán hàng và yêu cầu đặt cọc cho mọi giao dịch. Tài khoản có thể bị khóa tạm thời nếu điểm uy tín dưới 40.
 ''',
-      'keywords': ['ntt credit', 'điểm uy tín', 'điểm thưởng', 'credit', 'ưu đãi', 'giảm giá', 'tích điểm', 'quy đổi điểm'],
-      'category': 'payment',
+      'keywords': ['ntt credit', 'điểm uy tín', 'điểm thưởng', 'credit', 'ưu đãi', 'giảm giá', 'tích điểm', 'quy đổi điểm', 'order'],
+      'category': 'order',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 2,
@@ -657,8 +657,8 @@ Các mẹo khi mua hàng:
 
 Lưu ý: Mỗi giao dịch thành công sẽ tăng điểm uy tín và tích lũy NTT Point để sử dụng cho các giao dịch sau.
 ''',
-      'keywords': ['mua hàng', 'thanh toán', 'đặt hàng', 'giỏ hàng', 'quy trình mua', 'đặt mua', 'checkout'],
-      'category': 'payment',
+      'keywords': ['mua hàng', 'thanh toán', 'đặt hàng', 'giỏ hàng', 'quy trình mua', 'đặt mua', 'checkout', 'order'],
+      'category': 'order',
       'createdAt': Timestamp.now(),
       'updatedAt': Timestamp.now(),
       'order': 3,
