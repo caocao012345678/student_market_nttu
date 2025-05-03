@@ -69,8 +69,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _loginAsDemo() {
-    _emailController.text = 'demo@student.nttu.edu.vn';
-    _passwordController.text = 'demo123';
+    _emailController.text = '9999999999@nttu.edu.vn';
+    _passwordController.text = '123456';
     _login();
   }
 
