@@ -814,4 +814,306 @@ exports.createBulkAccounts = functions.https.onCall(async (data, context) => {
       { errorMessage: error.message }
     );
   }
-}); 
+});
+
+/**
+ * Cloud Function để gửi thông báo FCM đến người dùng
+ * 
+ * Dữ liệu đầu vào:
+ * {
+ *   targetUserId: string, // ID người dùng nhận thông báo
+ *   title: string,       // Tiêu đề thông báo
+ *   body: string,        // Nội dung thông báo
+ *   data: Object,        // Dữ liệu bổ sung
+ *   sender: {            // Thông tin người gửi (tùy chọn)
+ *     uid: string,
+ *     email: string
+ *   }
+ * }
+ * 
+ * Kết quả:
+ * {
+ *   success: boolean,
+ *   successCount: number,
+ *   failureCount: number,
+ *   message?: string
+ * }
+ */
+exports.sendFCM = functions.https.onCall(async (data, context) => {
+  // Kiểm tra xác thực người dùng
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Yêu cầu xác thực để thực hiện chức năng này');
+  }
+
+  const { targetUserId, title, body, data: additionalData = {}, sender = {} } = data;
+  
+  // Kiểm tra dữ liệu đầu vào
+  if (!targetUserId || !title || !body) {
+    throw new functions.https.HttpsError('invalid-argument', 'Thiếu thông tin targetUserId, title hoặc body');
+  }
+
+  try {
+    console.log(`Chuẩn bị gửi thông báo đến người dùng: ${targetUserId}`);
+    console.log(`Tiêu đề: ${title}, Nội dung: ${body}`);
+    
+    // Lấy token thiết bị của người dùng từ Firestore
+    const userDoc = await admin.firestore().collection('users').doc(targetUserId).get();
+    
+    if (!userDoc.exists) {
+      console.log(`Không tìm thấy người dùng với ID: ${targetUserId}`);
+      return { 
+        success: false, 
+        successCount: 0, 
+        failureCount: 0, 
+        message: 'Không tìm thấy người dùng' 
+      };
+    }
+    
+    const userData = userDoc.data();
+    const tokens = userData.fcmTokens || [];
+    
+    if (tokens.length === 0) {
+      console.log(`Người dùng ${targetUserId} không có thiết bị nào đăng ký`);
+      return { 
+        success: false, 
+        successCount: 0, 
+        failureCount: 0, 
+        message: 'Người dùng không có thiết bị nào đăng ký' 
+      };
+    }
+    
+    console.log(`Tìm thấy ${tokens.length} token thiết bị của người dùng`);
+    
+    // Thêm thông tin sender vào data nếu có
+    const messageData = { ...additionalData };
+    if (sender.uid) {
+      messageData.senderId = sender.uid;
+    }
+    
+    // Chuẩn bị thông báo FCM
+    const message = {
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: messageData,
+      tokens: tokens, // Gửi đến nhiều thiết bị
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'high_importance_channel',
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10',
+        },
+        payload: {
+          aps: {
+            sound: 'default',
+          },
+        },
+      },
+    };
+    
+    // Gửi thông báo sử dụng Admin SDK
+    console.log('Bắt đầu gửi thông báo FCM');
+    const response = await admin.messaging().sendMulticast(message);
+    console.log(`Kết quả: ${response.successCount} thành công, ${response.failureCount} thất bại`);
+    
+    // Nếu có lỗi với token thiết bị, cập nhật danh sách tokens
+    if (response.failureCount > 0) {
+      const failedTokens = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          console.log(`Lỗi với token: ${tokens[idx]}`);
+          console.log(`Lỗi: ${resp.error.code} - ${resp.error.message}`);
+          failedTokens.push(tokens[idx]);
+        }
+      });
+      
+      // Xóa token không hợp lệ khỏi Firestore
+      if (failedTokens.length > 0) {
+        console.log(`Xóa ${failedTokens.length} token không hợp lệ`);
+        const validTokens = tokens.filter(token => !failedTokens.includes(token));
+        
+        await admin.firestore().collection('users').doc(targetUserId).update({
+          fcmTokens: validTokens
+        });
+      }
+    }
+    
+    // Lưu thông báo vào Firestore
+    try {
+      const notificationRef = await admin.firestore().collection('notifications').add({
+        userId: targetUserId,
+        title: title,
+        body: body,
+        type: additionalData.type || 'system',
+        data: additionalData,
+        senderId: context.auth.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        isRead: false,
+      });
+      
+      console.log(`Đã lưu thông báo với ID: ${notificationRef.id}`);
+    } catch (error) {
+      console.error('Lỗi khi lưu thông báo vào Firestore:', error);
+    }
+    
+    return {
+      success: true,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+    };
+  } catch (error) {
+    console.error('Lỗi khi gửi FCM:', error);
+    throw new functions.https.HttpsError('internal', 'Lỗi khi gửi thông báo', error.message);
+  }
+});
+
+// Thêm Cloud Function tự động gửi thông báo khi có tin nhắn mới
+exports.sendChatNotification = functions.firestore
+  .document('chats/{chatId}/messages/{messageId}')
+  .onCreate(async (snapshot, context) => {
+    try {
+      const { chatId, messageId } = context.params;
+      const messageData = snapshot.data();
+      const senderId = messageData.senderId;
+      
+      console.log(`Nhận tin nhắn mới trong chat ${chatId} từ người dùng ${senderId}`);
+      
+      // Lấy thông tin chat để biết người nhận
+      const chatDoc = await admin.firestore().collection('chats').doc(chatId).get();
+      if (!chatDoc.exists) {
+        console.log(`Không tìm thấy chat với ID: ${chatId}`);
+        return null;
+      }
+      
+      const chatData = chatDoc.data();
+      const participants = chatData.participants || [];
+      
+      // Lấy thông tin người gửi
+      const senderDoc = await admin.firestore().collection('users').doc(senderId).get();
+      if (!senderDoc.exists) {
+        console.log(`Không tìm thấy người gửi với ID: ${senderId}`);
+        return null;
+      }
+      
+      const senderData = senderDoc.data();
+      const senderName = senderData.displayName || senderData.email || 'Người dùng';
+      
+      // Gửi thông báo cho tất cả người tham gia trò chuyện, trừ người gửi
+      for (const participantId of participants) {
+        if (participantId !== senderId) {
+          try {
+            console.log(`Chuẩn bị gửi thông báo cho người dùng ${participantId}`);
+            
+            // Lấy token thiết bị của người nhận
+            const recipientDoc = await admin.firestore().collection('users').doc(participantId).get();
+            if (!recipientDoc.exists) {
+              console.log(`Bỏ qua: Không tìm thấy người nhận ${participantId}`);
+              continue;
+            }
+            
+            const recipientData = recipientDoc.data();
+            const tokens = Array.isArray(recipientData.fcmTokens) ? recipientData.fcmTokens : [];
+            
+            if (tokens.length === 0) {
+              console.log(`Bỏ qua: Người nhận ${participantId} không có FCM token`);
+              continue;
+            }
+            
+            console.log(`Tìm thấy ${tokens.length} token cho người dùng ${participantId}`);
+            
+            // Chuẩn bị thông báo
+            const title = `Tin nhắn mới từ ${senderName}`;
+            const body = messageData.text || 'Đã gửi một tin nhắn';
+            
+            // Thay vì sendMulticast, gửi thông báo cho từng token riêng lẻ
+            for (const token of tokens) {
+              try {
+                // Chặn token rỗng
+                if (!token || token.trim() === '') {
+                  console.log('Bỏ qua token rỗng');
+                  continue;
+                }
+                
+                const message = {
+                  notification: {
+                    title: title,
+                    body: body,
+                  },
+                  data: {
+                    type: 'chat_message',
+                    chatId: chatId,
+                    messageId: messageId,
+                    senderId: senderId,
+                  },
+                  token: token, // Gửi cho một thiết bị
+                  android: {
+                    priority: 'high',
+                    notification: {
+                      channelId: 'chat_messages_channel',
+                      clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                    },
+                  },
+                  apns: {
+                    payload: {
+                      aps: {
+                        contentAvailable: true,
+                      },
+                    },
+                  },
+                };
+                
+                // Gửi thông báo riêng lẻ
+                await admin.messaging().send(message);
+                console.log(`Đã gửi thông báo tới token: ${token.substring(0, 10)}...`);
+              } catch (tokenError) {
+                console.error(`Lỗi gửi thông báo đến token ${token.substring(0, 10)}...: ${tokenError.message}`);
+                
+                // Nếu token không hợp lệ, xóa khỏi danh sách
+                if (tokenError.code === 'messaging/invalid-registration-token' || 
+                    tokenError.code === 'messaging/registration-token-not-registered') {
+                  console.log(`Chuẩn bị xóa token không hợp lệ ${token.substring(0, 10)}...`);
+                  const validTokens = tokens.filter(t => t !== token);
+                  
+                  await admin.firestore().collection('users').doc(participantId).update({
+                    fcmTokens: validTokens
+                  });
+                  console.log('Đã xóa token không hợp lệ');
+                }
+              }
+            }
+            
+            // Lưu thông báo vào Firestore
+            await admin.firestore().collection('notifications').add({
+              userId: participantId,
+              title: title,
+              body: body,
+              type: 'chat_message',
+              data: {
+                chatId: chatId,
+                messageId: messageId, 
+                senderId: senderId
+              },
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              isRead: false,
+            });
+            
+            console.log(`Đã lưu thông báo cho người dùng ${participantId}`);
+          } catch (participantError) {
+            console.error(`Lỗi xử lý thông báo cho người dùng ${participantId}: ${participantError.message}`);
+            // Tiếp tục với người tham gia khác
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Lỗi khi gửi thông báo chat:', error);
+      return null;
+    }
+  }); 

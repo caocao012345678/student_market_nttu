@@ -9,6 +9,7 @@ import 'package:student_market_nttu/models/chat_message_detail.dart';
 import 'package:student_market_nttu/models/user.dart';
 import 'package:student_market_nttu/services/chat_service.dart';
 import 'package:student_market_nttu/services/user_service.dart';
+import 'package:student_market_nttu/services/notification_service.dart';
 import 'package:student_market_nttu/utils/ui_utils.dart';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -100,7 +101,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     try {
       final chatService = Provider.of<ChatService>(context, listen: false);
-      await chatService.sendTextMessage(widget.chatId, message);
+      await chatService.sendTextMessage(widget.chatId, message, context: context);
       _messageController.clear();
       
       Future.delayed(const Duration(milliseconds: 300), () {
@@ -142,7 +143,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       });
 
       final chatService = Provider.of<ChatService>(context, listen: false);
-      await chatService.sendImageMessage(widget.chatId, pickedFile);
+      await chatService.sendImageMessage(widget.chatId, pickedFile, context: context);
     } catch (error) {
       debugPrint('Lỗi khi gửi hình ảnh: $error');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -419,7 +420,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       child: StreamBuilder<List<ChatMessageDetail>>(
                         stream: chatService.getChatMessages(widget.chatId),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
+                          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                             return const Center(
                               child: SizedBox(
                                 width: 30, 

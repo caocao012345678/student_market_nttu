@@ -20,8 +20,12 @@ import '../services/product_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/chat_service.dart';
+import '../services/notification_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
+  static const routeName = '/product-detail';
+  
   final Product product;
 
   const ProductDetailScreen({
@@ -661,9 +665,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         children: [
                           Expanded(
                             child: TextButton.icon(
-                              onPressed: () {
-                                // TODO: Chat with seller
-                              },
+                              onPressed: () => _chatWithSeller(context),
                               icon: const Icon(Icons.chat_bubble_outline, size: 16),
                               label: const Text('Nhắn tin', style: TextStyle(fontSize: 11)),
                               style: TextButton.styleFrom(
@@ -1158,6 +1160,76 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     } catch (e) {
       print('Error updating product view data: $e');
       // Không hiển thị lỗi cho người dùng vì đây là thao tác ngầm
+    }
+  }
+
+  Future<void> _chatWithSeller(BuildContext context) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    if (authService.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để nhắn tin với người bán')),
+      );
+      return;
+    }
+
+    if (authService.currentUser!.uid == widget.product.sellerId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đây là sản phẩm của bạn')),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _isLoading = true);
+      
+      // Lấy thông tin người dùng hiện tại và người bán
+      final userService = Provider.of<UserService>(context, listen: false);
+      final currentUser = await userService.getUserById(authService.currentUser!.uid);
+      final seller = await userService.getUserById(widget.product.sellerId);
+      
+      // Tạo đoạn chat mới hoặc lấy đoạn chat hiện có
+      final chatService = Provider.of<ChatService>(context, listen: false);
+      final chatId = await chatService.createOrGetChat(widget.product.sellerId);
+      
+      if (!mounted) return;
+      
+      // Điều hướng đến màn hình chat
+      Navigator.pushNamed(
+        context,
+        '/chat-detail',
+        arguments: {
+          'chatId': chatId,
+          'otherUser': seller,
+        },
+      );
+      
+      // Tạo tin nhắn về sản phẩm
+      final message = 'Tôi quan tâm đến sản phẩm: ${widget.product.title} (${NumberFormat('#,###').format(widget.product.price)} đ)';
+      await chatService.sendTextMessage(chatId, message, context: context);
+      
+      // Gửi thông báo đặc biệt cho người bán về việc có người hỏi sản phẩm
+      final notificationService = Provider.of<NotificationService>(context, listen: false);
+      await notificationService.createChatProductNotification(
+        userId: widget.product.sellerId,
+        chatId: chatId,
+        senderId: authService.currentUser!.uid,
+        senderName: currentUser?.displayName ?? 'Người mua',
+        productId: widget.product.id,
+        productTitle: widget.product.title,
+        message: message,
+      );
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 }

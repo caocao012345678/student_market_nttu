@@ -13,6 +13,7 @@ import 'package:student_market_nttu/models/chat_message_detail.dart';
 import 'package:student_market_nttu/models/user.dart';
 import 'package:student_market_nttu/services/user_service.dart';
 import 'package:student_market_nttu/services/firebase_messaging_service.dart';
+import 'package:student_market_nttu/services/notification_service.dart';
 
 class ChatService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -32,7 +33,9 @@ class ChatService extends ChangeNotifier {
 
   // Khởi tạo dữ liệu chat
   Future<void> initializeChats() async {
-    if (currentUserId.isEmpty) return;
+    if (currentUserId.isEmpty) {
+      return;
+    }
 
     // Nếu đang xử lý, không thực hiện lại
     if (_pendingRequests['init'] != null) {
@@ -196,7 +199,10 @@ class ChatService extends ChangeNotifier {
       _getFirestoreChatMessages(chatId).listen(
         (newMessages) {
           if (!controller.isClosed) {
-            controller.add(newMessages);
+            // Chỉ cập nhật khi dữ liệu thay đổi
+            if (_hasMessageListChanged(cachedMessages, newMessages)) {
+              controller.add(newMessages);
+            }
           }
         },
         onError: (error) {
@@ -218,8 +224,53 @@ class ChatService extends ChangeNotifier {
     return _getFirestoreChatMessages(chatId);
   }
   
+  // Kiểm tra xem danh sách tin nhắn có thay đổi không
+  bool _hasMessageListChanged(List<ChatMessageDetail> oldList, List<ChatMessageDetail> newList) {
+    // Nếu số lượng khác nhau, chắc chắn đã thay đổi
+    if (oldList.length != newList.length) return true;
+    
+    // So sánh tin nhắn mới nhất
+    if (oldList.isNotEmpty && newList.isNotEmpty) {
+      return oldList[0].id != newList[0].id || 
+             oldList[0].content != newList[0].content ||
+             !_mapsEqual(oldList[0].read, newList[0].read);
+    }
+    
+    return false;
+  }
+  
+  // So sánh hai map
+  bool _mapsEqual(Map<String, dynamic>? map1, Map<String, dynamic>? map2) {
+    if (map1 == null && map2 == null) return true;
+    if (map1 == null || map2 == null) return false;
+    if (map1.length != map2.length) return false;
+    
+    for (var key in map1.keys) {
+      if (!map2.containsKey(key) || map1[key] != map2[key]) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+  
   // Tách riêng phần lấy dữ liệu từ Firestore
   Stream<List<ChatMessageDetail>> _getFirestoreChatMessages(String chatId) {
+    // Sử dụng biến static để theo dõi thời gian chờ giữa các lần refresh
+    final Map<String, DateTime> _lastRefreshTimes = {};
+    final now = DateTime.now();
+    
+    // Chỉ refresh nếu đã qua 3 giây kể từ lần cuối
+    if (_lastRefreshTimes.containsKey(chatId) && 
+        now.difference(_lastRefreshTimes[chatId]!).inSeconds < 3) {
+      // Nếu chưa đủ thời gian, trả về cache nếu có
+      if (_messages.containsKey(chatId)) {
+        return Stream.value(_messages[chatId]!);
+      }
+    }
+    
+    _lastRefreshTimes[chatId] = now;
+    
     return _firestore
         .collection('chats')
         .doc(chatId)
@@ -316,7 +367,7 @@ class ChatService extends ChangeNotifier {
   }
 
   // Gửi tin nhắn văn bản
-  Future<void> sendTextMessage(String chatId, String content) async {
+  Future<void> sendTextMessage(String chatId, String content, {BuildContext? context}) async {
     if (currentUserId.isEmpty || content.trim().isEmpty) return;
 
     try {
@@ -385,7 +436,7 @@ class ChatService extends ChangeNotifier {
         final senderDoc = await _firestore.collection('users').doc(currentUserId).get();
         final senderName = senderDoc.data()?['displayName'] ?? 'Người dùng';
         
-        // Gửi thông báo
+        // Gửi thông báo đẩy
         await FirebaseMessagingService.sendNotificationToUser(
           targetUserId: receiverId,
           title: senderName,
@@ -397,6 +448,24 @@ class ChatService extends ChangeNotifier {
             'timestamp': now.millisecondsSinceEpoch.toString(),
           },
         );
+        
+        // Tạo thông báo trong ứng dụng nếu context được cung cấp
+        if (context != null) {
+          try {
+            // Thêm thông báo sử dụng NotificationService
+            final notificationService = Provider.of<NotificationService>(context, listen: false);
+            await notificationService.createChatNotification(
+              receiverId: receiverId,
+              senderId: currentUserId,
+              chatId: chatId,
+              senderName: senderName,
+              message: content,
+            );
+          } catch (notificationError) {
+            debugPrint('Lỗi khi tạo thông báo chat: $notificationError');
+            // Không ảnh hưởng đến việc gửi tin nhắn nếu tạo thông báo thất bại
+          }
+        }
       }
 
       notifyListeners();
@@ -407,7 +476,7 @@ class ChatService extends ChangeNotifier {
   }
 
   // Gửi tin nhắn hình ảnh
-  Future<void> sendImageMessage(String chatId, XFile imageFile) async {
+  Future<void> sendImageMessage(String chatId, XFile imageFile, {BuildContext? context}) async {
     if (currentUserId.isEmpty) return;
 
     try {
@@ -485,7 +554,7 @@ class ChatService extends ChangeNotifier {
         final senderDoc = await _firestore.collection('users').doc(currentUserId).get();
         final senderName = senderDoc.data()?['displayName'] ?? 'Người dùng';
         
-        // Gửi thông báo
+        // Gửi thông báo đẩy
         await FirebaseMessagingService.sendNotificationToUser(
           targetUserId: receiverId,
           title: senderName,
@@ -497,6 +566,23 @@ class ChatService extends ChangeNotifier {
             'timestamp': now.millisecondsSinceEpoch.toString(),
           },
         );
+        
+        // Tạo thông báo trong ứng dụng nếu context được cung cấp
+        if (context != null) {
+          try {
+            final notificationService = Provider.of<NotificationService>(context, listen: false);
+            await notificationService.createChatNotification(
+              receiverId: receiverId,
+              senderId: currentUserId,
+              chatId: chatId,
+              senderName: senderName,
+              message: 'Đã gửi hình ảnh',
+            );
+          } catch (notificationError) {
+            debugPrint('Lỗi khi tạo thông báo cho hình ảnh: $notificationError');
+            // Không ảnh hưởng đến việc gửi hình ảnh nếu tạo thông báo thất bại
+          }
+        }
       }
 
       notifyListeners();
@@ -530,7 +616,7 @@ class ChatService extends ChangeNotifier {
   }
 
   // Gửi tin nhắn về sản phẩm
-  Future<void> sendProductMessage(String chatId, String productId, String productName, String imageUrl, String price) async {
+  Future<void> sendProductMessage(String chatId, String productId, String productName, String imageUrl, String price, {BuildContext? context}) async {
     if (currentUserId.isEmpty) return;
 
     try {
@@ -546,11 +632,15 @@ class ChatService extends ChangeNotifier {
       final Map<String, bool> readStatus = {};
       final Map<String, int> unreadCount = {};
       
+      // ID của người nhận
+      String? receiverId;
+      
       for (var userId in chat.participants) {
         if (userId == currentUserId) {
           readStatus[userId] = true;
           unreadCount[userId] = 0;
         } else {
+          receiverId = userId;
           readStatus[userId] = false;
           unreadCount[userId] = (chat.unreadCount[userId] ?? 0) + 1;
         }
@@ -593,6 +683,43 @@ class ChatService extends ChangeNotifier {
           .collection('messages')
           .doc(messageId)
           .set(message.toMap());
+
+      // Gửi thông báo cho người nhận
+      if (receiverId != null) {
+        // Lấy thông tin người gửi
+        final senderDoc = await _firestore.collection('users').doc(currentUserId).get();
+        final senderName = senderDoc.data()?['displayName'] ?? 'Người dùng';
+        
+        // Gửi thông báo đẩy
+        await FirebaseMessagingService.sendNotificationToUser(
+          targetUserId: receiverId,
+          title: senderName,
+          body: 'Đã gửi thông tin sản phẩm: $productName',
+          data: {
+            'type': 'chat_message',
+            'chatId': chatId,
+            'senderId': currentUserId,
+            'timestamp': now.millisecondsSinceEpoch.toString(),
+          },
+        );
+        
+        // Tạo thông báo trong ứng dụng nếu context được cung cấp
+        if (context != null) {
+          try {
+            final notificationService = Provider.of<NotificationService>(context, listen: false);
+            await notificationService.createChatNotification(
+              receiverId: receiverId,
+              senderId: currentUserId,
+              chatId: chatId,
+              senderName: senderName,
+              message: 'Đã gửi thông tin sản phẩm: $productName',
+            );
+          } catch (notificationError) {
+            debugPrint('Lỗi khi tạo thông báo sản phẩm: $notificationError');
+            // Không ảnh hưởng đến việc gửi thông tin sản phẩm nếu tạo thông báo thất bại
+          }
+        }
+      }
 
       notifyListeners();
     } catch (e) {

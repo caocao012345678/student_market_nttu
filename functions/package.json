@@ -1,6 +1,6 @@
 {
   "name": "functions",
-  "description": "Firebase Cloud Functions cho Student Market NTTU",
+  "description": "Cloud Functions cho Student Market NTTU",
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -23,14 +23,19 @@ import '../services/cart_service.dart';
 import '../widgets/app_drawer.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialIndex;
+  
+  const HomeScreen({
+    super.key,
+    this.initialIndex = 0,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
   final PageController _bannerController = PageController();
   int _currentBannerIndex = 0;
 
@@ -47,6 +52,12 @@ class _HomeScreenState extends State<HomeScreen> {
     'assets/images/banner/banner2.jpg',
     'assets/images/banner/banner3.jpg',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
 
   @override
   void dispose() {
@@ -728,7 +739,7 @@ class _HomeContentState extends State<HomeContent> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ProductListScreen(),
+                          builder: (context) => const ProductListScreen(),
                         ),
                       );
                     },

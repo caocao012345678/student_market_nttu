@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Student Market Nttu</string>
+	<string>Student Market NTTU</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +45,22 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Thêm cấu hình cho thông báo đẩy -->
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Ứng dụng cần truy cập camera để chụp ảnh sản phẩm và hình đại diện</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ứng dụng cần truy cập thư viện ảnh để chọn ảnh sản phẩm và hình đại diện</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ứng dụng cần truy cập vị trí của bạn để hiển thị sản phẩm gần đây</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ứng dụng cần truy cập microphone để ghi âm chat thoại</string>
 </dict>
 </plist>

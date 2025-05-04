@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
 import 'package:student_market_nttu/widgets/cart_badge.dart';
+import 'package:student_market_nttu/widgets/notification_badge.dart';
 
 class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final bool showCartBadge;
+  final bool showNotificationBadge;
   final bool showDrawer;
   final List<Widget>? additionalActions;
   final PreferredSizeWidget? bottom;
@@ -13,6 +15,7 @@ class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
     Key? key,
     required this.title,
     this.showCartBadge = true,
+    this.showNotificationBadge = true,
     this.showDrawer = true,
     this.additionalActions,
     this.bottom,
@@ -37,6 +40,7 @@ class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
             );
           },
         ),
+        if (showNotificationBadge) const NotificationBadge(iconColor: Colors.white),
         if (showCartBadge) const CartBadge(),
         if (additionalActions != null) ...additionalActions!,
       ],
