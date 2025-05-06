@@ -955,7 +955,9 @@ class _UserProfilePageState extends State<UserProfilePage> with SingleTickerProv
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
-                            product.location ?? 'Không xác định',
+                            product.location != null && product.location!.containsKey('address')
+                                ? product.location!['address']
+                                : 'Không xác định',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

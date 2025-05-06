@@ -21,6 +21,7 @@ import 'package:student_market_nttu/widgets/common_app_bar.dart';
 import '../services/user_service.dart';
 import '../services/cart_service.dart';
 import '../widgets/app_drawer.dart';
+import '../utils/location_utils.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -171,6 +172,7 @@ class _HomeContentState extends State<HomeContent> {
             _buildFeaturedShops(),
             _buildDonorRecognition(),
             _buildLatestProducts(),
+            _buildNewArrivals(),
             const SizedBox(height: 16),
           ],
         ),
@@ -278,83 +280,125 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildRecommendedProducts() {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Sản phẩm đề xuất',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // Navigate to see all
-                    Navigator.push(
-                      context, 
-                      MaterialPageRoute(
-                        builder: (context) => const ProductListScreen(),
+    return FutureBuilder<List<Product>>(
+      future: _getPersonalizedRecommendations(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        } else if (snapshot.hasError) {
+          return SizedBox(
+            height: 200,
+            child: Center(
+              child: Text('Có lỗi xảy ra: ${snapshot.error}'),
+            ),
+          );
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: Text('Không có sản phẩm đề xuất'),
+            ),
+          );
+        } else {
+          // Lấy dịch vụ product và auth
+          final productService = Provider.of<ProductService>(context, listen: false);
+          final authService = Provider.of<AuthService>(context, listen: false);
+
+          // Tạo Future để lấy vị trí người dùng (nếu đăng nhập)
+          late final Future<Map<String, double>?> userLocationFuture;
+          if (authService.currentUser != null) {
+            userLocationFuture = productService.getUserLocation(authService.currentUser!.uid);
+          } else {
+            userLocationFuture = Future.value(null);
+          }
+
+          return FutureBuilder<Map<String, double>?>(
+            future: userLocationFuture,
+            builder: (context, locationSnapshot) {
+              // Lấy thông tin vị trí người dùng
+              final userLocation = locationSnapshot.data;
+              
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Đề xuất cho bạn',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (userLocation != null)
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.amber.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Gần bạn',
+                                  style: TextStyle(
+                                    color: Colors.amber.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          TextButton(
+                            onPressed: () {
+                              // Navigate to see all recommended products
+                            },
+                            child: Text(
+                              'Xem tất cả',
+                              style: TextStyle(
+                                color: Colors.blue[900],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                  child: Text(
-                    'Xem tất cả',
-                    style: TextStyle(
-                      color: Colors.blue[900],
-                      fontWeight: FontWeight.w500,
                     ),
-                  ),
+                    Container(
+                      height: 280,
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: snapshot.data!.length,
+                        itemBuilder: (context, index) {
+                          final product = snapshot.data![index];
+                          return SizedBox(
+                            width: 160,
+                            child: ProductCardStandard(
+                              product: product,
+                              isCompact: true,
+                              showDistance: userLocation != null,
+                              userLocation: userLocation,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 350,
-              child: FutureBuilder<List<Product>>(
-                future: _getPersonalizedRecommendations(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('Không có sản phẩm đề xuất'));
-                  }
-                  
-                  final products = snapshot.data!;
-                  
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        width: 180,
-                        margin: const EdgeInsets.only(right: 12),
-                        child: ProductCardStandard(
-                          product: products[index],
-                          isCompact: false,
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+              );
+            }
+          );
+        }
+      },
     );
   }
 
@@ -363,12 +407,22 @@ class _HomeContentState extends State<HomeContent> {
     final productService = Provider.of<ProductService>(context, listen: false);
     final authService = Provider.of<AuthService>(context, listen: false);
     
-    // Nếu người dùng đã đăng nhập, lấy đề xuất dựa trên hành vi của họ
+    // Nếu người dùng đã đăng nhập, lấy đề xuất dựa trên vị trí và hành vi
     if (authService.currentUser != null) {
-      return productService.getRecommendedProductsForUser(
-        authService.currentUser!.uid,
-        limit: 10,
-      );
+      try {
+        // Sử dụng phương thức mới để lấy đề xuất dựa trên vị trí hiện tại
+        return productService.getRecommendedProductsWithCurrentLocation(
+          authService.currentUser!.uid,
+          limit: 10
+        );
+      } catch (e) {
+        print('Lỗi khi lấy khuyến nghị nâng cao: $e');
+        // Fallback về phương thức khuyến nghị thông thường
+        return productService.getRecommendedProductsForUser(
+          authService.currentUser!.uid,
+          limit: 10,
+        );
+      }
     } else {
       // Nếu chưa đăng nhập, lấy đề xuất chung
       return productService.getRecommendedProducts(limit: 10);
@@ -710,94 +764,254 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildLatestProducts() {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Sản phẩm mới nhất',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      // Navigate to all products
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ProductListScreen(),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      'Xem tất cả',
-                      style: TextStyle(
-                        color: Colors.blue[900],
-                        fontWeight: FontWeight.w500,
+    return FutureBuilder<List<Product>>(
+      future: Provider.of<ProductService>(context, listen: false).getLatestProducts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        } else if (snapshot.hasError) {
+          return SizedBox(
+            height: 200,
+            child: Center(
+              child: Text('Có lỗi xảy ra: ${snapshot.error}'),
+            ),
+          );
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: Text('Không có sản phẩm mới nhất'),
+            ),
+          );
+        } else {
+          // Lấy dịch vụ auth và product
+          final authService = Provider.of<AuthService>(context, listen: false);
+          final productService = Provider.of<ProductService>(context, listen: false);
+          
+          // Tạo Future để lấy vị trí người dùng (nếu đăng nhập)
+          late final Future<Map<String, double>?> userLocationFuture;
+          if (authService.currentUser != null) {
+            userLocationFuture = productService.getUserLocation(authService.currentUser!.uid);
+          } else {
+            userLocationFuture = Future.value(null);
+          }
+          
+          return FutureBuilder<Map<String, double>?>(
+            future: userLocationFuture,
+            builder: (context, locationSnapshot) {
+              // Lấy thông tin vị trí người dùng
+              final userLocation = locationSnapshot.data;
+              
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Sản phẩm mới nhất',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (userLocation != null)
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.amber.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Gần bạn',
+                                  style: TextStyle(
+                                    color: Colors.amber.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          TextButton(
+                            onPressed: () {
+                              // Navigate to see all latest products
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ProductListScreen(),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              'Xem tất cả',
+                              style: TextStyle(
+                                color: Colors.blue[900],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
+                    Container(
+                      height: 280,
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: snapshot.data!.length,
+                        itemBuilder: (context, index) {
+                          final product = snapshot.data![index];
+                          return SizedBox(
+                            width: 160,
+                            child: ProductCardStandard(
+                              product: product,
+                              isCompact: true,
+                              showDistance: userLocation != null,
+                              userLocation: userLocation,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildNewArrivals() {
+    return FutureBuilder<List<Product>>(
+      future: Provider.of<ProductService>(context, listen: false).getNewArrivals(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: CircularProgressIndicator(),
             ),
-            const SizedBox(height: 16),
-            StreamBuilder<List<Product>>(
-              stream: Provider.of<ProductService>(context).searchProductsAdvanced(
-                sortBy: 'Mới nhất',
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
-                    child: Text('Không có sản phẩm nào'),
-                  );
-                }
-
-                final products = snapshot.data!.take(4).toList();
-
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(8),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.58,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    return ProductCardStandard(
-                      product: products[index],
-                      showFavoriteButton: true,
-                      isCompact: false,
-                    );
-                  },
-                );
-              },
+          );
+        } else if (snapshot.hasError) {
+          return SizedBox(
+            height: 200,
+            child: Center(
+              child: Text('Có lỗi xảy ra: ${snapshot.error}'),
             ),
-          ],
-        ),
-      ),
+          );
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: Text('Không có sản phẩm mới'),
+            ),
+          );
+        } else {
+          // Lấy dịch vụ auth và product
+          final authService = Provider.of<AuthService>(context, listen: false);
+          final productService = Provider.of<ProductService>(context, listen: false);
+          
+          // Tạo Future để lấy vị trí người dùng (nếu đăng nhập)
+          late final Future<Map<String, double>?> userLocationFuture;
+          if (authService.currentUser != null) {
+            userLocationFuture = productService.getUserLocation(authService.currentUser!.uid);
+          } else {
+            userLocationFuture = Future.value(null);
+          }
+          
+          return FutureBuilder<Map<String, double>?>(
+            future: userLocationFuture,
+            builder: (context, locationSnapshot) {
+              // Lấy thông tin vị trí người dùng
+              final userLocation = locationSnapshot.data;
+              
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Sản phẩm mới',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (userLocation != null)
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.amber.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Gần bạn',
+                                  style: TextStyle(
+                                    color: Colors.amber.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          TextButton(
+                            onPressed: () {
+                              // Navigate to see all new products
+                            },
+                            child: Text(
+                              'Xem tất cả',
+                              style: TextStyle(
+                                color: Colors.blue[900],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      height: 280,
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: snapshot.data!.length,
+                        itemBuilder: (context, index) {
+                          final product = snapshot.data![index];
+                          return SizedBox(
+                            width: 160,
+                            child: ProductCardStandard(
+                              product: product,
+                              isCompact: true,
+                              showDistance: userLocation != null,
+                              userLocation: userLocation,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          );
+        }
+      },
     );
   }
 } 

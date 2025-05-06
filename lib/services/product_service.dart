@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -10,6 +12,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/moderation_result.dart';
 import '../services/user_service.dart';
 import '../services/ntt_point_service.dart';
+import '../utils/location_utils.dart' as locUtils;
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class ProductService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -393,7 +399,7 @@ class ProductService extends ChangeNotifier {
       
       // 3. Get full details of recently viewed products to get their categories
       List<Product> recentlyViewedProducts = [];
-      Map<String, List<Product>> categoryProducts = {};
+      Set<String> categories = {};
       
       // Limit to last 5 viewed products
       List<String> limitedRecentIds = recentlyViewedIds.take(5).toList();
@@ -409,10 +415,11 @@ class ProductService extends ChangeNotifier {
         for (var doc in recentProductsSnapshot.docs) {
           final product = Product.fromMap(doc.data(), doc.id);
           recentlyViewedProducts.add(product);
+          categories.add(product.category);
           
           // Initialize category in the map if not exists
-          if (!categoryProducts.containsKey(product.category)) {
-            categoryProducts[product.category] = [];
+          if (!categories.contains(product.category)) {
+            categories.add(product.category);
           }
         }
       }
@@ -424,7 +431,7 @@ class ProductService extends ChangeNotifier {
       recommendations.addAll(recentlyViewedProducts);
       
       // For each category, get 2 additional products
-      for (var category in categoryProducts.keys) {
+      for (var category in categories) {
         final excludeIds = recentlyViewedProducts
             .where((p) => p.category == category)
             .map((p) => p.id)
@@ -547,18 +554,20 @@ class ProductService extends ChangeNotifier {
     if (productId.isEmpty) return;
     
     try {
-      // Get reference to the product
+      // Get product ref
       final productRef = _firestore.collection('products').doc(productId);
       
-      // Use transaction to safely increment the counter
+      // Use transaction to safely increment
       await _firestore.runTransaction((transaction) async {
-        // Get product
-        final productDoc = await transaction.get(productRef);
+        // Get current document
+        DocumentSnapshot productDoc = await transaction.get(productRef);
         
         if (productDoc.exists) {
-          // Get current count and increment
-          final int currentCount = productDoc.data()?['viewCount'] ?? 0;
-          transaction.update(productRef, {'viewCount': currentCount + 1});
+          // Get current view count or default to 0
+          int currentViews = (productDoc.data() as Map<String, dynamic>)['viewCount'] ?? 0;
+          
+          // Update with incremented count
+          transaction.update(productRef, {'viewCount': currentViews + 1});
         }
       });
     } catch (e) {
@@ -660,23 +669,46 @@ class ProductService extends ChangeNotifier {
     required String excludeProductId,
     int limit = 10,
   }) {
-    return _firestore
-        .collection('products')
-        .where('category', isEqualTo: category)
-        .where('isSold', isEqualTo: false)
-        .where('status', whereNotIn: ['pending_review', 'rejected'])
-        .orderBy('createdAt', descending: true)
-        .limit(limit + 1) // Fetch one extra to account for filtering
-        .snapshots()
-        .map((snapshot) {
-      List<Product> products = snapshot.docs
-          .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .where((product) => product.id != excludeProductId) // Filter out the current product
-          .take(limit) // Take only the number we need
-          .toList();
-      
-      return products;
-    });
+    if (category.isEmpty) {
+      // Trả về Stream rỗng nếu category không hợp lệ
+      return Stream.value([]);
+    }
+
+    try {
+      return _firestore
+          .collection('products')
+          .where('category', isEqualTo: category)
+          .where('isSold', isEqualTo: false)
+          .where('status', whereNotIn: ['pending_review', 'rejected'])
+          .orderBy('createdAt', descending: true)
+          .limit(limit + 1) // Fetch one extra to account for filtering
+          .snapshots()
+          .map((snapshot) {
+        try {
+          List<Product> products = [];
+          
+          // Kiểm tra snapshot có dữ liệu không
+          if (snapshot.docs.isNotEmpty) {
+            products = snapshot.docs
+                .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+                .where((product) => product.id != excludeProductId) // Filter out the current product
+                .take(limit) // Take only the number we need
+                .toList();
+          }
+          
+          return products;
+        } catch (e) {
+          debugPrint('Lỗi khi xử lý dữ liệu sản phẩm liên quan: $e');
+          return <Product>[];
+        }
+      }).handleError((error) {
+        debugPrint('Lỗi Stream sản phẩm liên quan: $error');
+        return <Product>[];
+      });
+    } catch (e) {
+      debugPrint('Lỗi tạo Stream sản phẩm liên quan: $e');
+      return Stream.value([]);
+    }
   }
 
   // Thêm sản phẩm mới với kiểm duyệt
@@ -687,7 +719,7 @@ class ProductService extends ChangeNotifier {
     required String category,
     required List<String> images,
     required String condition,
-    required String location,
+    required Map<String, dynamic>? location,
     List<String> tags = const [],
     Map<String, String> specifications = const {},
   }) async {
@@ -711,6 +743,22 @@ class ProductService extends ChangeNotifier {
       String sellerName = userSnapshot.exists ? userSnapshot.get('displayName') ?? user.displayName ?? 'Người dùng' : user.displayName ?? 'Người dùng';
       String sellerAvatar = userSnapshot.exists ? userSnapshot.get('photoURL') ?? '' : '';
       
+      // Chuyển đổi location thành Map nếu là String
+      Map<String, dynamic> locationMap;
+      if (location is String) {
+        locationMap = {
+          'address': location as String,
+          'lat': 10.7326,  // Vị trí mặc định
+          'lng': 106.6975, // Vị trí mặc định
+        };
+      } else {
+        locationMap = location ?? {
+          'address': 'Không xác định',
+          'lat': 10.7326,
+          'lng': 106.6975,
+        };
+      }
+      
       // Tạo sản phẩm mới với trạng thái đang chờ kiểm duyệt
       final Product newProduct = Product(
         id: productId,
@@ -725,7 +773,7 @@ class ProductService extends ChangeNotifier {
         createdAt: DateTime.now(),
         isSold: false,
         condition: condition,
-        location: location,
+        location: locationMap,
         tags: tags,
         specifications: specifications,
         status: ProductStatus.pending_review,
@@ -867,7 +915,7 @@ class ProductService extends ChangeNotifier {
     required String category,
     required List<String> images,
     required String condition,
-    required String location,
+    required Map<String, dynamic>? location,
     List<String> tags = const [],
     Map<String, String> specifications = const {},
   }) async {
@@ -1252,7 +1300,7 @@ class ProductService extends ChangeNotifier {
     required List<String> images,
     required int quantity,
     required String condition,
-    required String location,
+    required Map<String, dynamic>? location,
     List<String> tags = const [],
     Map<String, String> specifications = const {},
   }) async {
@@ -1326,10 +1374,745 @@ class ProductService extends ChangeNotifier {
     }
   }
 
+  /// Phương thức đề xuất sản phẩm nâng cao với vị trí và giá cả
+  /// Sử dụng thuật toán lọc cộng tác kết hợp lọc theo vị trí và giá
+  Future<List<Product>> getRecommendedProductsWithLocation({
+    required String userId,
+    required Map<String, double> userLocation,
+    int limit = 10,
+    bool verbose = true, // Tham số mới để kiểm soát lượng debug info
+  }) async {
+    try {
+      print('🚀 Bắt đầu tính toán đề xuất sản phẩm dựa trên vị trí: ${userLocation['lat']}, ${userLocation['lng']}');
+      
+      if (userId.isEmpty) {
+        // Fallback khi không có userId
+        print('❌ Không có userId, trả về đề xuất cơ bản');
+        return getRecommendedProducts(limit: limit);
+      }
+      
+      // 1. Lấy thông tin người dùng
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) {
+        print('❌ Không tìm thấy thông tin người dùng, trả về đề xuất cơ bản');
+        return getRecommendedProducts(limit: limit);
+      }
+      
+      final userData = userDoc.data()!;
+      
+      // 2. Lấy danh sách sản phẩm đã xem gần đây
+      List<String> recentlyViewedIds = List<String>.from(userData['recentlyViewed'] ?? []);
+      print('🔍 Người dùng đã xem ${recentlyViewedIds.length} sản phẩm gần đây');
+      
+      // 3. Lấy thông tin chi tiết sản phẩm đã xem và danh mục
+      List<Product> recentlyViewedProducts = [];
+      Set<String> categories = {};
+      Set<String> viewedSellerIds = {};
+      // Thêm bản đồ theo dõi tần suất xuất hiện danh mục
+      Map<String, int> categoryFrequency = {};
+      
+      if (recentlyViewedIds.isNotEmpty) {
+        final limitedRecentIds = recentlyViewedIds.take(10).toList();
+        final recentSnapshot = await _firestore
+            .collection('products')
+            .where(FieldPath.documentId, whereIn: limitedRecentIds)
+            .get();
+            
+        for (final doc in recentSnapshot.docs) {
+          final product = Product.fromMap(doc.data(), doc.id);
+          recentlyViewedProducts.add(product);
+          categories.add(product.category);
+          viewedSellerIds.add(product.sellerId);
+          
+          // Tăng tần suất danh mục
+          categoryFrequency[product.category] = (categoryFrequency[product.category] ?? 0) + 1;
+        }
+      }
+      
+      print('📊 Thống kê danh mục đã xem:');
+      categoryFrequency.forEach((category, count) {
+        print('   - $category: $count lần');
+      });
+      
+      // 4. Lấy sở thích của người dùng (nếu có)
+      List<String> preferredCategories = List<String>.from(userData['preferredCategories'] ?? []);
+      categories.addAll(preferredCategories);
+      
+      if (preferredCategories.isNotEmpty) {
+        print('⭐ Danh mục ưa thích: ${preferredCategories.join(', ')}');
+      }
+      
+      // Tạo Set để theo dõi ID sản phẩm đã thêm để tránh trùng lặp
+      Set<String> addedProductIds = Set<String>();
+      
+      // 5. Thu thập tất cả các sản phẩm tiềm năng
+      List<Product> potentialRecommendations = [];
+      
+      // 5.1 Sản phẩm từ cùng danh mục
+      if (categories.isNotEmpty) {
+        // Ưu tiên các danh mục xuất hiện nhiều trong lịch sử xem
+        List<String> prioritizedCategories = categories.toList()
+          ..sort((a, b) => (categoryFrequency[b] ?? 0).compareTo(categoryFrequency[a] ?? 0));
+        
+        print('🔄 Đang lấy sản phẩm từ ${prioritizedCategories.length} danh mục ưu tiên');
+        
+        for (final category in prioritizedCategories) {
+          final categorySnapshot = await _firestore
+              .collection('products')
+              .where('category', isEqualTo: category)
+              .where('isSold', isEqualTo: false)
+              .orderBy('viewCount', descending: true)
+              .limit(5)
+              .get();
+              
+          for (final doc in categorySnapshot.docs) {
+            // Kiểm tra trùng lặp trước khi thêm vào
+            if (!addedProductIds.contains(doc.id)) {
+              potentialRecommendations.add(Product.fromMap(doc.data(), doc.id));
+              addedProductIds.add(doc.id);
+            }
+          }
+        }
+      }
+      
+      // 5.2 Sản phẩm từ người bán quen thuộc
+      if (viewedSellerIds.isNotEmpty) {
+        print('👨‍💼 Đang lấy sản phẩm từ ${viewedSellerIds.length} người bán quen thuộc');
+        
+        final sellerSnapshot = await _firestore
+            .collection('products')
+            .where('sellerId', whereIn: viewedSellerIds.take(10).toList())
+            .where('isSold', isEqualTo: false)
+            .orderBy('createdAt', descending: true)
+            .limit(10)
+            .get();
+            
+        for (final doc in sellerSnapshot.docs) {
+          // Kiểm tra trùng lặp
+          if (!addedProductIds.contains(doc.id)) {
+            potentialRecommendations.add(Product.fromMap(doc.data(), doc.id));
+            addedProductIds.add(doc.id);
+          }
+        }
+      }
+      
+      // 5.3 Sản phẩm phổ biến (để bổ sung)
+      if (potentialRecommendations.length < limit * 2) {
+        print('🌟 Bổ sung sản phẩm phổ biến');
+        
+        final popularSnapshot = await _firestore
+            .collection('products')
+            .where('isSold', isEqualTo: false)
+            .orderBy('viewCount', descending: true)
+            .limit(limit)
+            .get();
+            
+        for (final doc in popularSnapshot.docs) {
+          if (!addedProductIds.contains(doc.id)) {
+            potentialRecommendations.add(Product.fromMap(doc.data(), doc.id));
+            addedProductIds.add(doc.id);
+          }
+        }
+      }
+      
+      print('📋 Đã thu thập ${potentialRecommendations.length} sản phẩm tiềm năng để đánh giá');
+      
+      // Cache kết quả tính khoảng cách để tránh tính lại nhiều lần
+      Map<String, double> distanceCache = {};
+      
+      // 6. Tính điểm cho từng sản phẩm dựa trên nhiều yếu tố (lọc cộng tác)
+      List<Map<String, dynamic>> scoredProducts = [];
+      
+      // Tính recency score cho danh mục - ưu tiên danh mục xem gần đây nhất
+      Map<String, double> recencyScores = {};
+      for (int i = 0; i < recentlyViewedProducts.length && i < 10; i++) {
+        String category = recentlyViewedProducts[i].category;
+        // Điểm giảm dần từ sản phẩm gần đây nhất (0.1 -> 0.01)
+        double score = 0.1 - (i * 0.01);
+        // Lấy điểm lớn nhất nếu danh mục xuất hiện nhiều lần
+        recencyScores[category] = max(recencyScores[category] ?? 0, score);
+      }
+      
+      if (verbose) {
+        print('📊 THÔNG TIN TÍNH ĐIỂM CHI TIẾT:');
+      }
+      
+      for (final product in potentialRecommendations) {
+        // 6.1 Điểm danh mục (ưu tiên danh mục đã xem và đánh dấu là yêu thích)
+        double categoryScore = 0;
+        if (categories.contains(product.category)) {
+          categoryScore = 0.3;
+          
+          // Tăng điểm nếu là danh mục ưa thích
+          if (preferredCategories.contains(product.category)) {
+            categoryScore += 0.2;
+          }
+          
+          // Thêm điểm recency cho danh mục mới xem gần đây
+          categoryScore += recencyScores[product.category] ?? 0;
+        }
+        
+        // 6.2 Điểm người bán (ưu tiên người bán quen thuộc)
+        double sellerScore = 0;
+        if (viewedSellerIds.contains(product.sellerId)) {
+          sellerScore = 0.1;
+        }
+        
+        // 6.3 Điểm vị trí (ưu tiên gần hơn)
+        double distanceScore = 0;
+        double distance = 999.0; // Giá trị mặc định cho khoảng cách không xác định
+        
+        // Lấy tọa độ vị trí từ địa chỉ sản phẩm - SỬ DỤNG PHƯƠNG THỨC BẤT ĐỒNG BỘ
+        final productLocation = await locUtils.LocationUtils.getLocationFromAddressAsync(product.location);
+        
+        if (productLocation != null && 
+            productLocation['lat'] != null && 
+            productLocation['lng'] != null &&
+            userLocation['lat'] != null && 
+            userLocation['lng'] != null) {
+          // Tạo khóa cache cho tính toán khoảng cách
+          String cacheKey = "${userLocation['lat']}-${userLocation['lng']}-${productLocation['lat']}-${productLocation['lng']}";
+          
+          // Tính khoảng cách giữa người dùng và sản phẩm
+          try {
+            if (distanceCache.containsKey(cacheKey)) {
+              distance = distanceCache[cacheKey]!;
+            } else {
+              distance = locUtils.LocationUtils.calculateDistance(
+                userLocation['lat']!, 
+                userLocation['lng']!,
+                productLocation['lat']!, 
+                productLocation['lng']!
+              );
+              distanceCache[cacheKey] = distance;
+            }
+            
+            // Lưu khoảng cách để sau này tính toán tương đối giữa các sản phẩm
+            distanceScore = distance <= 20 ? 1 : 0; // Chỉ để lưu trữ, sẽ tính lại sau
+          } catch (e) {
+            print('❌ Lỗi khi tính khoảng cách cho sản phẩm ${product.id}: $e');
+          }
+        } else {
+          print('ℹ️ Không thể tính khoảng cách cho sản phẩm ${product.id}: Vị trí không đầy đủ hoặc không hợp lệ');
+        }
+        
+        // 6.4 Điểm giá (ưu tiên sản phẩm có giá tương tự các sản phẩm đã xem)
+        double priceScore = 0;
+        double priceDiff = 0;
+        
+        if (recentlyViewedProducts.isNotEmpty) {
+          // Tính giá trung bình của các sản phẩm đã xem
+          double avgPrice = recentlyViewedProducts
+              .map((p) => p.price)
+              .reduce((a, b) => a + b) / recentlyViewedProducts.length;
+              
+          // Tính % chênh lệch giá
+          if (avgPrice > 0) {
+            priceDiff = (product.price - avgPrice).abs() / avgPrice;
+          } else {
+            priceDiff = product.price > 0 ? 1.0 : 0.0;
+          }
+          
+          // Lưu trữ giá trị để tính toán sau
+          priceScore = 1 - min(1, priceDiff); // Giá trị từ 0-1, càng gần giá trung bình càng cao
+        }
+        
+        // Thêm dữ liệu vào danh sách để so sánh và chuẩn hóa sau
+        scoredProducts.add({
+          'product': product,
+          'rawScore': categoryScore + sellerScore, // Điểm cơ bản không cần chuẩn hóa
+          'category': product.category,
+          'distance': distance,
+          'priceDiff': priceDiff,
+          // Lưu chi tiết cho việc hiển thị debug
+          'details': {
+            'categoryScore': categoryScore,
+            'sellerScore': sellerScore,
+            'distance': distance,
+            'priceDiff': priceDiff * 100, // Chuyển về phần trăm
+          }
+        });
+      }
+      
+      // Tính toán điểm tương đối giữa các sản phẩm
+      if (scoredProducts.isNotEmpty) {
+        // Tìm khoảng cách nhỏ nhất và lớn nhất
+        double minDistance = 999.0;
+        double maxDistance = 0.0;
+        
+        for (var product in scoredProducts) {
+          double dist = product['distance'] as double;
+          if (dist < minDistance && dist > 0) minDistance = dist;
+          if (dist > maxDistance && dist < 900) maxDistance = dist;
+        }
+        
+        // Chuẩn hóa điểm khoảng cách
+        double distanceRange = maxDistance - minDistance;
+        if (distanceRange > 0) {
+          for (var product in scoredProducts) {
+            double dist = product['distance'] as double;
+            double normalizedDistance = dist < 900 ? (maxDistance - dist) / distanceRange : 0;
+            
+            // Điểm vị trí: 0-0.5
+            double distanceScore = normalizedDistance * 0.5;
+            
+            // Điểm giá: 0-0.3 tùy thuộc vào sự chênh lệch
+            double priceDiff = product['priceDiff'] as double;
+            double priceScore = 0;
+            if (priceDiff <= 0.1) {
+              priceScore = 0.3; // Chênh lệch < 10%
+            } else if (priceDiff <= 0.2) {
+              priceScore = 0.25; // Chênh lệch < 20%
+            } else if (priceDiff <= 0.3) {
+              priceScore = 0.2; // Chênh lệch < 30%
+            } else if (priceDiff <= 0.5) {
+              priceScore = 0.15; // Chênh lệch < 50%
+            } else if (priceDiff <= 0.8) {
+              priceScore = 0.1; // Chênh lệch < 80%
+            } else {
+              priceScore = 0.05; // Chênh lệch > 80%
+            }
+            
+            // Tổng điểm
+            double totalScore = (product['rawScore'] as double) + distanceScore + priceScore;
+            product['score'] = totalScore;
+            
+            // Cập nhật chi tiết
+            Map<String, dynamic> details = product['details'] as Map<String, dynamic>;
+            details['distanceScore'] = distanceScore;
+            details['priceScore'] = priceScore;
+            details['totalScore'] = totalScore;
+          }
+        } else {
+          // Nếu tất cả sản phẩm đều có cùng khoảng cách, không cần chuẩn hóa
+          for (var product in scoredProducts) {
+            double priceDiff = product['priceDiff'] as double;
+            double priceScore = 0;
+            if (priceDiff <= 0.1) {
+              priceScore = 0.3; // Chênh lệch < 10%
+            } else if (priceDiff <= 0.2) {
+              priceScore = 0.25; // Chênh lệch < 20%
+            } else if (priceDiff <= 0.3) {
+              priceScore = 0.2; // Chênh lệch < 30%
+            } else if (priceDiff <= 0.5) {
+              priceScore = 0.15; // Chênh lệch < 50%
+            } else if (priceDiff <= 0.8) {
+              priceScore = 0.1; // Chênh lệch < 80%
+            } else {
+              priceScore = 0.05; // Chênh lệch > 80%
+            }
+            
+            product['score'] = (product['rawScore'] as double) + 0.25 + priceScore; // Mặc định 0.25 cho distanceScore
+            
+            // Cập nhật chi tiết
+            Map<String, dynamic> details = product['details'] as Map<String, dynamic>;
+            details['distanceScore'] = 0.25; // Giá trị mặc định
+            details['priceScore'] = priceScore;
+            details['totalScore'] = product['score'];
+          }
+        }
+      }
+      
+      // Chi tiết thông tin tính điểm cho debug
+      if (verbose) {
+        for (var product in scoredProducts) {
+          final details = product['details'] as Map<String, dynamic>;
+          
+          print('-----------------------------------------------');
+          print('Chi tiết điểm cho sản phẩm: ${(product['product'] as Product).title} (ID: ${(product['product'] as Product).id})');
+          print('- Khoảng cách: ${product['distance'].toStringAsFixed(2)}km (Điểm: ${details['distanceScore'].toStringAsFixed(2)})');
+          print('- Danh mục: ${product['category']} (Điểm: ${details['categoryScore'].toStringAsFixed(2)})');
+          if (preferredCategories.contains(product['category'])) {
+            print('  ⭐ Danh mục ưa thích!');
+          }
+          if (recencyScores[product['category']] != null) {
+            print('  🕒 Danh mục xem gần đây! +${recencyScores[product['category']]!.toStringAsFixed(2)}');
+          }
+          print('- Người bán: ${(product['product'] as Product).sellerId} (Điểm: ${details['sellerScore'].toStringAsFixed(2)})');
+          if (viewedSellerIds.contains((product['product'] as Product).sellerId)) {
+            print('  👨‍💼 Đã mua hàng từ người bán này trước đây!');
+          }
+          print('- Giá: ${(product['product'] as Product).price}đ (Chênh lệch: ${details['priceDiff'].toStringAsFixed(0)}%, Điểm: ${details['priceScore'].toStringAsFixed(2)})');
+          print('=> TỔNG ĐIỂM: ${details['totalScore'].toStringAsFixed(2)}');
+        }
+      }
+      
+      // 7. Sắp xếp theo điểm và trả về kết quả
+      scoredProducts.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
+      
+      // Nếu điểm bằng nhau thì ưu tiên sản phẩm gần hơn
+      final tiedThreshold = 0.05; // Ngưỡng xem là điểm gần bằng nhau
+      
+      for (int i = 0; i < scoredProducts.length - 1; i++) {
+        for (int j = i + 1; j < scoredProducts.length; j++) {
+          final scoreDiff = (scoredProducts[i]['score'] as double) - (scoredProducts[j]['score'] as double);
+          
+          // Nếu điểm gần bằng nhau, ưu tiên gần hơn
+          if (scoreDiff.abs() < tiedThreshold) {
+            final distanceI = scoredProducts[i]['distance'] as double;
+            final distanceJ = scoredProducts[j]['distance'] as double;
+            
+            if (distanceJ < distanceI) {
+              // Hoán đổi vị trí
+              final temp = scoredProducts[i];
+              scoredProducts[i] = scoredProducts[j];
+              scoredProducts[j] = temp;
+            }
+          }
+        }
+      }
+      
+      // 8. Đa dạng hóa kết quả - Tránh quá nhiều sản phẩm từ cùng một danh mục
+      List<Map<String, dynamic>> diversifiedResults = [];
+      Map<String, int> categoryCount = {};
+      
+      // Thêm vào kết quả đa dạng, tối đa 3 sản phẩm/danh mục
+      for (var product in scoredProducts) {
+        String category = product['category'] as String;
+        int currentCount = categoryCount[category] ?? 0;
+        
+        if (currentCount < 3) {
+          diversifiedResults.add(product);
+          categoryCount[category] = currentCount + 1;
+          
+          // Nếu đã đủ số lượng cần thiết, dừng lại
+          if (diversifiedResults.length >= limit) break;
+        }
+      }
+      
+      // Nếu chưa đủ, bổ sung từ danh sách gốc
+      if (diversifiedResults.length < limit) {
+        for (var product in scoredProducts) {
+          if (!diversifiedResults.contains(product)) {
+            diversifiedResults.add(product);
+            if (diversifiedResults.length >= limit) break;
+          }
+        }
+      }
+      
+      // In thông tin hữu ích để debug
+      print('✅ ĐÃ HOÀN THÀNH TÍNH TOÁN ĐỀ XUẤT:');
+      print('🌍 Dựa trên vị trí: ${userLocation['lat']}, ${userLocation['lng']}');
+      print('📊 Top ${min(diversifiedResults.length, 5)} sản phẩm đề xuất và khoảng cách:');
+      
+      for (int i = 0; i < min(5, diversifiedResults.length); i++) {
+        final item = diversifiedResults[i];
+        final product = item['product'] as Product;
+        final score = item['score'] as double;
+        final distance = item['distance'] as double;
+        final details = item['details'] as Map<String, dynamic>;
+        
+        print('${i+1}. ${product.title}: ${distance.toStringAsFixed(2)}km, Điểm: ${score.toStringAsFixed(2)}');
+        if (verbose) {
+          print('   - Danh mục: ${details['categoryScore']!.toStringAsFixed(2)} | ' +
+                'Người bán: ${details['sellerScore']!.toStringAsFixed(2)} | ' +
+                'Vị trí: ${details['distanceScore']!.toStringAsFixed(2)} | ' +
+                'Giá: ${details['priceScore']!.toStringAsFixed(2)}');
+        }
+      }
+      
+      // Trả về danh sách đề xuất có giới hạn và đã đa dạng hóa
+      return diversifiedResults
+          .map((item) => item['product'] as Product)
+          .toList();
+    } catch (e) {
+      print('❌ Lỗi khi lấy đề xuất sản phẩm nâng cao: $e');
+      // Fallback khi có lỗi
+      return getRecommendedProducts(limit: limit);
+    }
+  }
+
   // Thêm phương thức override dispose để đánh dấu service đã bị hủy
   @override
   void dispose() {
     _disposed = true;
     super.dispose();
+  }
+
+  // Phương thức cập nhật vị trí người dùng
+  Future<bool> updateUserLocation(String userId, Map<String, double> location) async {
+    if (userId.isEmpty || location.isEmpty) return false;
+    
+    try {
+      // Tham chiếu đến tài liệu người dùng
+      final userRef = _firestore.collection('users').doc(userId);
+      
+      // Dữ liệu vị trí cần cập nhật
+      final locationData = {
+        'currentLocation': {
+          'lat': location['lat'],
+          'lng': location['lng'],
+          'updatedAt': FieldValue.serverTimestamp(),
+        }
+      };
+      
+      // Cập nhật vị trí hiện tại
+      await userRef.update(locationData);
+      
+      // Xác minh dữ liệu đã được lưu chính xác
+      final verifyDoc = await userRef.get();
+      if (verifyDoc.exists && verifyDoc.data()!.containsKey('currentLocation')) {
+        final savedLocation = verifyDoc.data()!['currentLocation'];
+        
+        // Kiểm tra dữ liệu cập nhật có khớp không
+        if (savedLocation['lat'] == location['lat'] && 
+            savedLocation['lng'] == location['lng']) {
+          print('✅ Đã cập nhật và xác minh vị trí người dùng: ${location['lat']}, ${location['lng']}');
+          return true;
+        } else {
+          print('❌ Lỗi: Vị trí đã lưu (${savedLocation['lat']}, ${savedLocation['lng']}) ' 
+              'không khớp với vị trí cần lưu (${location['lat']}, ${location['lng']})');
+          return false;
+        }
+      }
+      
+      print('⚠️ Không thể xác minh vị trí đã lưu');
+      return false;
+    } catch (e) {
+      print('❌ Lỗi khi cập nhật vị trí người dùng: $e');
+      return false;
+    }
+  }
+  
+  // Phương thức lấy vị trí hiện tại của người dùng
+  Future<Map<String, double>?> getUserLocation(String userId) async {
+    if (userId.isEmpty) return null;
+    
+    try {
+      // Lấy tài liệu người dùng
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      
+      if (userDoc.exists && userDoc.data()!.containsKey('currentLocation')) {
+        final locationData = userDoc.data()!['currentLocation'];
+        return {
+          'lat': locationData['lat'],
+          'lng': locationData['lng'],
+        };
+      }
+      
+      return null;
+    } catch (e) {
+      print('Lỗi khi lấy vị trí người dùng: $e');
+      return null;
+    }
+  }
+  
+  // Method to update user's product view behavior including location
+  Future<void> trackProductView(String userId, String productId, Map<String, double>? userLocation) async {
+    if (userId.isEmpty || productId.isEmpty) return;
+    
+    try {
+      // 1. Add to recently viewed
+      await addToRecentlyViewed(userId, productId);
+      
+      // 2. Increment product view count
+      await incrementProductViewCount(productId);
+      
+      // 3. Update user location if provided
+      if (userLocation != null) {
+        await updateUserLocation(userId, userLocation);
+      }
+      
+      // 4. Track view in analytics (optional)
+      await _firestore.collection('analytics').add({
+        'userId': userId,
+        'productId': productId,
+        'action': 'view',
+        'timestamp': FieldValue.serverTimestamp(),
+        'location': userLocation,
+      });
+    } catch (e) {
+      print('Lỗi khi theo dõi lượt xem sản phẩm: $e');
+    }
+  }
+  
+  // Phương thức đề xuất nâng cao sử dụng vị trí người dùng hiện tại từ Firestore
+  Future<List<Product>> getRecommendedProductsWithCurrentLocation(String userId, {int limit = 10}) async {
+    if (userId.isEmpty) {
+      return getRecommendedProducts(limit: limit);
+    }
+    
+    try {
+      // Lấy vị trí hiện tại của người dùng từ Firestore
+      Map<String, double>? userLocation = await getUserLocation(userId);
+      
+      // Nếu không có vị trí lưu trữ hoặc vị trí quá cũ (>30 phút), cố gắng lấy vị trí hiện tại
+      bool needsLocationUpdate = userLocation == null;
+      
+      if (!needsLocationUpdate) {
+        // Kiểm tra thời gian cập nhật vị trí
+        final userDoc = await _firestore.collection('users').doc(userId).get();
+        if (userDoc.exists && userDoc.data()!.containsKey('currentLocation')) {
+          final locationData = userDoc.data()!['currentLocation'];
+          if (locationData.containsKey('updatedAt') && locationData['updatedAt'] != null) {
+            final updateTime = (locationData['updatedAt'] as Timestamp).toDate();
+            final timeDiff = DateTime.now().difference(updateTime).inMinutes;
+            
+            // Nếu vị trí cũ hơn 30 phút, cần cập nhật
+            if (timeDiff > 30) {
+              needsLocationUpdate = true;
+              print('Vị trí người dùng đã cũ ($timeDiff phút), đang cố gắng cập nhật...');
+            }
+          }
+        }
+      }
+      
+      // Cố gắng lấy vị trí hiện tại nếu cần
+      if (needsLocationUpdate) {
+        try {
+          // Kiểm tra quyền truy cập vị trí
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          
+          // Nếu người dùng cho phép, lấy vị trí hiện tại
+          if (permission != LocationPermission.denied && 
+              permission != LocationPermission.deniedForever) {
+            Position position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            );
+            
+            userLocation = {
+              'lat': position.latitude,
+              'lng': position.longitude,
+            };
+            
+            // Cập nhật vị trí người dùng trong Firestore và kiểm tra kết quả
+            bool updateSuccess = await updateUserLocation(userId, userLocation);
+            if (updateSuccess) {
+              print('✅ Đã cập nhật vị trí hiện tại thành công: ${position.latitude}, ${position.longitude}');
+              
+              // Xác minh một lần nữa bằng cách đọc lại từ Firestore
+              final verifiedLocation = await getUserLocation(userId);
+              if (verifiedLocation != null) {
+                print('🔍 Kiểm tra vị trí từ Firestore: ${verifiedLocation['lat']}, ${verifiedLocation['lng']}');
+                
+                // Sử dụng vị trí đã xác minh
+                userLocation = verifiedLocation;
+              }
+            } else {
+              print('❌ Không thể cập nhật vị trí hiện tại vào Firestore');
+            }
+          }
+        } catch (e) {
+          print('❌ Không thể lấy vị trí hiện tại: $e');
+          // Không báo lỗi với người dùng vì đây là tính năng ngầm
+        }
+      }
+      
+      // Nếu không có vị trí, sử dụng phương thức đề xuất thông thường
+      if (userLocation == null) {
+        print('ℹ️ Không thể lấy vị trí người dùng, sử dụng đề xuất thông thường');
+        return getRecommendedProductsForUser(userId, limit: limit);
+      }
+      
+      print('🌍 Sử dụng vị trí cho đề xuất: ${userLocation['lat']}, ${userLocation['lng']}');
+      
+      // Sử dụng phương thức đề xuất với vị trí
+      return getRecommendedProductsWithLocation(
+        userId: userId,
+        userLocation: userLocation,
+        limit: limit
+      );
+    } catch (e) {
+      print('❌ Lỗi khi lấy đề xuất với vị trí hiện tại: $e');
+      return getRecommendedProductsForUser(userId, limit: limit);
+    }
+  }
+
+  // Phương thức lấy các sản phẩm mới nhất
+  Future<List<Product>> getLatestProducts({int limit = 10}) async {
+    try {
+      final snapshot = await _firestore
+          .collection('products')
+          .where('isSold', isEqualTo: false)
+          .where('status', isEqualTo: 'approved')
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+      
+      return snapshot.docs
+          .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+    } catch (e) {
+      print('Lỗi khi lấy sản phẩm mới nhất: $e');
+      return [];
+    }
+  }
+
+  // Phương thức lấy các sản phẩm mới nhất (trong 7 ngày qua)
+  Future<List<Product>> getNewArrivals({int limit = 10}) async {
+    try {
+      // Lấy thời điểm 7 ngày trước
+      final DateTime sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+      
+      final snapshot = await _firestore
+          .collection('products')
+          .where('isSold', isEqualTo: false)
+          .where('status', isEqualTo: 'approved')
+          .where('createdAt', isGreaterThanOrEqualTo: sevenDaysAgo)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+      
+      return snapshot.docs
+          .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+    } catch (e) {
+      print('Lỗi khi lấy sản phẩm mới: $e');
+      return [];
+    }
+  }
+
+  // Update product with specified fields and Map for location
+  Future<void> updateProductData({
+    required String productId,
+    required String title,
+    required String description,
+    required double price,
+    double? originalPrice,
+    required String category,
+    required List<String> images,
+    required int quantity,
+    required String condition,
+    required Map<String, dynamic>? location,
+    List<String> tags = const [],
+    Map<String, String> specifications = const {},
+  }) async {
+    try {
+      if (!_disposed) {
+        _isLoading = true;
+        notifyListeners();
+      }
+
+      final productData = {
+        'title': title,
+        'description': description,
+        'price': price,
+        'originalPrice': originalPrice ?? 0.0,
+        'category': category,
+        'images': images,
+        'quantity': quantity,
+        'condition': condition,
+        'location': location,
+        'tags': tags,
+        'specifications': specifications,
+        'updatedAt': Timestamp.now(),
+      };
+
+      await _firestore.collection('products').doc(productId).update(productData);
+
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    } catch (e) {
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
+      throw e;
+    }
   }
 } 

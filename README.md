@@ -1044,3 +1044,53 @@ Sitemap này mô tả cấu trúc điều hướng chính của ứng dụng, gi
 Copyright © 2024 Trường Đại học Nguyễn Tất Thành. Đã đăng ký bản quyền.
 
 Phần mềm này được bảo vệ bởi luật bản quyền và chỉ được sử dụng trong phạm vi Trường Đại học Nguyễn Tất Thành. Nghiêm cấm sao chép, phân phối hoặc sửa đổi mà không có sự cho phép bằng văn bản.
+
+## Hệ Thống Khuyến Nghị
+
+### Hệ Thống Khuyến Nghị Nâng Cao Trong Student Market NTTU
+
+Ứng dụng Student Market NTTU sử dụng hệ thống khuyến nghị sản phẩm thông minh được cá nhân hóa cho từng người dùng. Hệ thống này kết hợp các phương pháp lọc cộng tác (collaborative filtering) và lọc dựa trên nội dung (content-based filtering) với các yếu tố vị trí địa lý và giá cả.
+
+#### Các yếu tố trong hệ thống khuyến nghị:
+
+1. **Vị trí địa lý**
+   - Tính toán khoảng cách giữa người dùng và người bán
+   - Ưu tiên đề xuất sản phẩm từ người bán gần hơn
+
+2. **Giá cả**
+   - Phân tích giá trung bình của các sản phẩm đã xem
+   - Đề xuất sản phẩm có mức giá tương tự
+
+3. **Lịch sử xem**
+   - Theo dõi các sản phẩm người dùng đã xem gần đây
+   - Đề xuất các sản phẩm tương tự về danh mục và đặc điểm
+
+4. **Danh mục ưa thích**
+   - Người dùng có thể chọn các danh mục quan tâm trong hồ sơ
+   - Hệ thống ưu tiên đề xuất từ các danh mục này
+
+5. **Mức độ phổ biến**
+   - Kết hợp lượt xem và lượt thích để đo lường mức độ phổ biến
+   - Sử dụng như một yếu tố bổ sung khi cần
+
+#### Thuật toán đề xuất:
+
+Hệ thống sử dụng thuật toán tính điểm đa yếu tố (multi-factor scoring):
+
+1. **Thu thập dữ liệu**: Lấy lịch sử xem, sở thích và vị trí của người dùng
+2. **Tạo tập ứng viên**: Thu thập sản phẩm từ các danh mục tương tự, người bán đã xem và sản phẩm phổ biến
+3. **Tính điểm**: Mỗi sản phẩm được tính điểm dựa trên 6 yếu tố:
+   - Điểm danh mục (30%)
+   - Điểm vị trí (30%)
+   - Điểm mức giá (20%)
+   - Điểm mới (15%)
+   - Điểm người bán (10%)
+   - Điểm phổ biến (10%)
+4. **So sánh khoảng cách**: Khi các sản phẩm có điểm gần bằng nhau, hệ thống ưu tiên sản phẩm gần người dùng hơn
+5. **Cá nhân hóa đề xuất**: Kết quả cuối cùng được sắp xếp theo điểm và giới hạn theo số lượng yêu cầu
+
+#### Hiệu suất và đảm bảo:
+
+- **Dự phòng**: Hệ thống luôn có cơ chế fallback để đảm bảo người dùng nhận được đề xuất kể cả khi gặp lỗi
+- **Cập nhật liên tục**: Các đề xuất được cập nhật mỗi khi người dùng xem sản phẩm mới
+- **Tối ưu truy vấn**: Các truy vấn được thiết kế để tối ưu hiệu suất Firestore

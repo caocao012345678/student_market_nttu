@@ -59,7 +59,9 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ứng dụng cần truy cập thư viện ảnh để chọn ảnh sản phẩm và hình đại diện</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Ứng dụng cần truy cập vị trí của bạn để hiển thị sản phẩm gần đây</string>
+	<string>Ứng dụng cần truy cập vị trí của bạn để hiển thị sản phẩm gần nơi bạn đang ở và cải thiện đề xuất sản phẩm</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Ứng dụng cần truy cập vị trí của bạn để hiển thị sản phẩm gần nơi bạn đang ở và cải thiện đề xuất sản phẩm</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ứng dụng cần truy cập microphone để ghi âm chat thoại</string>
 </dict>

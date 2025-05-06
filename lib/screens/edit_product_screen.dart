@@ -66,6 +66,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
     'Đã qua sử dụng',
     'Cần sửa chữa',
   ];
+  
+  // Danh sách các hình ảnh mới sẽ được tải lên
+  List<dynamic> _imagesToUpload = [];
 
   @override
   void initState() {
@@ -85,9 +88,24 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _titleController.text = product.title;
     _descriptionController.text = product.description;
     _priceController.text = product.price.toString();
-    _originalPriceController.text = product.originalPrice.toString();
-    _locationController.text = product.location;
+    _originalPriceController.text = product.originalPrice > 0 ? product.originalPrice.toString() : '';
+    _selectedCategoryId = product.category;
+    _selectedCategoryName = product.category;
     _quantityController.text = product.quantity.toString();
+    _condition = product.condition;
+    
+    // Cập nhật location
+    if (product.location != null) {
+      if (product.location!.containsKey('address')) {
+        _locationController.text = product.location!['address'].toString();
+      } else {
+        _locationController.text = '';
+      }
+    } else {
+      _locationController.text = '';
+    }
+    
+    _tags = List<String>.from(product.tags);
     
     setState(() {
       _selectedCategoryId = product.category;
@@ -156,6 +174,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
         ),
       );
     }
+  }
+  
+  // Upload images
+  Future<List<String>> _uploadImages(List<dynamic> images) async {
+    final productService = Provider.of<ProductService>(context, listen: false);
+    return await productService.uploadProductImages(images);
   }
 
   @override
@@ -608,62 +632,81 @@ class _EditProductScreenState extends State<EditProductScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      // Chuyển đổi giá tiền từ định dạng có dấu phẩy thành số
+      final price = double.parse(_priceController.text.replaceAll(RegExp(r'[^\d]'), ''));
       
-      final double price = double.tryParse(_priceController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
-      final double originalPrice = double.tryParse(_originalPriceController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
-      final int quantity = int.tryParse(_quantityController.text) ?? 1;
-      
-      if (_selectedCategoryId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vui lòng chọn danh mục')),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-        return;
+      // Xử lý giá gốc, có thể để trống
+      double originalPrice = 0.0;
+      if (_originalPriceController.text.isNotEmpty) {
+        originalPrice = double.parse(_originalPriceController.text.replaceAll(RegExp(r'[^\d]'), ''));
       }
       
-      // Cập nhật sản phẩm với thông tin mới
-      await Provider.of<ProductService>(context, listen: false).updateProductWithModeration(
-        id: widget.product.id,
+      // Xử lý hình ảnh mới
+      List<String> allImageUrls = [];
+      
+      // Thêm các URL hình ảnh hiện có
+      allImageUrls.addAll(_existingImageUrls);
+      
+      // Tải lên các hình ảnh mới (nếu có)
+      if (_imagesToUpload.isNotEmpty) {
+        final newUploadedUrls = await _uploadImages(_imagesToUpload);
+        allImageUrls.addAll(newUploadedUrls);
+      }
+      
+      // Xây dựng Map location
+      Map<String, dynamic> location = {
+        'address': _locationController.text,
+        'lat': 10.7326,  // Vị trí mặc định hoặc lấy từ bản đồ
+        'lng': 106.6975, // Vị trí mặc định hoặc lấy từ bản đồ
+      };
+      
+      // Nếu sản phẩm đã có vị trí với tọa độ, giữ lại tọa độ đó
+      if (widget.product.location != null && 
+          widget.product.location!.containsKey('lat') && 
+          widget.product.location!.containsKey('lng')) {
+        location['lat'] = widget.product.location!['lat'];
+        location['lng'] = widget.product.location!['lng'];
+      }
+      
+      // Cập nhật sản phẩm
+      await Provider.of<ProductService>(context, listen: false).updateProductData(
+        productId: widget.product.id,
         title: _titleController.text,
         description: _descriptionController.text,
         price: price,
+        originalPrice: originalPrice,
         category: _selectedCategoryId,
-        images: _existingImageUrls,
+        images: allImageUrls,
+        quantity: int.parse(_quantityController.text),
         condition: _condition,
-        location: _locationController.text,
+        location: location,
         tags: _tags,
         specifications: _specifications,
       );
-      
-      setState(() {
-        _isLoading = false;
-      });
-      
+
       if (!mounted) return;
       
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cập nhật sản phẩm thành công')),
+        const SnackBar(content: Text('Sản phẩm đã được cập nhật thành công')),
       );
       
-      // Trả về true để thông báo rằng đã cập nhật thành công
-      Navigator.pop(context, true);
+      Navigator.pop(context);
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      
-      if (!mounted) return;
-      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi: ${e.toString()}')),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

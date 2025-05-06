@@ -10,6 +10,8 @@ import '../models/category.dart';
 import '../screens/my_products_screen.dart';
 import '../services/auth_service.dart';
 import '../models/product.dart';
+import '../services/location_service.dart';
+import 'package:flutter/services.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({Key? key}) : super(key: key);
@@ -38,8 +40,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // Biến kiểm tra đây có phải là đồ tặng không
   bool _isGiftItem = false;
   
-  // Thêm biến lưu địa điểm đã chọn
-  String? _selectedLocationId;
+  // Thay thế biến lưu địa điểm đã chọn
+  String? _selectedLocation;
+  
+  // Thêm cấu trúc dữ liệu lưu trữ danh sách địa điểm cố định
+  Map<String, List<Map<String, dynamic>>> _locations = {};
+  bool _loadingLocations = true;
   
   final List<String> _conditionOptions = [
     'Mới',
@@ -56,6 +62,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _isLoading = false;
   bool _showCategorySearch = false;
   bool _showLocationSelect = false;
+  String _selectedDistrict = '';
 
   @override
   void initState() {
@@ -64,6 +71,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCategories();
     });
+    
+    // Thêm phần này để tải dữ liệu vị trí
+    _loadLocations();
   }
 
   Future<void> _initializeCategories() async {
@@ -266,128 +276,41 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  // Mở giao diện chọn địa điểm từ danh sách đã lưu
-  void _openLocationSelectDialog() {
-    setState(() {
-      _showLocationSelect = true;
-    });
-    
-    final userService = Provider.of<UserService>(context, listen: false);
-    final locations = userService.getUserLocations();
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.6,
-              maxChildSize: 0.8,
-              minChildSize: 0.4,
-              expand: false,
-              builder: (context, scrollController) {
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Chọn địa điểm',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Danh sách địa điểm
-                      Expanded(
-                        child: locations.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'Bạn chưa thêm địa điểm nào.\nVui lòng thêm địa điểm tại trang cá nhân.',
-                                  textAlign: TextAlign.center,
-                                ),
-                              )
-                            : ListView.builder(
-                                controller: scrollController,
-                                itemCount: locations.length,
-                                itemBuilder: (context, index) {
-                                  final location = locations[index];
-                                  final address = [
-                                    location['addressDetail'],
-                                    location['ward'],
-                                    location['district'],
-                                    location['province'],
-                                  ].where((e) => e != null && e.isNotEmpty).join(', ');
-                                  
-                                  return RadioListTile<String>(
-                                    title: Text(
-                                      address,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    value: location['id'],
-                                    groupValue: _selectedLocationId,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _selectedLocationId = value;
-                                      });
-                                    },
-                                  );
-                                },
-                              ),
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      // Nút chọn
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_selectedLocationId != null) {
-                              final location = locations.firstWhere(
-                                (loc) => loc['id'] == _selectedLocationId,
-                              );
-                              
-                              final address = [
-                                location['addressDetail'],
-                                location['ward'],
-                                location['district'],
-                                location['province'],
-                              ].where((e) => e != null && e.isNotEmpty).join(', ');
-                              
-                              this.setState(() {
-                                _locationController.text = address;
-                              });
-                            }
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Chọn địa điểm'),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
+  // Thêm phương thức tải dữ liệu vị trí
+  Future<void> _loadLocations() async {
+    try {
+      setState(() {
+        _loadingLocations = true;
+      });
+      
+      final locationService = Provider.of<LocationService>(context, listen: false);
+      final locationsMap = await locationService.getLocationsAsMap();
+      
+      setState(() {
+        _locations = locationsMap;
+        _loadingLocations = false;
+        
+        // Cập nhật lại selected district và location nếu có
+        if (_selectedDistrict.isNotEmpty && !_locations.containsKey(_selectedDistrict)) {
+          _selectedDistrict = '';
+          _selectedLocation = '';
+        } else if (_selectedLocation != null && _selectedLocation!.isNotEmpty) {
+          // Kiểm tra xem location đã chọn có còn tồn tại trong district hay không
+          final locationExists = _locations[_selectedDistrict]?.any(
+            (loc) => loc['id'] == _selectedLocation
+          ) ?? false;
+          
+          if (!locationExists) {
+            _selectedLocation = '';
           }
-        );
-      },
-    );
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _loadingLocations = false;
+      });
+      print('Lỗi khi tải dữ liệu vị trí: $e');
+    }
   }
 
   // Kiểm tra xem danh mục đã chọn có phải là "Đồ tặng" không
@@ -841,25 +764,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     const SizedBox(height: 16),
 
                     // Location (Now uses saved locations)
-                    GestureDetector(
-                      onTap: _openLocationSelectDialog,
-                      child: TextFormField(
-                        controller: _locationController,
-                        decoration: const InputDecoration(
-                          labelText: 'Địa điểm',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_on),
-                          suffixIcon: Icon(Icons.arrow_drop_down),
-                        ),
-                        enabled: false, // Disable direct editing, only select from list
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Vui lòng chọn địa điểm';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
+                    _buildDropdownLocation(),
                     const SizedBox(height: 8),
                     const Text(
                       'Chọn từ danh sách địa điểm đã lưu trong trang cá nhân',
@@ -972,6 +877,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
     
+    // Kiểm tra xem người dùng đã chọn địa điểm chưa
+    if (_selectedLocation == null || _selectedLocation!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn địa điểm')),
+      );
+      return;
+    }
+    
     setState(() {
       _isLoading = true;
     });
@@ -1027,24 +940,33 @@ class _AddProductScreenState extends State<AddProductScreen> {
       // Lấy thông tin người dùng hiện tại
       final authService = Provider.of<AuthService>(context, listen: false);
       final userId = authService.currentUser!.uid;
+      final userName = authService.currentUser!.displayName;
+      final userPhotoUrl = authService.currentUser!.photoURL;
       
-      // Tạo đối tượng sản phẩm
+      // Tạo sản phẩm với thông tin đã nhập
       final product = Product(
-        id: '', // ID sẽ được Firebase gán
+        id: '',
         title: _titleController.text,
         description: _descriptionController.text,
-        price: price,
-        originalPrice: originalPrice,
-        category: _selectedCategoryName, // Sử dụng tên danh mục
+        price: double.parse(_priceController.text.replaceAll(RegExp(r'[^\d]'), '')),
+        originalPrice: _originalPriceController.text.isEmpty 
+            ? 0.0 
+            : double.parse(_originalPriceController.text.replaceAll(RegExp(r'[^\d]'), '')),
+        category: _selectedCategoryName,
         images: imageUrls,
         sellerId: userId,
+        sellerName: userName ?? '',
+        sellerAvatar: userPhotoUrl ?? '',
         createdAt: DateTime.now(),
         quantity: int.parse(_quantityController.text),
         condition: _condition,
-        location: _locationController.text,
+        location: {
+          'address': _locationController.text,
+          'lat': 10.7326,  // Vị trí mặc định hoặc lấy từ bản đồ
+          'lng': 106.6975, // Vị trí mặc định hoặc lấy từ bản đồ
+        },
         tags: _tags,
         specifications: specifications,
-        status: ProductStatus.pending_review, // Sản phẩm cần được duyệt
       );
       
       // Thêm sản phẩm vào database
@@ -1080,5 +1002,128 @@ class _AddProductScreenState extends State<AddProductScreen> {
         SnackBar(content: Text('Lỗi: ${e.toString()}')),
       );
     }
+  }
+
+  // Cập nhật hàm buildDropdownLocation
+  Widget _buildDropdownLocation() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Địa điểm',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        
+        // Dropdown District
+        DropdownButtonFormField<String>(
+          decoration: InputDecoration(
+            hintText: 'Chọn quận',
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          value: _selectedDistrict.isNotEmpty ? _selectedDistrict : null,
+          items: _loadingLocations
+              ? [const DropdownMenuItem(value: '', child: Text('Đang tải...'))]
+              : _locations.keys.map((district) {
+                  return DropdownMenuItem(
+                    value: district,
+                    child: Text(district),
+                  );
+                }).toList(),
+          onChanged: _loadingLocations
+              ? null
+              : (value) {
+                  setState(() {
+                    _selectedDistrict = value ?? '';
+                    _selectedLocation = ''; // Reset selected location
+                  });
+                },
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Vui lòng chọn quận';
+            }
+            return null;
+          },
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Dropdown Location
+        if (_selectedDistrict.isNotEmpty)
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              hintText: 'Chọn cơ sở',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            value: _selectedLocation?.isNotEmpty == true ? _selectedLocation : null,
+            items: _loadingLocations
+                ? [const DropdownMenuItem(value: '', child: Text('Đang tải...'))]
+                : (_locations[_selectedDistrict] ?? []).map((location) {
+                    return DropdownMenuItem(
+                      value: location['id'] as String,
+                      child: Text(location['name'] as String),
+                    );
+                  }).toList(),
+            onChanged: _loadingLocations
+                ? null
+                : (value) {
+                    setState(() {
+                      _selectedLocation = value ?? '';
+                      
+                      // Cập nhật thông tin địa chỉ
+                      if (_selectedLocation?.isNotEmpty == true) {
+                        final selectedLocationData = (_locations[_selectedDistrict] ?? [])
+                            .firstWhere((loc) => loc['id'] == _selectedLocation);
+                        _locationController.text = selectedLocationData['address'] as String;
+                      } else {
+                        _locationController.text = '';
+                      }
+                    });
+                  },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Vui lòng chọn cơ sở';
+              }
+              return null;
+            },
+          ),
+        
+        const SizedBox(height: 16),
+        
+        // Địa chỉ đầy đủ
+        TextFormField(
+          controller: _locationController,
+          readOnly: true,
+          maxLines: 2,
+          decoration: InputDecoration(
+            labelText: 'Địa chỉ đầy đủ',
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            suffixIcon: _locationController.text.isNotEmpty 
+                ? IconButton(
+                    icon: const Icon(Icons.copy),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _locationController.text));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Đã sao chép địa chỉ')),
+                      );
+                    },
+                  )
+                : null,
+          ),
+        ),
+      ],
+    );
   }
 } 

@@ -17,6 +17,7 @@ import 'package:student_market_nttu/screens/notification_detail_screen.dart';
 import 'package:student_market_nttu/screens/ntt_point_history_screen.dart';
 import 'package:student_market_nttu/screens/order_detail_screen.dart';
 import 'package:student_market_nttu/screens/product_detail_screen.dart';
+import 'package:student_market_nttu/screens/admin/location_management_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/services/shipper_service.dart';
@@ -34,6 +35,7 @@ import 'package:student_market_nttu/services/ntt_point_service.dart';
 import 'package:student_market_nttu/services/firebase_messaging_service.dart';
 import 'package:student_market_nttu/services/knowledge_base_service.dart';
 import 'package:student_market_nttu/services/notification_service.dart';
+import 'package:student_market_nttu/services/location_service.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 // import 'package:student_market_nttu/services/wishlist_service.dart'; // Xóa import này vì không tồn tại
 // import 'package:student_market_nttu/services/search_service.dart';
@@ -85,6 +87,7 @@ class _MyAppState extends State<MyApp> {
     // Khởi tạo push notification service sau khi widget đã build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeFirebaseMessaging();
+      _initializeLocationData();
     });
   }
 
@@ -97,6 +100,15 @@ class _MyAppState extends State<MyApp> {
       }
     } catch (e) {
       debugPrint('Lỗi khi khởi tạo Firebase Messaging: $e');
+    }
+  }
+
+  Future<void> _initializeLocationData() async {
+    try {
+      final locationService = LocationService();
+      await locationService.initializeDefaultLocations();
+    } catch (e) {
+      debugPrint('Lỗi khi khởi tạo dữ liệu vị trí: $e');
     }
   }
 
@@ -124,6 +136,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => NotificationService()),
         ChangeNotifierProvider(create: (_) => KnowledgeBaseService()),
+        ChangeNotifierProvider(create: (_) => LocationService()),
         ChangeNotifierProxyProvider<ProductService, ChatbotService>(
           create: (context) => ChatbotService(Provider.of<ProductService>(context, listen: false)),
           update: (_, productService, previousChatbotService) => 
@@ -212,6 +225,7 @@ class _MyAppState extends State<MyApp> {
               ChatListScreen.routeName: (ctx) => const ChatListScreen(),
               NTTPointHistoryScreen.routeName: (ctx) => const NTTPointHistoryScreen(),
               NotificationScreen.routeName: (ctx) => const NotificationScreen(),
+              LocationManagementScreen.routeName: (ctx) => const LocationManagementScreen(),
               NotificationDetailScreen.routeName: (ctx) {
                 final args = ModalRoute.of(ctx)?.settings.arguments as Map<String, dynamic>?;
                 final notificationId = args?['notificationId'] as String? ?? '';

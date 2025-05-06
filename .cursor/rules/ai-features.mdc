@@ -60,15 +60,6 @@ class ProductModerationService extends ChangeNotifier {
 ```
 
 Quy trình kiểm duyệt được hiển thị trong [lib/screens/moderation_result_screen.dart](mdc:lib/screens/moderation_result_screen.dart)
-
-## Gợi Ý Sản Phẩm
-
-[lib/screens/product_recommendation_screen.dart](mdc:lib/screens/product_recommendation_screen.dart) hiển thị các sản phẩm được đề xuất bởi AI dựa trên:
-- Lịch sử xem và mua sắm
-- Sở thích đã khai báo
-- Xu hướng thị trường
-- Tương tác gần đây
-
 ## RAG (Retrieval Augmented Generation)
 
 [lib/services/rag_service.dart](mdc:lib/services/rag_service.dart) cung cấp khả năng tìm kiếm thông tin từ cơ sở dữ liệu và tăng cường trả lời của AI:

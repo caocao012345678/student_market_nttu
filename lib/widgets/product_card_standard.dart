@@ -10,6 +10,7 @@ import '../screens/user_profile_page.dart';
 import '../services/favorites_service.dart';
 import '../services/auth_service.dart';
 import '../services/cart_service.dart';
+import '../utils/location_utils.dart';
 
 class ProductCardStandard extends StatefulWidget {
   final Product product;
@@ -17,6 +18,8 @@ class ProductCardStandard extends StatefulWidget {
   final bool isCompact;
   final bool isListView;
   final Function()? onFavoriteToggle;
+  final bool showDistance;
+  final Map<String, double>? userLocation;
 
   const ProductCardStandard({
     super.key,
@@ -25,6 +28,8 @@ class ProductCardStandard extends StatefulWidget {
     this.isCompact = false,
     this.isListView = false,
     this.onFavoriteToggle,
+    this.showDistance = false,
+    this.userLocation,
   });
 
   @override
@@ -205,6 +210,18 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
   }
   
   Widget _buildGridViewLayout(Color primaryColor, NumberFormat currencyFormat, bool hasDiscount, int discountPercentage) {
+    // Tính khoảng cách nếu có vị trí
+    double? distance;
+    if (widget.showDistance && widget.userLocation != null) {
+      final productLocation = LocationUtils.getLocationFromAddress(widget.product.location);
+      if (productLocation != null) {
+        distance = LocationUtils.calculateDistance(
+          widget.userLocation!['lat']!, widget.userLocation!['lng']!,
+          productLocation['lat']!, productLocation['lng']!
+        );
+      }
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -230,6 +247,10 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                   widget.product.createdAt != null &&
                   DateTime.now().difference(widget.product.createdAt!).inDays < 3)
                 _buildNewBadge(),
+              
+              // Distance badge
+              if (widget.showDistance && distance != null)
+                _buildDistanceBadge(distance),
               
               // Favorite button
               if (widget.showFavoriteButton && !widget.product.isSold)
@@ -315,7 +336,7 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Location
-                      if (widget.product.location.isNotEmpty)
+                      if (widget.product.location != null)
                         Expanded(
                           child: Row(
                             children: [
@@ -323,7 +344,7 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                               const SizedBox(width: 2),
                               Expanded(
                                 child: Text(
-                                  widget.product.location,
+                                  widget.product.location?['address'] ?? 'Không xác định',
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: Colors.grey[700],
@@ -397,6 +418,18 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
   }
   
   Widget _buildListViewLayout(Color primaryColor, NumberFormat currencyFormat, bool hasDiscount, int discountPercentage) {
+    // Tính khoảng cách nếu có vị trí
+    double? distance;
+    if (widget.showDistance && widget.userLocation != null) {
+      final productLocation = LocationUtils.getLocationFromAddress(widget.product.location);
+      if (productLocation != null) {
+        distance = LocationUtils.calculateDistance(
+          widget.userLocation!['lat']!, widget.userLocation!['lng']!,
+          productLocation['lat']!, productLocation['lng']!
+        );
+      }
+    }
+    
     return Row(
       children: [
         // Image container (left side)
@@ -420,6 +453,10 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                   widget.product.createdAt != null &&
                   DateTime.now().difference(widget.product.createdAt!).inDays < 3)
                 _buildNewBadge(),
+                
+              // Distance badge
+              if (widget.showDistance && distance != null)
+                _buildDistanceBadge(distance),
                 
               // Favorite button
               if (widget.showFavoriteButton && !widget.product.isSold)
@@ -472,19 +509,21 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
                     ),
                     
                     // Location
-                    if (widget.product.location.isNotEmpty)
+                    if (widget.product.location != null)
                       Row(
                         children: [
                           Icon(Icons.location_on, size: 12, color: Colors.grey[700]),
                           const SizedBox(width: 2),
-                          Text(
-                            widget.product.location,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[700],
+                          Expanded(
+                            child: Text(
+                              widget.product.location?['address'] ?? 'Không xác định',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[700],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -595,26 +634,64 @@ class _ProductCardStandardState extends State<ProductCardStandard> {
   
   Widget _buildDiscountBadge(int discountPercentage) {
     return Positioned(
-      top: 0,
-      left: 0,
+      top: 8,
+      left: 8,
       child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: widget.isListView ? 4 : 6, 
-          vertical: widget.isListView ? 2 : 3,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.red,
-          borderRadius: BorderRadius.only(
-            bottomRight: Radius.circular(widget.isListView ? 8 : 12),
-          ),
+          borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
           '-$discountPercentage%',
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: widget.isCompact ? 9 : 11,
+            fontSize: 12,
           ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildDistanceBadge(double distance) {
+    // Định dạng khoảng cách thành m hoặc km
+    String distanceText;
+    if (distance < 1) {
+      // Dưới 1km hiển thị theo mét
+      distanceText = '${(distance * 1000).toInt()}m';
+    } else {
+      // Trên 1km hiển thị theo km, làm tròn 1 số thập phân
+      distanceText = '${distance.toStringAsFixed(1)}km';
+    }
+    
+    return Positioned(
+      top: widget.product.isSold ? 40 : 8,
+      right: widget.showFavoriteButton ? 40 : 8,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade100,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.location_on,
+              size: 12,
+              color: Colors.amber.shade800,
+            ),
+            const SizedBox(width: 2),
+            Text(
+              distanceText,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.amber.shade800,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );

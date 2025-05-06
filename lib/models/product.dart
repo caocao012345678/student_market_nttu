@@ -25,7 +25,7 @@ class Product {
   final bool isSold;
   final int quantity;
   final String condition;
-  final String location;
+  final Map<String, dynamic>? location;
   final List<String> tags;
   final Map<String, String> specifications;
   final int viewCount;
@@ -52,7 +52,7 @@ class Product {
     this.isSold = false,
     this.quantity = 1,
     this.condition = 'Mới',
-    this.location = '',
+    this.location,
     this.tags = const [],
     this.specifications = const {},
     this.viewCount = 0,
@@ -80,6 +80,19 @@ class Product {
       else if (statusString == 'rejected') productStatus = ProductStatus.rejected;
     }
 
+    // Xử lý trường location - có thể là String hoặc Map
+    Map<String, dynamic>? locationData;
+    if (map['location'] != null) {
+      if (map['location'] is String) {
+        // Chuyển đổi từ String thành Map
+        locationData = {
+          'address': map['location'],
+        };
+      } else if (map['location'] is Map) {
+        locationData = Map<String, dynamic>.from(map['location'] as Map);
+      }
+    }
+
     return Product(
       id: id,
       title: map['title'] ?? '',
@@ -95,7 +108,7 @@ class Product {
       isSold: map['isSold'] ?? false,
       quantity: map['quantity'] ?? 1,
       condition: map['condition'] ?? 'Mới',
-      location: map['location'] ?? '',
+      location: locationData,
       tags: List<String>.from(map['tags'] ?? []),
       specifications: Map<String, String>.from(map['specifications'] ?? {}),
       viewCount: map['viewCount'] ?? 0,
@@ -161,7 +174,7 @@ class Product {
     bool? isSold,
     int? quantity,
     String? condition,
-    String? location,
+    Map<String, dynamic>? location,
     List<String>? tags,
     Map<String, String>? specifications,
     int? viewCount,

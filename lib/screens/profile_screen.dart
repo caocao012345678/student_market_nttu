@@ -17,7 +17,6 @@ import 'package:student_market_nttu/screens/change_password_screen.dart';
 import 'package:student_market_nttu/screens/notification_screen.dart';
 import 'package:student_market_nttu/services/theme_service.dart';
 import 'package:student_market_nttu/widgets/app_drawer.dart';
-import 'package:student_market_nttu/screens/user_locations_screen.dart';
 import 'package:student_market_nttu/widgets/common_app_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -292,18 +291,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const FavoriteProductsScreen(),
-              ),
-            );
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.location_on),
-          title: const Text('Địa điểm của tôi'),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const UserLocationScreen(),
               ),
             );
           },

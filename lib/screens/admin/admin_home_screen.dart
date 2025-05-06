@@ -4,6 +4,7 @@ import 'package:student_market_nttu/services/user_service.dart';
 import 'package:student_market_nttu/screens/admin/moderation_dashboard_screen.dart';
 import 'package:student_market_nttu/screens/admin/moderation_stats_screen.dart';
 import 'package:student_market_nttu/screens/admin/user_management_screen.dart';
+import 'package:student_market_nttu/screens/admin/location_management_screen.dart';
 import 'package:student_market_nttu/screens/home_screen.dart';
 import 'package:student_market_nttu/screens/login_screen.dart';
 import 'package:student_market_nttu/screens/admin/bulk_register_screen.dart';
@@ -244,6 +245,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       );
                     },
                     subtitle: 'Phân quyền và quản lý tài khoản',
+                  ),
+                ),
+                SizedBox(
+                  width: (MediaQuery.of(context).size.width - 48) / 2,
+                  child: _buildMenuCard(
+                    title: 'Quản lý vị trí',
+                    icon: Icons.location_on,
+                    color: Colors.purple,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LocationManagementScreen(),
+                        ),
+                      );
+                    },
+                    subtitle: 'Quản lý địa điểm cơ sở trường',
                   ),
                 ),
                 SizedBox(
