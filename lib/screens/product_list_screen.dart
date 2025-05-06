@@ -6,7 +6,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:student_market_nttu/services/product_service.dart';
 import 'package:student_market_nttu/services/category_service.dart';
+import 'package:student_market_nttu/services/location_service.dart';
 import 'package:student_market_nttu/models/category.dart';
+import 'package:student_market_nttu/models/location.dart';
 import 'package:student_market_nttu/screens/search_screen.dart';
 import 'package:student_market_nttu/screens/cart_screen.dart';
 import 'package:student_market_nttu/widgets/cart_badge.dart';
@@ -32,6 +34,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
   bool _isLoadingProducts = true;
   List<Category> _availableCategories = [];
   bool _disposed = false;
+  
+  // Biến cho lọc địa điểm
+  LocationModel? _selectedLocation;
+  List<LocationModel> _availableLocations = [];
+  bool _isLoadingLocations = true;
 
   final List<String> _bannerImages = [
     'https://firebasestorage.googleapis.com/v0/b/student-market-nttu.appspot.com/o/banners%2Fbanner1.jpg?alt=media',
@@ -49,6 +56,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   void initState() {
     super.initState();
     _fetchInitialData();
+    _loadLocations();
   }
 
   Future<void> _fetchInitialData() async {
@@ -176,6 +184,99 @@ class _ProductListScreenState extends State<ProductListScreen> {
             );
           }).toList(),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Phương thức tải danh sách địa điểm
+  Future<void> _loadLocations() async {
+    if (_disposed) return;
+    
+    setState(() {
+      _isLoadingLocations = true;
+    });
+    
+    try {
+      final locationService = Provider.of<LocationService>(context, listen: false);
+      
+      // Lấy danh sách địa điểm từ stream và chuyển thành list
+      final locationsStream = locationService.getAllLocations();
+      final locations = await locationsStream.first;
+      
+      if (!_disposed) {
+        setState(() {
+          _availableLocations = locations;
+          _isLoadingLocations = false;
+        });
+      }
+    } catch (e) {
+      print('Lỗi khi tải danh sách địa điểm: $e');
+      if (!_disposed) {
+        setState(() {
+          _isLoadingLocations = false;
+        });
+      }
+    }
+  }
+  
+  // Phương thức hiển thị dialog chọn địa điểm
+  void _showLocationFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Lọc theo cơ sở'),
+        content: _isLoadingLocations 
+          ? const Center(child: CircularProgressIndicator())
+          : SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Tùy chọn bỏ lọc địa điểm
+                  ListTile(
+                    title: const Text('Tất cả cơ sở'),
+                    trailing: _selectedLocation == null ? const Icon(Icons.check_circle, color: Colors.green) : null,
+                    onTap: () {
+                      setState(() {
+                        _selectedLocation = null;
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  const Divider(),
+                  
+                  // Danh sách địa điểm có thể chọn
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _availableLocations.length,
+                      itemBuilder: (context, index) {
+                        final location = _availableLocations[index];
+                        final isSelected = _selectedLocation?.id == location.id;
+                        
+                        return ListTile(
+                          title: Text(location.name),
+                          subtitle: Text('${location.district} - ${location.address}'),
+                          trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.green) : null,
+                          onTap: () {
+                            setState(() {
+                              _selectedLocation = location;
+                            });
+                            Navigator.pop(context);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -317,7 +418,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
           );
         }
         
-        final products = snapshot.data!;
+        // Lọc theo địa điểm nếu đã chọn
+        final allProducts = snapshot.data!;
+        List<Product> filteredProducts = allProducts;
+        
+        if (_selectedLocation != null) {
+          filteredProducts = allProducts.where((product) {
+            // Nếu sản phẩm có vị trí, kiểm tra có trùng với khu vực đã chọn không
+            if (product.location != null && product.location!.containsKey('address')) {
+              String address = product.location!['address'].toString().toLowerCase();
+              // Kiểm tra xem địa chỉ sản phẩm có chứa tên cơ sở hoặc địa chỉ cơ sở không
+              return address.contains(_selectedLocation!.name.toLowerCase()) || 
+                     address.contains(_selectedLocation!.address.toLowerCase()) ||
+                     address.contains(_selectedLocation!.district.toLowerCase());
+            }
+            return false;
+          }).toList();
+        }
+        
+        final products = filteredProducts;
         
         // Controls bar và danh sách sản phẩm
         return Column(
@@ -336,6 +455,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   ),
                   Row(
                     children: [
+                      // Nút lọc địa điểm
+                      IconButton(
+                        icon: Icon(
+                          Icons.location_on,
+                          color: _selectedLocation != null ? Colors.blue : null,
+                        ),
+                        tooltip: 'Lọc theo cơ sở',
+                        onPressed: _showLocationFilterDialog,
+                      ),
                       // Nút sắp xếp
                       IconButton(
                         icon: const Icon(Icons.sort),
@@ -361,6 +489,34 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 ],
               ),
             ),
+            
+            // Hiển thị thông tin địa điểm đã chọn
+            if (_selectedLocation != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: Colors.blue.shade50,
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Lọc theo cơ sở: ${_selectedLocation!.name} (${_selectedLocation!.district})',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedLocation = null;
+                        });
+                      },
+                      child: const Icon(Icons.close, size: 16),
+                    ),
+                  ],
+                ),
+              ),
             
             // Product grid/list
             Expanded(
