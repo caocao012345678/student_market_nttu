@@ -339,24 +339,6 @@ class _HomeContentState extends State<HomeContent> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (userLocation != null)
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 16,
-                                  color: Colors.amber.shade700,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Gần bạn',
-                                  style: TextStyle(
-                                    color: Colors.amber.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
                           TextButton(
                             onPressed: () {
                               // Navigate to see all recommended products
@@ -823,24 +805,6 @@ class _HomeContentState extends State<HomeContent> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (userLocation != null)
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 16,
-                                  color: Colors.amber.shade700,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Gần bạn',
-                                  style: TextStyle(
-                                    color: Colors.amber.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
                           TextButton(
                             onPressed: () {
                               // Navigate to see all latest products
@@ -952,24 +916,6 @@ class _HomeContentState extends State<HomeContent> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (userLocation != null)
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 16,
-                                  color: Colors.amber.shade700,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Gần bạn',
-                                  style: TextStyle(
-                                    color: Colors.amber.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
                           TextButton(
                             onPressed: () {
                               // Navigate to see all new products

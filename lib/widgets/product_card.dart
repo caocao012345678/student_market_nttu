@@ -211,7 +211,9 @@ class ProductCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          product.location,
+                          product.location != null 
+                              ? (product.location!['address'] as String? ?? 'Không xác định')
+                              : 'Không xác định',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],

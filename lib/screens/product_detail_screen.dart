@@ -771,7 +771,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Khoảng cách đến sản phẩm',
+                                              'Khoảng cách',
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                               ),
