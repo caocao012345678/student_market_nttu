@@ -131,7 +131,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               
               // Nếu vị trí còn mới (< 30 phút), sử dụng vị trí đã lưu
               if (timeDiff <= 30) {
-                print('🕒 Sử dụng vị trí đã lưu (${timeDiff} phút trước): ${savedLocation['lat']}, ${savedLocation['lng']}');
                 // Tính khoảng cách đến sản phẩm - đã chuyển thành phương thức bất đồng bộ
                 if (widget.product.location != null) {
                   await _calculateDistanceToProduct(savedLocation);
@@ -148,22 +147,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          print('❌ Người dùng từ chối quyền truy cập vị trí');
           return null;
         }
       }
       
       if (permission == LocationPermission.deniedForever) {
-        print('❌ Người dùng đã từ chối vĩnh viễn quyền truy cập vị trí');
         return null;
       }
       
-      print('📱 Đang lấy vị trí hiện tại...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
       
-      print('📍 Đã lấy được vị trí: ${position.latitude}, ${position.longitude}');
       final currentLocation = {
         'lat': position.latitude,
         'lng': position.longitude,
@@ -173,24 +168,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       if (authService.currentUser != null) {
         final productService = Provider.of<ProductService>(context, listen: false);
         
-        print('💾 Đang lưu vị trí vào Firestore...');
         bool updateSuccess = await productService.updateUserLocation(
           authService.currentUser!.uid, 
           currentLocation
         );
         
         if (updateSuccess) {
-          print('✅ Đã lưu vị trí thành công');
           
           // Xác minh vị trí đã lưu
           final verifiedLocation = await productService.getUserLocation(authService.currentUser!.uid);
           if (verifiedLocation != null) {
-            print('🔍 Kiểm tra vị trí từ Firestore: ${verifiedLocation['lat']}, ${verifiedLocation['lng']}');
+
           } else {
-            print('⚠️ Không thể xác minh vị trí đã lưu');
+            
           }
         } else {
-          print('❌ Không thể lưu vị trí vào Firestore');
+          
         }
       }
       
@@ -201,7 +194,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       
       return currentLocation;
     } catch (e) {
-      print('❌ Lỗi khi lấy vị trí hiện tại: $e');
       return null;
     }
   }
@@ -215,7 +207,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       final productLocation = await LocationUtils.getLocationFromAddressAsync(widget.product.location);
       
       if (productLocation == null) {
-        print('❌ Không thể xác định vị trí cho sản phẩm: ${widget.product.title}');
         setState(() {
           _distanceToProduct = null; // Đặt lại khoảng cách thành null khi không thể xác định vị trí
         });
@@ -226,15 +217,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       final productLng = productLocation['lng'];
       
       if (productLat == null || productLng == null) {
-        print('❌ Vị trí sản phẩm không hợp lệ');
         setState(() {
           _distanceToProduct = null;
         });
         return;
       }
       
-      print('📍 Vị trí sản phẩm: $productLat, $productLng');
-      print('📍 Vị trí người dùng: ${userLocation['lat']}, ${userLocation['lng']}');
       
       final distance = LocationUtils.calculateDistance(
         userLocation['lat']!,
@@ -243,13 +231,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         productLng,
       );
       
-      print('📏 Khoảng cách tính toán: ${distance.toStringAsFixed(2)} km');
       
       setState(() {
         _distanceToProduct = distance;
       });
     } catch (e) {
-      print('❌ Lỗi khi tính khoảng cách đến sản phẩm: $e');
       setState(() {
         _distanceToProduct = null;
       });
@@ -1570,7 +1556,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         );
       }
     } catch (e) {
-      print('❌ Lỗi khi mở vị trí sản phẩm: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Có lỗi xảy ra khi mở bản đồ')),
       );
@@ -1645,7 +1630,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         }
       }
     } catch (e) {
-      print('❌ Lỗi khi cập nhật database địa chỉ: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi: $e')),
       );

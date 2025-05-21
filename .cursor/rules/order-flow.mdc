@@ -1,0 +1,76 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Quy Trình Đơn Hàng
+
+## Tổng Quan
+
+Student Market NTTU có một quy trình đơn hàng hoàn chỉnh từ khi tạo giỏ hàng đến khi hoàn thành giao dịch và đánh giá sản phẩm.
+
+## Các Model Liên Quan
+
+- [lib/models/cart_item.dart](mdc:lib/models/cart_item.dart) - Model mặt hàng trong giỏ hàng
+- [lib/models/order.dart](mdc:lib/models/order.dart) - Model đơn hàng
+- [lib/models/purchase_order.dart](mdc:lib/models/purchase_order.dart) - Model đơn hàng mua
+- [lib/models/review.dart](mdc:lib/models/review.dart) - Model đánh giá
+
+## Dịch Vụ Quản Lý
+
+- [lib/services/cart_service.dart](mdc:lib/services/cart_service.dart) - Quản lý giỏ hàng
+- [lib/services/order_service.dart](mdc:lib/services/order_service.dart) - Quản lý đơn hàng
+- [lib/services/shipper_service.dart](mdc:lib/services/shipper_service.dart) - Dịch vụ vận chuyển
+- [lib/services/payment_service.dart](mdc:lib/services/payment_service.dart) - Dịch vụ thanh toán
+- [lib/services/review_service.dart](mdc:lib/services/review_service.dart) - Dịch vụ đánh giá
+
+## Trạng Thái Đơn Hàng
+
+Đơn hàng trong hệ thống có thể ở một trong các trạng thái sau:
+1. **Chờ xác nhận** - Đơn hàng mới được tạo
+2. **Đã xác nhận** - Người bán đã xác nhận đơn hàng
+3. **Đang giao hàng** - Đơn hàng đang được giao
+4. **Đã giao hàng** - Đơn hàng đã được giao thành công
+5. **Đã hoàn thành** - Đơn hàng đã hoàn thành sau khi người mua xác nhận
+6. **Đã hủy** - Đơn hàng đã bị hủy
+
+## Quy Trình Đặt Hàng
+
+1. Người dùng thêm sản phẩm vào giỏ hàng qua [lib/screens/product_detail_screen.dart](mdc:lib/screens/product_detail_screen.dart)
+2. Người dùng xem giỏ hàng và tiến hành thanh toán qua [lib/screens/cart_screen.dart](mdc:lib/screens/cart_screen.dart)
+3. Người dùng xác nhận đơn hàng và chọn phương thức thanh toán tại [lib/screens/checkout_screen.dart](mdc:lib/screens/checkout_screen.dart)
+4. Hệ thống tạo đơn hàng mới và thông báo cho người bán
+5. Người bán xác nhận đơn hàng và chuẩn bị giao hàng
+6. Người giao hàng nhận và giao sản phẩm
+7. Người mua nhận sản phẩm và xác nhận đã nhận
+8. Người mua có thể đánh giá sản phẩm
+
+## Màn Hình Liên Quan
+
+- [lib/screens/cart_screen.dart](mdc:lib/screens/cart_screen.dart) - Màn hình giỏ hàng
+- [lib/screens/checkout_screen.dart](mdc:lib/screens/checkout_screen.dart) - Màn hình thanh toán
+- [lib/screens/order_detail_screen.dart](mdc:lib/screens/order_detail_screen.dart) - Màn hình chi tiết đơn hàng
+- [lib/screens/order_history_screen.dart](mdc:lib/screens/order_history_screen.dart) - Màn hình lịch sử đơn hàng
+
+## Ví dụ Quy Trình Đơn Hàng
+
+```dart
+// 1. Thêm vào giỏ hàng
+await cartService.addToCart(productId, quantity);
+
+// 2. Tạo đơn hàng
+final orderId = await orderService.createOrder(userId, cartItems, shippingAddress);
+
+// 3. Thanh toán đơn hàng
+await paymentService.processPayment(orderId, paymentMethod);
+
+// 4. Cập nhật trạng thái đơn hàng
+await orderService.updateOrderStatus(orderId, OrderStatus.confirmed);
+
+// 5. Đánh giá sản phẩm
+await reviewService.addReview(productId, userId, rating, comment);
+```
+
+## Thông Báo Đơn Hàng
+
+Hệ thống gửi thông báo cho người dùng tại mỗi thay đổi trạng thái đơn hàng thông qua [lib/services/notification_service.dart](mdc:lib/services/notification_service.dart).

@@ -9,6 +9,7 @@ import 'package:student_market_nttu/screens/home_screen.dart';
 import 'package:student_market_nttu/screens/login_screen.dart';
 import 'package:student_market_nttu/screens/admin/bulk_register_screen.dart';
 import 'package:student_market_nttu/services/auth_service.dart';
+import 'package:student_market_nttu/screens/admin/ai_agent_dashboard_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({Key? key}) : super(key: key);
@@ -262,6 +263,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       );
                     },
                     subtitle: 'Quản lý địa điểm cơ sở trường',
+                  ),
+                ),
+                SizedBox(
+                  width: (MediaQuery.of(context).size.width - 48) / 2,
+                  child: _buildMenuCard(
+                    title: 'AI Agent',
+                    icon: Icons.smart_toy,
+                    color: Colors.indigo,
+                    onTap: () {
+                      Navigator.pushNamed(context, AIAgentDashboardScreen.routeName);
+                    },
+                    subtitle: 'Trợ lý AI kiểm duyệt tự động',
                   ),
                 ),
                 SizedBox(

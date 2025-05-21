@@ -633,7 +633,6 @@ class ProductService extends ChangeNotifier {
                 String? name = categoryDoc.data()!['name'];
                 if (name != null && name.isNotEmpty) {
                   categoryName = name;
-                  print('Tìm thấy tên danh mục: $categoryName từ ID: $categoryId');
                 }
               }
             } catch (e) {
@@ -658,7 +657,6 @@ class ProductService extends ChangeNotifier {
               filteredProducts.sort((a, b) => b.price.compareTo(a.price));
             }
             
-            print('Tìm thấy ${filteredProducts.length} sản phẩm thuộc danh mục: $categoryName (ID: $categoryId)');
             return filteredProducts;
           });
     }
@@ -1383,18 +1381,15 @@ class ProductService extends ChangeNotifier {
     bool verbose = true, // Tham số mới để kiểm soát lượng debug info
   }) async {
     try {
-      print('🚀 Bắt đầu tính toán đề xuất sản phẩm dựa trên vị trí: ${userLocation['lat']}, ${userLocation['lng']}');
       
       if (userId.isEmpty) {
         // Fallback khi không có userId
-        print('❌ Không có userId, trả về đề xuất cơ bản');
         return getRecommendedProducts(limit: limit);
       }
       
       // 1. Lấy thông tin người dùng
       final userDoc = await _firestore.collection('users').doc(userId).get();
       if (!userDoc.exists) {
-        print('❌ Không tìm thấy thông tin người dùng, trả về đề xuất cơ bản');
         return getRecommendedProducts(limit: limit);
       }
       
@@ -1402,7 +1397,6 @@ class ProductService extends ChangeNotifier {
       
       // 2. Lấy danh sách sản phẩm đã xem gần đây
       List<String> recentlyViewedIds = List<String>.from(userData['recentlyViewed'] ?? []);
-      print('🔍 Người dùng đã xem ${recentlyViewedIds.length} sản phẩm gần đây');
       
       // 3. Lấy thông tin chi tiết sản phẩm đã xem và danh mục
       List<Product> recentlyViewedProducts = [];
@@ -1429,18 +1423,11 @@ class ProductService extends ChangeNotifier {
         }
       }
       
-      print('📊 Thống kê danh mục đã xem:');
-      categoryFrequency.forEach((category, count) {
-        print('   - $category: $count lần');
-      });
       
       // 4. Lấy sở thích của người dùng (nếu có)
       List<String> preferredCategories = List<String>.from(userData['preferredCategories'] ?? []);
       categories.addAll(preferredCategories);
       
-      if (preferredCategories.isNotEmpty) {
-        print('⭐ Danh mục ưa thích: ${preferredCategories.join(', ')}');
-      }
       
       // Tạo Set để theo dõi ID sản phẩm đã thêm để tránh trùng lặp
       Set<String> addedProductIds = Set<String>();
@@ -1454,7 +1441,6 @@ class ProductService extends ChangeNotifier {
         List<String> prioritizedCategories = categories.toList()
           ..sort((a, b) => (categoryFrequency[b] ?? 0).compareTo(categoryFrequency[a] ?? 0));
         
-        print('🔄 Đang lấy sản phẩm từ ${prioritizedCategories.length} danh mục ưu tiên');
         
         for (final category in prioritizedCategories) {
           final categorySnapshot = await _firestore
@@ -1477,7 +1463,6 @@ class ProductService extends ChangeNotifier {
       
       // 5.2 Sản phẩm từ người bán quen thuộc
       if (viewedSellerIds.isNotEmpty) {
-        print('👨‍💼 Đang lấy sản phẩm từ ${viewedSellerIds.length} người bán quen thuộc');
         
         final sellerSnapshot = await _firestore
             .collection('products')
@@ -1498,7 +1483,6 @@ class ProductService extends ChangeNotifier {
       
       // 5.3 Sản phẩm phổ biến (để bổ sung)
       if (potentialRecommendations.length < limit * 2) {
-        print('🌟 Bổ sung sản phẩm phổ biến');
         
         final popularSnapshot = await _firestore
             .collection('products')
@@ -1515,7 +1499,6 @@ class ProductService extends ChangeNotifier {
         }
       }
       
-      print('📋 Đã thu thập ${potentialRecommendations.length} sản phẩm tiềm năng để đánh giá');
       
       // Cache kết quả tính khoảng cách để tránh tính lại nhiều lần
       Map<String, double> distanceCache = {};
@@ -1531,10 +1514,6 @@ class ProductService extends ChangeNotifier {
         double score = 0.1 - (i * 0.01);
         // Lấy điểm lớn nhất nếu danh mục xuất hiện nhiều lần
         recencyScores[category] = max(recencyScores[category] ?? 0, score);
-      }
-      
-      if (verbose) {
-        print('📊 THÔNG TIN TÍNH ĐIỂM CHI TIẾT:');
       }
       
       for (final product in potentialRecommendations) {
@@ -1713,30 +1692,6 @@ class ProductService extends ChangeNotifier {
         }
       }
       
-      // Chi tiết thông tin tính điểm cho debug
-      if (verbose) {
-        for (var product in scoredProducts) {
-          final details = product['details'] as Map<String, dynamic>;
-          
-          print('-----------------------------------------------');
-          print('Chi tiết điểm cho sản phẩm: ${(product['product'] as Product).title} (ID: ${(product['product'] as Product).id})');
-          print('- Khoảng cách: ${product['distance'].toStringAsFixed(2)}km (Điểm: ${details['distanceScore'].toStringAsFixed(2)})');
-          print('- Danh mục: ${product['category']} (Điểm: ${details['categoryScore'].toStringAsFixed(2)})');
-          if (preferredCategories.contains(product['category'])) {
-            print('  ⭐ Danh mục ưa thích!');
-          }
-          if (recencyScores[product['category']] != null) {
-            print('  🕒 Danh mục xem gần đây! +${recencyScores[product['category']]!.toStringAsFixed(2)}');
-          }
-          print('- Người bán: ${(product['product'] as Product).sellerId} (Điểm: ${details['sellerScore'].toStringAsFixed(2)})');
-          if (viewedSellerIds.contains((product['product'] as Product).sellerId)) {
-            print('  👨‍💼 Đã mua hàng từ người bán này trước đây!');
-          }
-          print('- Giá: ${(product['product'] as Product).price}đ (Chênh lệch: ${details['priceDiff'].toStringAsFixed(0)}%, Điểm: ${details['priceScore'].toStringAsFixed(2)})');
-          print('=> TỔNG ĐIỂM: ${details['totalScore'].toStringAsFixed(2)}');
-        }
-      }
-      
       // 7. Sắp xếp theo điểm và trả về kết quả
       scoredProducts.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
       
@@ -1790,25 +1745,12 @@ class ProductService extends ChangeNotifier {
         }
       }
       
-      // In thông tin hữu ích để debug
-      print('✅ ĐÃ HOÀN THÀNH TÍNH TOÁN ĐỀ XUẤT:');
-      print('🌍 Dựa trên vị trí: ${userLocation['lat']}, ${userLocation['lng']}');
-      print('📊 Top ${min(diversifiedResults.length, 5)} sản phẩm đề xuất và khoảng cách:');
-      
       for (int i = 0; i < min(5, diversifiedResults.length); i++) {
         final item = diversifiedResults[i];
         final product = item['product'] as Product;
         final score = item['score'] as double;
         final distance = item['distance'] as double;
         final details = item['details'] as Map<String, dynamic>;
-        
-        print('${i+1}. ${product.title}: ${distance.toStringAsFixed(2)}km, Điểm: ${score.toStringAsFixed(2)}');
-        if (verbose) {
-          print('   - Danh mục: ${details['categoryScore']!.toStringAsFixed(2)} | ' +
-                'Người bán: ${details['sellerScore']!.toStringAsFixed(2)} | ' +
-                'Vị trí: ${details['distanceScore']!.toStringAsFixed(2)} | ' +
-                'Giá: ${details['priceScore']!.toStringAsFixed(2)}');
-        }
       }
       
       // Trả về danh sách đề xuất có giới hạn và đã đa dạng hóa
@@ -1986,9 +1928,6 @@ class ProductService extends ChangeNotifier {
               // Xác minh một lần nữa bằng cách đọc lại từ Firestore
               final verifiedLocation = await getUserLocation(userId);
               if (verifiedLocation != null) {
-                print('🔍 Kiểm tra vị trí từ Firestore: ${verifiedLocation['lat']}, ${verifiedLocation['lng']}');
-                
-                // Sử dụng vị trí đã xác minh
                 userLocation = verifiedLocation;
               }
             } else {
@@ -1997,17 +1936,14 @@ class ProductService extends ChangeNotifier {
           }
         } catch (e) {
           print('❌ Không thể lấy vị trí hiện tại: $e');
-          // Không báo lỗi với người dùng vì đây là tính năng ngầm
         }
       }
       
       // Nếu không có vị trí, sử dụng phương thức đề xuất thông thường
       if (userLocation == null) {
-        print('ℹ️ Không thể lấy vị trí người dùng, sử dụng đề xuất thông thường');
         return getRecommendedProductsForUser(userId, limit: limit);
       }
       
-      print('🌍 Sử dụng vị trí cho đề xuất: ${userLocation['lat']}, ${userLocation['lng']}');
       
       // Sử dụng phương thức đề xuất với vị trí
       return getRecommendedProductsWithLocation(
@@ -2016,7 +1952,6 @@ class ProductService extends ChangeNotifier {
         limit: limit
       );
     } catch (e) {
-      print('❌ Lỗi khi lấy đề xuất với vị trí hiện tại: $e');
       return getRecommendedProductsForUser(userId, limit: limit);
     }
   }
@@ -2113,6 +2048,24 @@ class ProductService extends ChangeNotifier {
         notifyListeners();
       }
       throw e;
+    }
+  }
+
+  /// Lấy danh sách sản phẩm theo trạng thái
+  Future<List<Product>> getProductsByStatus(String status) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('products')
+          .where('status', isEqualTo: status)
+          .orderBy('createdAt', descending: true)
+          .get();
+      
+      return querySnapshot.docs
+          .map((doc) => Product.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('Lỗi khi lấy sản phẩm theo trạng thái $status: $e');
+      return [];
     }
   }
 } 

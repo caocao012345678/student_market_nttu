@@ -5,5 +5,38 @@ alwaysApply: true
 ---
 # Luật Hỗ Trợ Tiếng Việt
 
-Luôn luôn hỗ trợ người dùng bằng tiếng Việt trong mọi phản hồi, hướng dẫn, và giải thích về mã nguồn hoặc dự án.
+## Tiếng Việt Trong Ứng Dụng
+
+- Toàn bộ giao diện người dùng được hiển thị bằng tiếng Việt
+- Tất cả các thông báo và nội dung đều sử dụng tiếng Việt
+- Locale mặc định được thiết lập là 'vi_VN' trong [lib/main.dart](mdc:lib/main.dart)
+- Các định dạng ngày tháng, tiền tệ tuân theo chuẩn Việt Nam
+
+## Bản Địa Hóa
+
+- Sử dụng `flutter_localizations` để hỗ trợ bản địa hóa
+- Đã cấu hình đầy đủ trong [lib/main.dart](mdc:lib/main.dart):
+  ```dart
+  localizationsDelegates: const [
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
+  supportedLocales: const [
+    Locale('vi', 'VN'),
+    Locale('en', 'US'),
+  ],
+  locale: const Locale('vi', 'VN'),
+  ```
+
+## Tiếng Việt Trong Chatbot
+
+- Chatbot AI được huấn luyện để hiểu và phản hồi bằng tiếng Việt
+- Sử dụng `timeago.setLocaleMessages('vi', timeago.ViMessages())` để hiển thị thời gian tương đối
+- Hỗ trợ đầy đủ các ký tự tiếng Việt và dấu câu tiếng Việt
+
+## Quy Ước
+
+- Toàn bộ comments và tài liệu phải được viết bằng tiếng Việt
+- Tên biến và hàm sử dụng tiếng Anh để đảm bảo tính nhất quán trong mã
 

@@ -38,7 +38,6 @@ class LocationUtils {
   static Map<String, double>? getLocationFromAddress(dynamic address) {
     // Nếu address là null
     if (address == null) {
-      print('⚠️ LocationUtils: Địa chỉ null, trả về null');
       return null;
     }
     
@@ -54,16 +53,13 @@ class LocationUtils {
             : double.tryParse(address['lng'].toString());
         
         if (lat != null && lng != null) {
-          print('ℹ️ LocationUtils: Lấy vị trí từ Map: $lat, $lng');
           return {'lat': lat, 'lng': lng};
         }
       } else if (address.containsKey('address')) {
         // Nếu không có tọa độ nhưng có địa chỉ text, dùng địa chỉ để tìm
-        print('ℹ️ LocationUtils: Lấy vị trí từ address field');
         return getLocationFromAddress(address['address']);
       }
       
-      print('⚠️ LocationUtils: Map không chứa thông tin vị trí hợp lệ, trả về null');
       return null;
     }
     
@@ -72,7 +68,6 @@ class LocationUtils {
     
     // Nếu địa chỉ rỗng
     if (addressStr.isEmpty) {
-      print('⚠️ LocationUtils: Địa chỉ rỗng, trả về null');
       return null;
     }
 
@@ -110,14 +105,10 @@ class LocationUtils {
     for (final entry in locationMap.entries) {
       if (addressStr.toLowerCase().contains(entry.key.toLowerCase())) {
         final result = {'lat': entry.value['lat']!, 'lng': entry.value['lng']!};
-        print('✅ LocationUtils: Tìm thấy vị trí cho "$addressStr" từ danh sách cứng: ${result['lat']}, ${result['lng']}');
         return result;
       }
     }
 
-    // Ghi log rõ ràng
-    print('⚠️ LocationUtils: Không tìm thấy vị trí cho "$addressStr" trong danh sách cứng. Thử sử dụng getLocationFromAddressAsync để truy vấn Firestore');
-    
     // Trả về null thay vì vị trí mặc định
     return null;
   }
@@ -126,7 +117,6 @@ class LocationUtils {
   static Future<Map<String, double>?> getLocationFromAddressAsync(dynamic address) async {
     // Nếu address là null hoặc rỗng, trả về null
     if (address == null) {
-      print('⚠️ LocationUtils: Địa chỉ null, trả về null');
       return null;
     }
     
@@ -142,14 +132,12 @@ class LocationUtils {
             : double.tryParse(address['lng'].toString());
         
         if (lat != null && lng != null) {
-          print('ℹ️ LocationUtils: Lấy vị trí từ Map: $lat, $lng');
           return {'lat': lat, 'lng': lng};
         }
       } else if (address.containsKey('address')) {
         return getLocationFromAddressAsync(address['address']);
       }
       
-      print('⚠️ LocationUtils: Map không chứa thông tin vị trí hợp lệ, trả về null');
       return null;
     }
     
@@ -157,12 +145,10 @@ class LocationUtils {
     String addressStr = address.toString();
     
     if (addressStr.isEmpty) {
-      print('⚠️ LocationUtils: Địa chỉ rỗng, trả về null');
       return null;
     }
     
     try {
-      print('🔍 LocationUtils: Đang tìm kiếm địa chỉ "$addressStr" trong Firestore');
       
       // Truy vấn collection locations để tìm địa chỉ tương ứng
       final QuerySnapshot locationsSnapshot = await FirebaseFirestore.instance
@@ -198,17 +184,13 @@ class LocationUtils {
       }
       
       if (coordinates != null) {
-        print('✅ LocationUtils: Tìm thấy vị trí cho "$addressStr" từ Firestore: ${coordinates['lat']}, ${coordinates['lng']}');
         return coordinates;
       }
-      
-      print('⚠️ LocationUtils: Không tìm thấy vị trí cho "$addressStr" trong Firestore');
       
       // Sử dụng getLocationFromAddress để fallback về danh sách cứng
       return getLocationFromAddress(addressStr);
       
     } catch (e) {
-      print('❌ LocationUtils: Lỗi khi tìm kiếm địa chỉ từ Firestore: $e');
       
       // Sử dụng getLocationFromAddress để fallback về danh sách cứng
       return getLocationFromAddress(addressStr);

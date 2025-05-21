@@ -1,0 +1,76 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Hệ Thống NTT Point
+
+## Tổng Quan
+
+NTT Point là hệ thống điểm thưởng riêng của Student Market NTTU, cho phép sinh viên tích lũy và sử dụng điểm trong giao dịch và các hoạt động trên ứng dụng.
+
+## Mô Hình Dữ Liệu
+
+- [lib/models/ntt_point_transaction.dart](mdc:lib/models/ntt_point_transaction.dart) - Model giao dịch điểm
+```dart
+class NTTPointTransaction {
+  final String id;
+  final String userId;
+  final int points;
+  final String description;
+  final DateTime timestamp;
+  final TransactionType type;
+  // ...
+}
+```
+
+## Dịch Vụ Quản Lý
+
+- [lib/services/ntt_point_service.dart](mdc:lib/services/ntt_point_service.dart) - Dịch vụ quản lý điểm
+
+```dart
+class NTTPointService extends ChangeNotifier {
+  // Lấy số điểm hiện tại
+  Future<int> getUserPoints(String userId) async { ... }
+  
+  // Thêm điểm cho người dùng
+  Future<void> addPoints(String userId, int points, String description) async { ... }
+  
+  // Trừ điểm của người dùng
+  Future<bool> usePoints(String userId, int points, String description) async { ... }
+  
+  // Lấy lịch sử giao dịch
+  Future<List<NTTPointTransaction>> getTransactionHistory(String userId) async { ... }
+}
+```
+
+## Giao Diện Lịch Sử Giao Dịch
+
+- [lib/screens/ntt_point_history_screen.dart](mdc:lib/screens/ntt_point_history_screen.dart) - Màn hình hiển thị lịch sử giao dịch điểm
+
+## Cách Thức Tích Lũy Điểm
+
+Người dùng có thể tích lũy NTT Point thông qua:
+1. Hoàn thành giao dịch mua hàng
+2. Đăng sản phẩm mới lên hệ thống
+3. Tham gia các hoạt động khảo sát
+4. Giới thiệu bạn bè sử dụng ứng dụng
+5. Hoàn thành các nhiệm vụ hàng ngày
+
+## Sử Dụng Điểm
+
+Điểm NTT có thể được sử dụng để:
+1. Giảm giá khi mua hàng
+2. Đổi lấy các ưu đãi đặc biệt
+3. Nâng cấp tài khoản
+4. Mua các tính năng độc quyền
+
+## Các Component Liên Quan
+
+- Hiển thị số điểm trong [lib/screens/profile_screen.dart](mdc:lib/screens/profile_screen.dart)
+- Sử dụng điểm khi thanh toán trong [lib/screens/checkout_screen.dart](mdc:lib/screens/checkout_screen.dart)
+- Tích hợp điểm vào dịch vụ sản phẩm [lib/services/product_service.dart](mdc:lib/services/product_service.dart)
+
+## Bảo Mật
+
+Các giao dịch điểm luôn được xác thực người dùng và lưu lịch sử đầy đủ để đảm bảo tính minh bạch và an toàn.

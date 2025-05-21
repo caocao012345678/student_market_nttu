@@ -3,37 +3,145 @@ description:
 globs:
 alwaysApply: false
 ---
-# Kiến Trúc Chatbot
+# Kiến Trúc Chatbot - Student Market NTTU
 
-Hệ thống chatbot trong Student Market NTTU tích hợp AI để hỗ trợ người dùng tìm kiếm sản phẩm và trả lời các câu hỏi thường gặp.
+## Tổng Quan
 
-## Thành phần chính
+Chatbot của Student Market NTTU được xây dựng trên nền tảng Google Gemini AI, kết hợp với RAG (Retrieval Augmented Generation) để cung cấp trải nghiệm trò chuyện thông minh và hữu ích cho người dùng.
 
-### Frontend
-- [lib/screens/chatbot_screen.dart](mdc:lib/screens/chatbot_screen.dart): Giao diện người dùng của chatbot
-- [lib/widgets/chatbot_button.dart](mdc:lib/widgets/chatbot_button.dart): Button hiển thị để truy cập chatbot
+## Thành Phần Chính
 
-### Service & Models
-- [lib/services/chatbot_service.dart](mdc:lib/services/chatbot_service.dart): Xử lý logic của chatbot, bao gồm phân loại tin nhắn và tạo phản hồi
-- [lib/models/chat_message.dart](mdc:lib/models/chat_message.dart): Model cho tin nhắn chat
-- [lib/models/knowledge_base.dart](mdc:lib/models/knowledge_base.dart): Model cho cơ sở kiến thức của chatbot
+![Chatbot Architecture](https://mermaid.ink/img/pako:eNqFkc9qwzAMh1_F-NTCBnvZbdDDLhtjlzG2Q5DlNIb8wXZgpeyzT21LC9vBPoik7_uRZWnFZqtYxhZvfA2VhqvrzQPkWDYEH3XfDQ5aSCGvlLZo0Xh0cDHhoWxJox_Rlf7rZp52LuENXEPOwZF3zsDbuoQflRPRhCKQzUlzh07DJ_zkfXDGDwi7f5ebMsrpwcRCbkvZUxgwHHmj_OYsBiTMvPKTw7qj4QFp4Pw8rBGJnVQ18gVJWfxD03fzC_Wd3E29kdLrQcWBvp0x1zM_Sct5fKqxGEJ56zhbshh1zSSTYb8yKVdI9JRljS6uLt-ztJEVu7HCZgfnJWkz1rG0sKvZ5g_xzJA3?type=png)
 
-### Cloud Functions
-- [functions/index.js](mdc:functions/index.js): Cloud Functions cho xử lý tìm kiếm và phân tích dữ liệu:
-  - `searchProductsByText`: Tìm kiếm sản phẩm bằng vector embeddings
-  - `findSimilarProducts`: Tìm sản phẩm tương tự
+## Service và Components Chính
 
-## Luồng xử lý tin nhắn
+### ChatbotService
 
-1. Người dùng gửi tin nhắn qua `ChatbotScreen`
-2. `ChatbotService.addUserMessage()` thêm tin nhắn vào danh sách
-3. `ChatbotService._processMessage()` phân loại tin nhắn dựa vào AI
-4. Dựa trên phân loại (tìm kiếm sản phẩm, câu hỏi, v.v.), gọi các handler tương ứng
-5. Handler gọi Cloud Function hoặc xử lý trực tiếp và thêm tin nhắn phản hồi từ chatbot
+[lib/services/chatbot_service.dart](mdc:lib/services/chatbot_service.dart) là service trung tâm của chatbot, xử lý:
+- Kết nối với Google Gemini API
+- Lưu trữ và quản lý lịch sử hội thoại
+- Phân tích ý định người dùng
+- Tạo prompt động dựa trên context
 
-## Công nghệ AI
+```dart
+class ChatbotService extends ChangeNotifier {
+  final ProductService _productService;
+  final List<ChatMessage> _messages = [];
+  
+  // Khởi tạo chatbot
+  ChatbotService(this._productService);
+  
+  // Xử lý tin nhắn và tạo phản hồi
+  Future<ChatMessage> sendMessage(String content, String userId) async {
+    // Thêm tin nhắn người dùng
+    final userMessage = ChatMessage(
+      id: const Uuid().v4(),
+      content: content,
+      senderId: userId,
+      timestamp: DateTime.now(),
+      isUserMessage: true,
+    );
+    _messages.add(userMessage);
+    
+    // Xử lý và tạo phản hồi
+    final response = await _generateResponse(content, userId);
+    _messages.add(response);
+    
+    notifyListeners();
+    return response;
+  }
+  
+  // Tạo phản hồi từ chatbot
+  Future<ChatMessage> _generateResponse(String userMessage, String userId) async {
+    // Xác định intent của người dùng
+    final intent = await _determineIntent(userMessage);
+    
+    // Tạo phản hồi dựa trên intent
+    String responseContent;
+    
+    switch (intent) {
+      case 'product_search':
+        responseContent = await _handleProductSearch(userMessage);
+        break;
+      // Các intent khác...
+      default:
+        responseContent = await _handleGeneralQuery(userMessage);
+    }
+    
+    return ChatMessage(
+      id: const Uuid().v4(),
+      content: responseContent,
+      senderId: 'chatbot',
+      timestamp: DateTime.now(),
+      isUserMessage: false,
+    );
+  }
+  
+  // Các phương thức khác...
+}
+```
 
-- **Vector Embeddings**: Sử dụng Google Generative AI để tạo vector embeddings cho văn bản
-- **Pinecone**: Vector database để lưu trữ và tìm kiếm ngữ nghĩa
-- **Phân loại tin nhắn**: Sử dụng Gemini API để phân loại loại tin nhắn
-- **RAG (Retrieval-Augmented Generation)**: Kết hợp tìm kiếm và tạo phản hồi dựa trên cơ sở kiến thức
+### KnowledgeBaseService
+
+[lib/services/knowledge_base_service.dart](mdc:lib/services/knowledge_base_service.dart) quản lý cơ sở kiến thức cho chatbot:
+- Lưu trữ thông tin sản phẩm, FAQ, hướng dẫn...
+- Cung cấp phương thức tìm kiếm thông tin liên quan
+- Chuyển đổi dữ liệu thành các vector embeddings
+
+## Giao Diện Người Dùng
+
+### ChatbotScreen
+
+[lib/screens/chatbot_screen.dart](mdc:lib/screens/chatbot_screen.dart) cung cấp giao diện trò chuyện:
+- Hiển thị tin nhắn qua lại
+- Cho phép người dùng nhập và gửi tin nhắn
+- Hỗ trợ gửi hình ảnh và attachment
+- Hiển thị gợi ý và quick replies
+
+### ChatbotHelpScreen
+
+[lib/screens/chatbot_help_screen.dart](mdc:lib/screens/chatbot_help_screen.dart) giới thiệu các tính năng và cách sử dụng chatbot.
+
+## Xử Lý Ngôn Ngữ Tự Nhiên
+
+Chatbot sử dụng kỹ thuật xử lý ngôn ngữ tự nhiên để:
+1. Phân tích cảm xúc
+2. Trích xuất thông tin quan trọng
+3. Phân loại ý định người dùng
+4. Tạo phản hồi phù hợp
+
+## Tính Năng Chính
+
+1. **Tìm kiếm sản phẩm** - Hỗ trợ người dùng tìm kiếm sản phẩm theo tên, danh mục, giá...
+2. **FAQ** - Trả lời các câu hỏi thường gặp về ứng dụng
+3. **Hỗ trợ đơn hàng** - Kiểm tra trạng thái đơn hàng, giải quyết vấn đề
+4. **Gợi ý sản phẩm** - Đề xuất sản phẩm phù hợp với người dùng
+5. **Đánh giá phản hồi** - Thu thập đánh giá và phản hồi từ người dùng
+
+## Tích Hợp Với Các Service Khác
+
+Chatbot tích hợp với nhiều service khác để cung cấp trải nghiệm toàn diện:
+- ProductService - Truy vấn và tìm kiếm sản phẩm
+- UserService - Lấy thông tin người dùng
+- OrderService - Kiểm tra trạng thái đơn hàng
+- NotificationService - Gửi thông báo
+
+## Cách Mở Rộng
+
+Để thêm khả năng mới cho chatbot:
+1. Thêm intent mới trong `_determineIntent()`
+2. Tạo handler mới cho intent đó
+3. Cập nhật cơ sở kiến thức nếu cần
+
+Ví dụ:
+```dart
+// Thêm intent mới
+case 'price_comparison':
+  responseContent = await _handlePriceComparison(userMessage);
+  break;
+
+// Tạo handler
+Future<String> _handlePriceComparison(String query) async {
+  // Xử lý logic so sánh giá
+}
+```
