@@ -157,9 +157,27 @@ class ProductService extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      await _firestore.collection('products').doc(productId).update({
+      // Cập nhật trạng thái
+      Map<String, dynamic> updateData = {
         'isSold': isSold,
-      });
+      };
+      
+      // Nếu sản phẩm được đánh dấu đã bán, cập nhật cả trạng thái status
+      if (isSold) {
+        updateData['status'] = ProductStatus.sold.toString().split('.').last;
+      } else {
+        // Nếu sản phẩm được đánh dấu chưa bán, kiểm tra trạng thái hiện tại
+        final productDoc = await _firestore.collection('products').doc(productId).get();
+        if (productDoc.exists) {
+          final productData = productDoc.data();
+          if (productData != null && productData['status'] == ProductStatus.sold.toString().split('.').last) {
+            // Nếu sản phẩm đang ở trạng thái "sold", đổi lại thành "available"
+            updateData['status'] = ProductStatus.available.toString().split('.').last;
+          }
+        }
+      }
+
+      await _firestore.collection('products').doc(productId).update(updateData);
 
       _isLoading = false;
       notifyListeners();
@@ -591,15 +609,13 @@ class ProductService extends ChangeNotifier {
 
   // Lấy sản phẩm theo danh mục
   Stream<List<Product>> getProductsByCategory(String categoryId, {String sortBy = 'newest'}) {
-    print('Đang tìm kiếm sản phẩm theo danh mục ID: $categoryId với sortBy: $sortBy');
     
     // Nếu danh mục là "all" thì không lọc theo danh mục
     if (categoryId == 'all') {
-      print('Tìm kiếm tất cả danh mục');
       
       Query query = _firestore.collection('products')
           .where('isSold', isEqualTo: false)
-          .where('status', whereIn: ['available', 'verified']);
+          .where('status', isEqualTo: ProductStatus.available.toString().split('.').last);
       
       // Sắp xếp cho trường hợp "Tất cả"
       if (sortBy == 'newest') {
@@ -615,14 +631,13 @@ class ProductService extends ChangeNotifier {
           return Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
         }).toList();
         
-        print('Tìm thấy ${products.length} sản phẩm từ tất cả danh mục');
         return products;
       });
     } else {
       // Lấy tất cả sản phẩm
       return _firestore.collection('products')
           .where('isSold', isEqualTo: false)
-          .where('status', whereIn: ['available', 'verified'])
+          .where('status', isEqualTo: ProductStatus.available.toString().split('.').last)
           .snapshots()
           .asyncMap((snapshot) async {
             // Tìm tên danh mục từ ID
@@ -636,7 +651,7 @@ class ProductService extends ChangeNotifier {
                 }
               }
             } catch (e) {
-              print('Lỗi khi tìm tên danh mục: $e');
+              debugPrint('Lỗi khi tìm tên danh mục: $e');
             }
             
             // Lọc sản phẩm theo tên danh mục
@@ -2021,6 +2036,10 @@ class ProductService extends ChangeNotifier {
         notifyListeners();
       }
 
+      // Lấy sản phẩm hiện tại để kiểm tra trạng thái
+      final currentProduct = await getProductById(productId);
+      
+      // Chuẩn bị dữ liệu cập nhật
       final productData = {
         'title': title,
         'description': description,
@@ -2034,9 +2053,21 @@ class ProductService extends ChangeNotifier {
         'tags': tags,
         'specifications': specifications,
         'updatedAt': Timestamp.now(),
+        // Đặt trạng thái về pending_review nếu sản phẩm đang active hoặc rejected
+        // Điều này đảm bảo sản phẩm được kiểm duyệt lại khi có thay đổi
+        'status': 'pending_review',
       };
 
+      // Cập nhật sản phẩm trong Firestore
       await _firestore.collection('products').doc(productId).update(productData);
+      
+      // Thêm vào hàng đợi kiểm duyệt
+      await _firestore.collection('moderation_queue').doc(productId).set({
+        'productId': productId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'isUpdate': true,
+      });
 
       if (!_disposed) {
         _isLoading = false;

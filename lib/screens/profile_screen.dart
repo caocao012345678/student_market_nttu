@@ -20,6 +20,8 @@ import 'package:student_market_nttu/widgets/app_drawer.dart';
 import 'package:student_market_nttu/widgets/common_app_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/user.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
@@ -52,32 +54,42 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
-    final userService = Provider.of<UserService>(context);
-    final user = authService.user;
-    final userModel = userService.currentUser;
-    final themeService = Provider.of<ThemeService>(context);
-    final isDarkMode = themeService.isDarkMode;
+    final user = authService.currentUser;
+    final isLoggedIn = user != null;
 
-    if (user == null) {
+    // Hiển thị màn hình đăng nhập nếu người dùng chưa đăng nhập
+    if (!isLoggedIn) {
       return Scaffold(
+        appBar: AppBar(
+          title: const Text('Tài khoản'),
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const Icon(
+                Icons.account_circle,
+                size: 100,
+                color: Colors.grey,
+              ),
+              const SizedBox(height: 24),
               const Text(
                 'Vui lòng đăng nhập để xem thông tin cá nhân',
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.login),
+                label: const Text('Đăng nhập'),
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const LoginScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
                   );
                 },
-                child: const Text('Đăng nhập'),
               ),
             ],
           ),
@@ -85,14 +97,31 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       );
     }
 
-    return Scaffold(
-      drawer: const AppDrawer(),
-      body: _buildProfileContent(),
+    return FutureBuilder<UserModel?>(
+      // Chỉ tải dữ liệu khi đã đăng nhập
+      future: Provider.of<UserService>(context, listen: false).getUserById(user!.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CircularProgressIndicator();
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Lỗi: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data == null) {
+          return const CircularProgressIndicator();
+        }
+
+        final userModel = snapshot.data;
+        final themeService = Provider.of<ThemeService>(context);
+        final isDarkMode = themeService.isDarkMode;
+
+        return Scaffold(
+          drawer: const AppDrawer(),
+          body: _buildProfileContent(userModel!),
+        );
+      },
     );
   }
 
-  Widget _buildProfileContent() {
-    final userModel = Provider.of<UserService>(context).currentUser;
+  Widget _buildProfileContent(UserModel userModel) {
     final authService = Provider.of<AuthService>(context);
     final user = authService.user;
     
@@ -104,11 +133,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             children: [
               CircleAvatar(
                 radius: 50,
-                backgroundImage: userModel?.photoURL.isNotEmpty == true
-                    ? NetworkImage(userModel!.photoURL)
+                backgroundImage: userModel.photoURL.isNotEmpty
+                    ? NetworkImage(userModel.photoURL)
                     : null,
                 backgroundColor: Colors.grey[300],
-                child: userModel?.photoURL.isEmpty != false
+                child: userModel.photoURL.isEmpty != false
                     ? const Icon(
                         Icons.person,
                         size: 50,
@@ -146,8 +175,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         const SizedBox(height: 20),
         Center(
           child: Text(
-            userModel?.displayName.isNotEmpty == true
-                ? userModel!.displayName
+            userModel.displayName.isNotEmpty
+                ? userModel.displayName
                 : user?.email ?? 'Không có tên',
             style: const TextStyle(
               fontSize: 18,
@@ -164,12 +193,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ),
         ),
-        if (userModel?.phoneNumber.isNotEmpty == true)
+        if (userModel.phoneNumber.isNotEmpty)
           Center(
             child: Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                userModel!.phoneNumber,
+                userModel.phoneNumber,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -178,7 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ),
         // Student information display
-        if (userModel?.isStudent == true) ...[
+        if (userModel.isStudent) ...[
           const SizedBox(height: 10),
           Center(
             child: Chip(
@@ -189,20 +218,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ),
           const SizedBox(height: 4),
-          if (userModel?.studentId?.isNotEmpty == true)
+          if (userModel.studentId?.isNotEmpty == true)
             Center(
               child: Text(
-                'MSSV: ${userModel!.studentId}',
+                'MSSV: ${userModel.studentId}',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
                 ),
               ),
             ),
-          if (userModel?.department?.isNotEmpty == true)
+          if (userModel.department?.isNotEmpty == true)
             Center(
               child: Text(
-                'Khoa: ${userModel!.department}',
+                'Khoa: ${userModel.department}',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -227,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   if (snapshot.hasData && snapshot.data != null) {
                     nttPoint = snapshot.data!.get('nttPoint') ?? 0;
                   } else {
-                    nttPoint = userModel?.nttPoint ?? 0;
+                    nttPoint = userModel.nttPoint ?? 0;
                   }
                   return _buildStatCard(
                     context, 
@@ -241,7 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               _buildStatCard(
                 context, 
                 'NTT Credit', 
-                '${userModel?.nttCredit ?? 0}',
+                '${userModel.nttCredit ?? 0}',
                 Icons.credit_score,
                 Colors.green
               ),
@@ -257,8 +286,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               MaterialPageRoute(
                 builder: (_) => UserProfilePage(
                   userId: user?.uid ?? '',
-                  username: userModel?.displayName.isNotEmpty == true
-                      ? userModel!.displayName
+                  username: userModel.displayName.isNotEmpty
+                      ? userModel.displayName
                       : 'Cửa hàng của tôi',
                 ),
               ),
@@ -281,7 +310,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           leading: const Icon(Icons.favorite),
           title: const Text('Sản phẩm yêu thích'),
           trailing: Text(
-            userModel?.favoriteProducts.length.toString() ?? '0',
+            userModel.favoriteProducts.length.toString(),
             style: TextStyle(
               color: Theme.of(context).primaryColor,
               fontWeight: FontWeight.bold,
@@ -298,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ListTile(
           leading: const Icon(Icons.local_shipping),
           title: const Text('Đăng ký làm shipper'),
-          trailing: userModel?.isShipper == true
+          trailing: userModel.isShipper == true
               ? const Chip(
                   label: Text('Đã đăng ký'),
                   backgroundColor: Colors.green,
@@ -306,7 +335,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 )
               : null,
           onTap: () {
-            if (userModel?.isShipper != true) {
+            if (userModel.isShipper != true) {
               _showShipperRegistrationDialog(context);
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -343,11 +372,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           leading: const Icon(Icons.interests),
           title: const Text('Khảo sát sở thích'),
           subtitle: Text(
-            userModel?.completedSurvey == true 
+            userModel.completedSurvey == true 
                 ? 'Đã hoàn thành' 
                 : 'Chưa hoàn thành'
           ),
-          trailing: userModel?.completedSurvey == true
+          trailing: userModel.completedSurvey == true
               ? const Icon(Icons.check_circle, color: Colors.green)
               : const Icon(Icons.arrow_forward_ios, size: 16),
           onTap: () {
@@ -392,11 +421,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 final authService = Provider.of<AuthService>(context, listen: false);
                 await authService.signOut();
                 if (!context.mounted) return;
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => const LoginScreen(),
-                  ),
-                );
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
               } catch (e) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(

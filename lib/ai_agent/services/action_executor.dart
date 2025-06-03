@@ -37,6 +37,7 @@ class ActionExecutor {
           newStatus = 'active';
           productUpdateData = {
             'status': newStatus,
+            'moderationStatus': 'approved',
             'approvedAt': FieldValue.serverTimestamp(),
             'approvedBy': 'ai_agent',
           };
@@ -46,6 +47,7 @@ class ActionExecutor {
           newStatus = 'rejected';
           productUpdateData = {
             'status': newStatus,
+            'moderationStatus': 'rejected',
             'rejectedAt': FieldValue.serverTimestamp(),
             'rejectedBy': 'ai_agent',
             'rejectionReason': decision.reason,
@@ -56,6 +58,7 @@ class ActionExecutor {
           newStatus = 'pending_manual_review';
           productUpdateData = {
             'status': newStatus,
+            'moderationStatus': 'pending',
             'flaggedAt': FieldValue.serverTimestamp(),
             'flaggedBy': 'ai_agent',
             'flagReason': decision.reason,

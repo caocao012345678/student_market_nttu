@@ -88,13 +88,13 @@ class TextAnalyzer {
         }
       }
       
-      // Nếu không kết nối được LM Studio hoặc có lỗi phân tích,
-      // thực hiện phân tích cơ bản
+      // Nếu không kết nối được LM Studio, yêu cầu kiểm duyệt thủ công
+      debugPrint('Không kết nối được LM Studio để phân tích tiêu đề: $title');
       return AnalysisResult(
         type: AnalysisType.title,
-        isCompliant: true,
-        confidenceScore: 0.7,
-        details: 'Kiểm tra cơ bản: Tiêu đề có vẻ hợp lệ',
+        isCompliant: false, // Đánh dấu không tuân thủ để yêu cầu kiểm duyệt
+        confidenceScore: 0.0,
+        details: 'Không thể kết nối đến AI để phân tích tiêu đề. Cần kiểm duyệt thủ công.',
       );
     } catch (e) {
       debugPrint('Lỗi khi phân tích tiêu đề: $e');
@@ -169,12 +169,13 @@ class TextAnalyzer {
         }
       }
       
-      // Nếu không kết nối được LM Studio, thực hiện phân tích cơ bản
+      // Nếu không kết nối được LM Studio, yêu cầu kiểm duyệt thủ công
+      debugPrint('Không kết nối được LM Studio để phân tích mô tả sản phẩm');
       return AnalysisResult(
         type: AnalysisType.description,
-        isCompliant: true,
-        confidenceScore: 0.7,
-        details: 'Kiểm tra cơ bản: Mô tả có vẻ hợp lệ',
+        isCompliant: false, // Đánh dấu không tuân thủ để yêu cầu kiểm duyệt
+        confidenceScore: 0.0,
+        details: 'Không thể kết nối đến AI để phân tích mô tả. Cần kiểm duyệt thủ công.',
       );
     } catch (e) {
       debugPrint('Lỗi khi phân tích mô tả: $e');

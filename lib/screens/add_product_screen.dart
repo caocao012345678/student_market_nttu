@@ -967,6 +967,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         },
         tags: _tags,
         specifications: specifications,
+        status: ProductStatus.pending_review,
       );
       
       // Thêm sản phẩm vào database

@@ -9,6 +9,8 @@ import 'package:student_market_nttu/services/notification_service.dart' as app_n
 import 'package:student_market_nttu/services/user_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import 'login_screen.dart';
+
 class NotificationScreen extends StatefulWidget {
   static const routeName = '/notifications';
 
@@ -39,6 +41,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
     try {
       // Khởi tạo dữ liệu thông báo
       final notificationService = Provider.of<app_notification.NotificationService>(context, listen: false);
+      final userService = Provider.of<UserService>(context, listen: false);
+      
+      // Kiểm tra người dùng đã đăng nhập chưa
+      if (userService.currentUser == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+      
       await notificationService.initializeNotifications();
     } catch (e) {
       debugPrint('Lỗi khi tải dữ liệu thông báo: $e');
@@ -184,27 +196,61 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userService = Provider.of<UserService>(context, listen: false);
+    final isLoggedIn = userService.currentUser != null;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Thông báo'),
         actions: [
-          IconButton(
+          if (isLoggedIn) IconButton(
             icon: const Icon(Icons.done_all),
             tooltip: 'Đánh dấu tất cả là đã đọc',
             onPressed: _markAllAsRead,
           ),
-          IconButton(
+          if (isLoggedIn) IconButton(
             icon: const Icon(Icons.delete_sweep),
             tooltip: 'Xóa tất cả thông báo',
             onPressed: _deleteAllNotifications,
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _hasError
-              ? _buildErrorView()
-              : _buildNotificationList(),
+      body: !isLoggedIn 
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.notifications_off,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Vui lòng đăng nhập để xem thông báo',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.login),
+                    label: const Text('Đăng nhập'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            )
+          : (_isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _hasError
+                  ? _buildErrorView()
+                  : _buildNotificationList()),
     );
   }
 

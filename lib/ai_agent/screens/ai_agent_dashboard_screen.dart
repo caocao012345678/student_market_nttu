@@ -20,21 +20,49 @@ class _AIAgentDashboardScreenState extends State<AIAgentDashboardScreen> with Si
   late TabController _tabController;
   bool _isLoading = false;
   List<Product> _pendingProducts = [];
+  
+  // Thêm timer để cập nhật định kỳ
+  late final _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _fetchPendingProducts();
+    
+    // Thiết lập auto refresh mỗi 15 giây
+    _refreshTimer = Stream.periodic(Duration(seconds: 15)).listen((_) {
+      _fetchPendingProducts();
+    });
+    
+    // Đăng ký lắng nghe thay đổi AI Agent
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final aiAgentService = Provider.of<AIAgentService>(context, listen: false);
+      aiAgentService.addListener(_updateState);
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
+    final aiAgentService = Provider.of<AIAgentService>(context, listen: false);
+    aiAgentService.removeListener(_updateState);
     _tabController.dispose();
     super.dispose();
   }
 
+  // Cập nhật state khi có thông báo từ service
+  void _updateState() {
+    if (mounted) {
+      setState(() {
+        // Chỉ cập nhật state, dữ liệu thực tế lấy từ service ở build
+      });
+    }
+  }
+
   Future<void> _fetchPendingProducts() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
@@ -43,12 +71,14 @@ class _AIAgentDashboardScreenState extends State<AIAgentDashboardScreen> with Si
       final productService = Provider.of<ProductService>(context, listen: false);
       final products = await productService.getProductsByStatus('pending_review');
       
+      if (!mounted) return;
       setState(() {
         _pendingProducts = products;
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Lỗi khi tải sản phẩm đang chờ duyệt: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -204,12 +234,22 @@ class _AIAgentDashboardScreenState extends State<AIAgentDashboardScreen> with Si
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Thống kê duyệt bài',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Thống kê duyệt bài',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.refresh),
+                onPressed: () => setState(() {}), // Force refresh UI
+                tooltip: 'Refresh thống kê',
+              ),
+            ],
           ),
           SizedBox(height: 8),
           Row(
@@ -243,7 +283,7 @@ class _AIAgentDashboardScreenState extends State<AIAgentDashboardScreen> with Si
               SizedBox(width: 8),
               Expanded(
                 child: _buildStatCard(
-                  title: 'Chuyển kiểm duyệt',
+                  title: 'Chuyển duyệt',
                   value: aiAgentService.flaggedForReview.toString(),
                   color: Colors.orange,
                   icon: Icons.flag,
@@ -448,8 +488,8 @@ class _AIAgentDashboardScreenState extends State<AIAgentDashboardScreen> with Si
   }
 
   Widget _buildSettingsTab(AIAgentService aiAgentService) {
-    return Padding(
-      padding: EdgeInsets.all(16),
+    return SingleChildScrollView( // Wrap the content in SingleChildScrollView
+      padding: EdgeInsets.all(16), // Apply padding here instead of the Column
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

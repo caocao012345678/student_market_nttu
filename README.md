@@ -6,6 +6,18 @@ Sàn mua bán hàng dành cho sinh viên Trường Đại học Nguyễn Tất T
 
 Student Market NTTU là nền tảng thương mại điện tử dành riêng cho cộng đồng sinh viên NTTU, giúp sinh viên có thể mua bán, trao đổi sản phẩm một cách thuận tiện trong khuôn viên trường. Ứng dụng tích hợp hệ thống điểm thưởng NTT Point, chatbot hỗ trợ AI, và nhiều tính năng đặc biệt khác.
 
+## Cấu Hình Môi Trường
+
+Ứng dụng sử dụng biến môi trường để cấu hình các dịch vụ AI và xử lý sản phẩm. Hãy tạo file `.env` trong thư mục gốc với các biến sau:
+
+```
+LM_API_LLM_IDENTIFIER=oh-dcft-v3.1-gemini-1.5-pro-i1
+LM_API_VLM_IDENTIFIER=moondream2
+LM_LOCAL_SERVER=http://your-lm-studio-ip:1234/v1/models
+```
+
+**Lưu ý quan trọng:** AI Agent kiểm duyệt sản phẩm yêu cầu kết nối với LM Studio. Nếu không thể kết nối đến LM Studio, tất cả sản phẩm sẽ được đánh dấu để kiểm duyệt thủ công thay vì tự động duyệt. Đây là biện pháp an toàn để tránh việc duyệt sản phẩm không đúng khi không có AI hỗ trợ.
+
 ## Chức Năng Chính
 
 ### 1. Quản lý người dùng

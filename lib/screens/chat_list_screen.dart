@@ -10,6 +10,8 @@ import 'package:student_market_nttu/services/user_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student_market_nttu/widgets/common_app_bar.dart';
 
+import 'login_screen.dart';
+
 class ChatListScreen extends StatefulWidget {
   static const routeName = '/chat-list';
 
@@ -123,11 +125,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton(
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.login),
+                    label: const Text('Đăng nhập'),
                     onPressed: () {
-                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      );
                     },
-                    child: const Text('Quay lại'),
                   ),
                 ],
               ),

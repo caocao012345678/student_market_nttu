@@ -13,7 +13,7 @@ import 'moderation_history_screen.dart';
 import 'edit_product_screen.dart';
 import 'package:student_market_nttu/widgets/common_app_bar.dart';
 import 'package:student_market_nttu/widgets/app_drawer.dart';
-
+import 'login_screen.dart';
 class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({Key? key}) : super(key: key);
 
@@ -56,9 +56,36 @@ class _MyProductsScreenState extends State<MyProductsScreen> with SingleTickerPr
     final user = Provider.of<AuthService>(context).user;
 
     if (user == null) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: Text('Vui lòng đăng nhập để xem sản phẩm của bạn'),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.account_circle,
+                size: 80,
+                color: Colors.grey,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Vui lòng đăng nhập để xem sản phẩm của bạn',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.login),
+                label: const Text('Đăng nhập'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       );
     }

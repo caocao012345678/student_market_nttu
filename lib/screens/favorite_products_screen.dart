@@ -9,6 +9,8 @@ import 'package:student_market_nttu/services/auth_service.dart';
 import 'package:student_market_nttu/widgets/common_app_bar.dart';
 import 'package:student_market_nttu/widgets/app_drawer.dart';
 
+import 'login_screen.dart';
+
 class FavoriteProductsScreen extends StatelessWidget {
   const FavoriteProductsScreen({Key? key}) : super(key: key);
 
@@ -19,9 +21,36 @@ class FavoriteProductsScreen extends StatelessWidget {
     final favoritesService = Provider.of<FavoritesService>(context);
 
     if (user == null) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: Text('Vui lòng đăng nhập để xem sản phẩm yêu thích'),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.favorite_border,
+                size: 80,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Vui lòng đăng nhập để xem sản phẩm yêu thích',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.login),
+                label: const Text('Đăng nhập'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       );
     }
